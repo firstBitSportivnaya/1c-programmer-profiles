@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
 import { addTransitionAction, createProfileAction, deleteJobAction, deleteTransitionAction, saveJobAction } from "@/app/actions";
@@ -41,9 +40,9 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
 
       {profile ? (
         <p>
-          <Link className="btn-primary" href={`/jobs/${jobId}/profile`}>
+          <a className="btn-primary" href={`/jobs/${jobId}/profile`}>
             Открыть профиль
-          </Link>
+          </a>
         </p>
       ) : (
         <div className="panel panel-pad" style={{ borderStyle: "dashed" }}>
@@ -65,9 +64,9 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
           {outs.map((tr) => (
             <li key={`${tr.fromJobId}-${tr.toJobId}`} className="list-row text-sm">
               <div className="flex items-center gap-3">
-                <Link className="link-accent" href={`/jobs/${tr.toJobId}`}>
+                <a className="link-accent" href={`/jobs/${tr.toJobId}`}>
                   {nameById[tr.toJobId] ?? tr.toJobId}
-                </Link>
+                </a>
                 <span className={tr.kind === "linear" ? "chip chip-frontend" : "chip chip-cloud"}>
                   {tr.kind === "linear" ? "линейный" : "смена уровня"}
                 </span>

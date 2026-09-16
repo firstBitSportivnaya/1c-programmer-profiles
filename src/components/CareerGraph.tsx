@@ -13,8 +13,6 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 type Job = {
   id: string;
@@ -84,7 +82,7 @@ function JobNode({ id, data }: NodeProps) {
   const filled = Boolean((data as { filled?: boolean }).filled);
   const label = String((data as { label?: string }).label ?? "");
   return (
-    <Link
+    <a
       href={`/jobs/${id}`}
       className={filled ? "job-card job-card--filled nopan" : "job-card nopan"}
       onClick={(event) => event.stopPropagation()}
@@ -98,7 +96,7 @@ function JobNode({ id, data }: NodeProps) {
       <Handle id="r" type="source" position={Position.Right} />
       <Handle id="tr" type="target" position={Position.Right} />
       {label}
-    </Link>
+    </a>
   );
 }
 
@@ -167,7 +165,6 @@ export function CareerGraph({
   transitions: Transition[];
   profileJobIds: string[];
 }) {
-  const router = useRouter();
   const theme = useArchifyTheme();
   const hasProfile = new Set(profileJobIds);
   const positions = useMemo(() => ({ ...LAYOUT, ...extraJobPositions(jobs) }), [jobs]);
@@ -285,10 +282,6 @@ export function CareerGraph({
           proOptions={{ hideAttribution: true }}
           onInit={(instance) => {
             instance.fitView({ padding: 0.1, minZoom: 0.35, maxZoom: 1.15 });
-          }}
-          onNodeClick={(_, node) => {
-            if (node.type !== "job") return;
-            router.push(`/jobs/${node.id}`);
           }}
         >
           <Background color="var(--grid)" gap={24} />

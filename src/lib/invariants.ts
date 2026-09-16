@@ -1,6 +1,7 @@
 import { eq, or } from "drizzle-orm";
-import { competencies, jobTransitions, profileSkills, profiles } from "@/db/schema";
+import { competencies, employees, idps, jobTransitions, profileSkills, profiles } from "@/db/schema";
 import { getDb } from "@/db";
+import type { SessionEmployee } from "@/lib/auth";
 
 export class InvariantError extends Error {
   constructor(message: string) {
@@ -88,6 +89,82 @@ export function assertJobDeletable(jobId: string) {
   if (edge) {
     throw new InvariantError("Нельзя удалить должность: есть рёбра карьеры");
   }
+  const holder = db.select().from(employees).where(eq(employees.jobId, jobId)).get();
+  if (holder) {
+    throw new InvariantError("Нельзя удалить должность: она назначена сотруднику");
+  }
+  const target = db.select().from(idps).where(eq(idps.targetJobId, jobId)).get();
+  if (target) {
+    throw new InvariantError("Нельзя удалить должность: она цель ИПР");
+  }
+  const source = db.select().from(idps).where(eq(idps.sourceJobId, jobId)).get();
+  if (source) {
+    throw new InvariantError("Нельзя удалить должность: она текущая в ИПР");
+  }
+}
+
+export function assertManagerLink(employeeId: string, managerId: string | null) {
+  if (!managerId) return;
+  if (managerId === employeeId) {
+    throw new InvariantError("Сотрудник не может быть своим руководителем");
+  }
+  const db = getDb();
+  const manager = db.select().from(employees).where(eq(employees.id, managerId)).get();
+  if (!manager) {
+    throw new InvariantError("Руководитель не найден");
+  }
+  const seen = new Set([employeeId, managerId]);
+  let cursor: string | null = manager.managerId;
+  while (cursor) {
+    if (seen.has(cursor)) {
+      throw new InvariantError("Оргсвязь не может содержать цикл");
+    }
+    seen.add(cursor);
+    const row = db.select().from(employees).where(eq(employees.id, cursor)).get();
+    cursor = row?.managerId ?? null;
+  }
+}
+
+export function assertNoSecondActiveIdp(employeeId: string) {
+  const active = getDb()
+    .select()
+    .from(idps)
+    .where(eq(idps.employeeId, employeeId))
+    .all()
+    .find((row) => row.status === "active");
+  if (active) {
+    throw new InvariantError("У сотрудника уже есть активный ИПР");
+  }
+}
+
+export function assertNotLastAdmin(employeeId: string) {
+  const db = getDb();
+  const row = db.select().from(employees).where(eq(employees.id, employeeId)).get();
+  if (!row || row.isAdmin !== 1) return;
+  const other = db
+    .select()
+    .from(employees)
+    .all()
+    .find((e) => e.id !== employeeId && e.isAdmin === 1 && e.isActive === 1);
+  if (!other) {
+    throw new InvariantError("Нельзя убрать последнего админа");
+  }
+}
+
+export function canManageEmployee(actor: SessionEmployee, targetId: string): boolean {
+  if (actor.isAdmin) return true;
+  const target = getDb().select().from(employees).where(eq(employees.id, targetId)).get();
+  return Boolean(target && target.managerId === actor.id);
+}
+
+export function canViewEmployee(actor: SessionEmployee, targetId: string): boolean {
+  if (actor.id === targetId) return true;
+  return canManageEmployee(actor, targetId);
+}
+
+export function canTickIdpItem(actor: SessionEmployee, employeeId: string): boolean {
+  if (actor.id === employeeId) return true;
+  return canManageEmployee(actor, employeeId);
 }
 
 export function assertCompetencyDeletable(id: string) {

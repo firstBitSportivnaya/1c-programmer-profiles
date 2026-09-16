@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
 import { deleteSkillAction, upsertSkillAction } from "@/app/actions";
@@ -181,9 +180,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
   return (
     <div className="space-y-6">
       <p className="text-sm">
-        <Link href={`/jobs/${jobId}`} className="link-accent">
+        <a href={`/jobs/${jobId}`} className="link-accent">
           ← {job.name}
-        </Link>
+        </a>
       </p>
       <div className="page-kicker">
         <span className="pulse-dot" />

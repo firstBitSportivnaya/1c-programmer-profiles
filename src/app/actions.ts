@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb, now } from "@/db";
 import { competencies, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
-import { clearAdminCookie, requireAdmin, setAdminCookie, verifyPassword } from "@/lib/auth";
+import { clearAdminCookie, requireAdmin } from "@/lib/auth";
 import {
   InvariantError,
   assertCompetencyDeletable,
@@ -38,19 +38,6 @@ function asActionError(error: unknown): ActionResult {
 
 function isUniqueConstraint(error: unknown) {
   return error instanceof Error && /UNIQUE constraint failed/i.test(error.message);
-}
-
-export async function loginAction(_prev: unknown, formData: FormData) {
-  const password = String(formData.get("password") ?? "");
-  if (!verifyPassword(password)) {
-    return { ok: false as const, error: "Неверный пароль" };
-  }
-  try {
-    await setAdminCookie();
-  } catch (error) {
-    return { ok: false as const, error: error instanceof Error ? error.message : "Нет SESSION_SECRET" };
-  }
-  redirect("/");
 }
 
 export async function logoutAction() {

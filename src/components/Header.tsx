@@ -1,37 +1,52 @@
-import Link from "next/link";
-import { logoutAction } from "@/app/actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import type { SessionEmployee } from "@/lib/auth";
 
-export function Header({ admin }: { admin: boolean }) {
+export function Header({ employee }: { employee: SessionEmployee | null }) {
   return (
     <header className="toolbar">
       <div className="toolbar-inner">
-        <Link href="/" className="brand">
+        <a href="/" className="brand">
           <span className="pulse-dot" />
           Профили должностей
-        </Link>
+        </a>
         <nav className="flex items-center gap-1">
-          <Link href="/" className="nav-link">
+          <a href="/" className="nav-link">
             Граф
-          </Link>
-          <Link href="/compare" className="nav-link">
+          </a>
+          <a href="/compare" className="nav-link">
             Сравнение
-          </Link>
-          {admin ? (
-            <Link href="/admin/competencies" className="nav-link">
-              Компетенции
-            </Link>
+          </a>
+          {employee ? (
+            <a href="/me" className="nav-link">
+              Кабинет
+            </a>
           ) : null}
-          {admin ? (
-            <form action={logoutAction}>
+          {employee ? (
+            <a href="/idps" className="nav-link">
+              ИПР
+            </a>
+          ) : null}
+          {employee?.isAdmin || employee ? (
+            <a href="/people" className="nav-link">
+              Сотрудники
+            </a>
+          ) : null}
+          {employee?.isAdmin ? (
+            <a href="/admin/competencies" className="nav-link">
+              Компетенции
+            </a>
+          ) : null}
+          {employee ? (
+            <form action="/api/session" method="post">
+              <input type="hidden" name="intent" value="logout" />
               <button type="submit" className="nav-link">
                 Выйти
               </button>
             </form>
           ) : (
-            <Link href="/admin/login" className="nav-link">
+            <a href="/login" className="nav-link">
               Войти
-            </Link>
+            </a>
           )}
           <ThemeToggle />
         </nav>

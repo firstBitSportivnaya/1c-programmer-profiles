@@ -39,6 +39,37 @@ CREATE TABLE IF NOT EXISTS profile_skills (
   updated_at INTEGER NOT NULL,
   UNIQUE (profile_id, competency_id)
 );
+CREATE TABLE IF NOT EXISTS employees (
+  id TEXT PRIMARY KEY,
+  login TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  job_id TEXT NOT NULL REFERENCES jobs(id),
+  manager_id TEXT REFERENCES employees(id),
+  is_admin INTEGER NOT NULL,
+  is_active INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS idps (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL REFERENCES employees(id),
+  source_job_id TEXT NOT NULL REFERENCES jobs(id),
+  target_job_id TEXT NOT NULL REFERENCES jobs(id),
+  created_by_id TEXT NOT NULL REFERENCES employees(id),
+  status TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS idp_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  idp_id TEXT NOT NULL REFERENCES idps(id),
+  kind TEXT NOT NULL,
+  competency_id TEXT,
+  competency_name TEXT,
+  required_level INTEGER,
+  body TEXT,
+  status TEXT NOT NULL,
+  sort_order INTEGER NOT NULL
+);
 `;
 
 function ensureCompetenciesParentFk() {
@@ -74,8 +105,46 @@ function ensureParentNameIndex() {
   `);
 }
 
+function ensureIdpActiveIndex() {
+  getSqlite().exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idps_one_active
+      ON idps (employee_id) WHERE status = 'active';
+  `);
+}
+
+function idpColumnNames() {
+  return new Set(
+    (getSqlite().prepare("PRAGMA table_info(idps)").all() as { name: string }[]).map((row) => row.name),
+  );
+}
+
+function ensureIdpDocumentColumns() {
+  const sqlite = getSqlite();
+  const names = idpColumnNames();
+  if (!names.has("source_job_id")) {
+    sqlite.exec("ALTER TABLE idps ADD COLUMN source_job_id TEXT REFERENCES jobs(id)");
+  }
+  if (!names.has("created_by_id")) {
+    sqlite.exec("ALTER TABLE idps ADD COLUMN created_by_id TEXT REFERENCES employees(id)");
+  }
+  sqlite.exec(`
+    UPDATE idps
+    SET source_job_id = (
+      SELECT job_id FROM employees WHERE employees.id = idps.employee_id
+    )
+    WHERE source_job_id IS NULL OR source_job_id = '';
+    UPDATE idps
+    SET created_by_id = (
+      SELECT COALESCE(manager_id, id) FROM employees WHERE employees.id = idps.employee_id
+    )
+    WHERE created_by_id IS NULL OR created_by_id = '';
+  `);
+}
+
 export function migrate() {
   getSqlite().exec(DDL);
   ensureCompetenciesParentFk();
   ensureParentNameIndex();
+  ensureIdpActiveIndex();
+  ensureIdpDocumentColumns();
 }

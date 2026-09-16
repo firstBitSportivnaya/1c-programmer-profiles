@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { compareJobs, getJob, getProfileByJob, listJobs } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -102,9 +101,9 @@ export default async function ComparePage({
         <p className="muted">Нет профилей для сравнения.</p>
       )}
       <p className="text-sm">
-        <Link href="/" className="link-accent">
+        <a href="/" className="link-accent">
           На граф
-        </Link>
+        </a>
       </p>
     </div>
   );

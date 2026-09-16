@@ -1,14 +1,15 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { migrate } from "@/db/migrate";
-import { competencies, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
+import { competencies, employees, idpItems, idps, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
 import { sectionForType } from "@/lib/invariants";
 
-let migrated = false;
+const SCHEMA_TICK = 2;
+let appliedTick = 0;
 export function ensureSchema() {
-  if (!migrated) {
+  if (appliedTick !== SCHEMA_TICK) {
     migrate();
-    migrated = true;
+    appliedTick = SCHEMA_TICK;
   }
 }
 
@@ -148,4 +149,81 @@ export function unusedCompetencies(profileId: string, type: string) {
     if (all.some((x) => x.parentId === c.id)) return false;
     return true;
   });
+}
+
+export function listEmployees() {
+  ensureSchema();
+  return getDb().select().from(employees).orderBy(asc(employees.name)).all();
+}
+
+export function getEmployee(id: string) {
+  ensureSchema();
+  return getDb().select().from(employees).where(eq(employees.id, id)).get();
+}
+
+export function getEmployeeByLogin(login: string) {
+  ensureSchema();
+  return getDb().select().from(employees).where(eq(employees.login, login)).get();
+}
+
+export function listDirectReports(managerId: string) {
+  ensureSchema();
+  return getDb().select().from(employees).where(eq(employees.managerId, managerId)).orderBy(asc(employees.name)).all();
+}
+
+export function listEmployeesVisibleTo(actor: { id: string; isAdmin: boolean }) {
+  if (actor.isAdmin) {
+    return listEmployees().filter((row) => row.isActive === 1);
+  }
+  const self = getEmployee(actor.id);
+  const reports = listDirectReports(actor.id).filter((row) => row.isActive === 1 && row.id !== actor.id);
+  return self && self.isActive === 1 ? [self, ...reports] : reports;
+}
+
+export function getActiveIdp(employeeId: string) {
+  ensureSchema();
+  return getDb()
+    .select()
+    .from(idps)
+    .where(eq(idps.employeeId, employeeId))
+    .all()
+    .find((row) => row.status === "active");
+}
+
+export function listIdps(employeeId: string) {
+  ensureSchema();
+  return getDb()
+    .select()
+    .from(idps)
+    .where(eq(idps.employeeId, employeeId))
+    .orderBy(asc(idps.updatedAt))
+    .all()
+    .reverse();
+}
+
+export function listIdpsVisibleTo(actor: { id: string; isAdmin: boolean }) {
+  ensureSchema();
+  const rows = getDb().select().from(idps).orderBy(desc(idps.updatedAt)).all();
+  if (actor.isAdmin) return rows;
+  return rows.filter((idp) => {
+    if (idp.employeeId === actor.id) return true;
+    const owner = getEmployee(idp.employeeId);
+    return owner?.managerId === actor.id;
+  });
+}
+
+export function getIdp(id: string) {
+  ensureSchema();
+  return getDb().select().from(idps).where(eq(idps.id, id)).get();
+}
+
+export function listIdpItems(idpId: string) {
+  ensureSchema();
+  return getDb().select().from(idpItems).where(eq(idpItems.idpId, idpId)).orderBy(asc(idpItems.sortOrder)).all();
+}
+
+export function jobsWithProfiles() {
+  ensureSchema();
+  const profiled = new Set(getDb().select().from(profiles).all().map((p) => p.jobId));
+  return listJobs().filter((job) => profiled.has(job.id));
 }

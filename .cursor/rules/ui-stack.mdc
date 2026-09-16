@@ -9,7 +9,8 @@ alwaysApply: false
 - SQLite через `node:sqlite` (`src/db/sqlite.ts`). `better-sqlite3` — только `file:vendor/better-sqlite3`. Нативный модуль не ставить.
 - Вложенные транзакции — SAVEPOINT. Seed чистит таблицы `DELETE`, не unlink файла БД.
 - `ADMIN_PASSWORD` / `SESSION_SECRET`: пусто и `change-me` / `dev-only-change-me` отклонять. Дефолтов в коде нет.
-- Мутации форм — `ActionForm` + `useActionState`, ошибки инвариантов на экране.
+- Мутации справочника и пунктов ИПР — `ActionForm` + `useActionState`, ошибки инвариантов на экране.
+- Вход, выход, первый админ — POST `/api/session`, не server action с `redirect`.
 
 ```tsx
 // ❌ BAD: порядок на карточке должности
@@ -20,5 +21,7 @@ alwaysApply: false
 
 - `rankOrder` пользователю не показывать (карточка, список на главной). Граф раскладывает по `lane` + `rankOrder`.
 - На главной нет текста про колонки OKP2 и «циан — заполненный профиль».
-- Узел графа — `Link` с `nopan`. Lanes/handles: `pointer-events: none`, иначе клики не доходят.
+- Внутренние ссылки — `<a href>`, не `next/link` (клиентский переход глотает клик).
+- Узел графа — `<a className="… nopan">`. Lanes/handles: `pointer-events: none`, иначе клики не доходят.
+- ИПР — `/idps` и `/idps/{id}`, не редактор на карточке сотрудника.
 - Стиль — Archify Classic в `globals.css`. После UI-правок проверить сценарий в браузере.

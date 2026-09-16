@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CareerGraphView } from "@/components/CareerGraphView";
 import { NewJobForm } from "@/components/NewJobForm";
 import { getProfileByJob, listJobs, listTransitions } from "@/lib/queries";
@@ -32,18 +31,18 @@ export default function HomePage() {
           {jobs.map((job) => (
             <li key={job.id} className="list-row">
               <div>
-                <Link href={`/jobs/${job.id}`} className="link-accent font-medium">
+                <a href={`/jobs/${job.id}`} className="link-accent font-medium">
                   {job.name}
-                </Link>
+                </a>
                 <div className="mt-1 text-xs muted">
                   {LANE[job.lane]}
                   {profileJobIds.includes(job.id) ? " · профиль есть" : " · профиль не заполнен"}
                 </div>
               </div>
               {profileJobIds.includes(job.id) ? (
-                <Link href={`/jobs/${job.id}/profile`} className="nav-link">
+                <a href={`/jobs/${job.id}/profile`} className="nav-link">
                   Профиль
-                </Link>
+                </a>
               ) : (
                 <span className="chip">пусто</span>
               )}
