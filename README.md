@@ -28,4 +28,4 @@ Next.js (App Router, только `localhost`) + Drizzle + SQLite через `no
 
 Карта узлов: `docs/node-map.md`. Контракт seed: `docs/seed-contract.md`. JSON: `seed/data.json`.
 
-Профиль стажёра входит в seed (mxfile 2022, страница 229982860). Уровни 1–3 у навыков в seed не заполнены: в drawio есть только грейд шапки должности, не уровень компетенции.
+Профиль стажёра входит в seed (mxfile 2022, страница 229982860). Уровни 1–3 у `professional` / `universal` задаёт матрица `LEVEL_MATRIX` в `scripts/extract_drawio.py` (пять грейдов) и таблица `PROFILE_LEVELS` (архитектор, руководитель команды); из drawio они не извлекаются. После изменения `seed/data.json` нужен повторный `npm run db:seed`.

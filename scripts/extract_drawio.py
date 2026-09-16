@@ -21,8 +21,95 @@ SECTION_TITLES = {
     "Функциональные обязанности": "duty",
 }
 
-# Drawio stores grade in the job header (Junior/Middle/Senior), not per skill.
-# Per-competency 1–3 is filled in the app; extractor leaves it null.
+# Drawio хранит только грейд в шапке должности. Уровни 1–3 ставит
+# LEVEL_MATRIX / PROFILE_LEVELS после разбора; пустой уровень в seed запрещён.
+
+# Drawio называет одну и ту же компетенцию по-разному на разных грейдах
+# («Базовое знание языка запросов 1С» против «Знание языка запросов 1С»).
+# Уровень должен жить в ProfileSkill.level, а не в имени, поэтому такие записи
+# сводятся к одной канонической компетенции.
+CANONICAL_COMPETENCIES = {
+    "comp-bazovoe-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3": {
+        "id": "comp-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3",
+        "name": "Владение средствами разработки и администрирования Платформы 1С 8.3",
+        "parentId": "group-platform",
+    },
+    "comp-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3": {
+        "id": "comp-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3",
+        "name": "Владение средствами разработки и администрирования Платформы 1С 8.3",
+        "parentId": "group-platform",
+    },
+    "comp-bazovye-navyki-programmirovaniya-na-yazyke-1s": {
+        "id": "comp-navyki-programmirovaniya-na-yazyke-1s",
+        "name": "Навыки программирования на языке 1С",
+        "parentId": "group-platform",
+    },
+    "comp-navyki-programmirovaniya-na-yazyke-1s": {
+        "id": "comp-navyki-programmirovaniya-na-yazyke-1s",
+        "name": "Навыки программирования на языке 1С",
+        "parentId": "group-platform",
+    },
+    "comp-bazovoe-znanie-yazyka-zaprosov-1s": {
+        "id": "comp-znanie-yazyka-zaprosov-1s",
+        "name": "Знание языка запросов 1С",
+        "parentId": "group-db",
+    },
+    "comp-znanie-yazyka-zaprosov-1s": {
+        "id": "comp-znanie-yazyka-zaprosov-1s",
+        "name": "Знание языка запросов 1С",
+        "parentId": "group-db",
+    },
+    "comp-bazovoe-znanie-hotya-by-odnoi-tipovoi-konfiguracii": {
+        "id": "comp-znanie-tipovyh-konfiguracii",
+        "name": "Знание типовых конфигураций",
+        "parentId": "group-platform",
+    },
+    "comp-znanie-neskolkih-tipovyh-konfiguracii": {
+        "id": "comp-znanie-tipovyh-konfiguracii",
+        "name": "Знание типовых конфигураций",
+        "parentId": "group-platform",
+    },
+    "comp-opyt-vypolneniya-zadach-po-razrabotke-pechatnyh-form-i-ili-otchetov-na-skd": {
+        "id": "comp-pechatnye-formy-i-otchety-na-skd",
+        "name": "Печатные формы и отчёты на СКД",
+        "parentId": "group-platform",
+    },
+    "comp-opyt-vypolneniya-zadach-po-razrabotke-pechatnyh-form-i-otchetov-na-skd": {
+        "id": "comp-pechatnye-formy-i-otchety-na-skd",
+        "name": "Печатные формы и отчёты на СКД",
+        "parentId": "group-platform",
+    },
+    "comp-opyt-vypolneniya-zadach-po-razrabotke-slozhnyh-pechatnyh-form-i-otchetov-na-skd": {
+        "id": "comp-pechatnye-formy-i-otchety-na-skd",
+        "name": "Печатные формы и отчёты на СКД",
+        "parentId": "group-platform",
+    },
+    "comp-rabota-s-sistemami-kontrolya-versii-osnovy": {
+        "id": "comp-sistemy-kontrolya-versii",
+        "name": "Системы контроля версий (хранилище 1С, Git)",
+        "parentId": "group-devops",
+    },
+    "comp-rabota-s-git-osnovy": {
+        "id": "comp-sistemy-kontrolya-versii",
+        "name": "Системы контроля версий (хранилище 1С, Git)",
+        "parentId": "group-devops",
+    },
+    "comp-bazovoe-znanie-oop-i-algoritmov": {
+        "id": "comp-oop-i-algoritmy",
+        "name": "ООП и алгоритмы",
+        "parentId": None,
+    },
+    "comp-bazovye-znaniya-vysokourovnevogo-yazyka-programmirovaniya": {
+        "id": "comp-vysokourovnevyi-yazyk-programmirovaniya",
+        "name": "Высокоуровневый язык программирования (кроме 1С)",
+        "parentId": None,
+    },
+    "comp-bazovye-znaniya-yazyka-sql": {
+        "id": "comp-yazyk-sql",
+        "name": "Язык SQL",
+        "parentId": "group-db",
+    },
+}
 
 INFOSTART_GROUPS = [
     ("group-platform", "Платформа 1С", "professional", ("платформ", "конфигурац", "метаданн", "управляем", "скд", "печатн")),
@@ -35,6 +122,186 @@ INFOSTART_GROUPS = [
     ("group-mentoring", "Менторинг", "universal", ("наставн", "ментор", "обучен")),
     ("group-leadership", "Лидерство", "universal", ("лидер", "самостоятельн", "управлен")),
 ]
+
+
+# Ручная разметка уровней 1–3 по грейдам: колонки — стажёр, младший,
+# программист, старший, ведущий; None — компетенции нет в профиле.
+# Шкала: 1 базовый (делает по образцу, работу проверяют),
+# 2 уверенный (самостоятельно на боевых задачах обычной сложности),
+# 3 эксперт (нестандартные случаи, задаёт стандарт, проверяет других).
+# Обязанностям уровень не ставится — запрещено инвариантом.
+GRADE_ORDER = ("intern", "junior", "programmer", "senior", "lead")
+LEVEL_MATRIX = {
+    "comp-oop-i-algoritmy": (1, None, None, None, None),
+    "comp-vysokourovnevyi-yazyk-programmirovaniya": (1, None, None, None, None),
+    "comp-yazyk-sql": (1, None, None, None, None),
+    "comp-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3": (1, 2, 2, 3, 3),
+    "comp-navyki-programmirovaniya-na-yazyke-1s": (None, 1, 2, 3, 3),
+    "comp-znanie-yazyka-zaprosov-1s": (None, 1, 2, 3, 3),
+    "comp-opyt-raboty-s-interfeisami-v-upravlyaemom-prilozhenii": (None, 1, 2, 3, 3),
+    "comp-pechatnye-formy-i-otchety-na-skd": (None, 1, 2, 3, 3),
+    "comp-znanie-tipovyh-konfiguracii": (None, 1, 2, 2, 3),
+    "comp-znanie-reglamenta-i-standartov-razrabotki": (None, 1, 2, 2, 3),
+    "comp-instrumenty-ii": (1, 1, 2, 2, 3),
+    "comp-sistemy-kontrolya-versii": (None, 1, 2, 2, 3),
+    "comp-rabota-s-pravami-dostupa-i-rls": (None, None, 1, 2, 3),
+    "comp-avtomatizirovannoe-testirovanie": (None, None, 1, 2, 3),
+    "comp-rest-odata-http-servisy": (None, None, 1, 2, 3),
+    "comp-sonarqube-staticheskii-analiz-koda": (None, None, 1, 2, 3),
+    "comp-integracionnye-mehanizmy": (None, None, None, 2, 3),
+    "comp-linux-krossplatformennost": (None, None, None, 1, 2),
+    "comp-rabota-s-brokerami-soobschenii": (None, None, None, 1, 2),
+    "comp-proektirovanie-dorabotok-konfiguracii": (None, None, None, 2, 3),
+    "comp-dokumentirovanie-arhitektury": (None, None, None, None, 2),
+    # темы, которых не было в схемах 2022–2026: добавлены вручную
+    "comp-proizvoditelnost-zaprosov": (None, None, 1, 2, 3),
+    "comp-blokirovki-i-tranzakcii": (None, None, 1, 2, 3),
+    "comp-tehnologicheskii-zhurnal-i-monitoring": (None, None, 1, 2, 3),
+    "comp-ci-cd-sborka-i-postavka-resheniya": (None, None, 1, 2, 3),
+    "comp-personalnye-dannye-i-trebovaniya-bezopasnosti": (None, None, 1, 2, 3),
+    "comp-edt-i-rabota-s-ishodnikami": (None, None, None, 1, 2),
+    "comp-integracionnye-platformy-i-esb": (None, None, None, 1, 2),
+    "comp-obuchaemost": (2, 2, 2, 2, 2),
+    "comp-gramotnaya-pismennaya-rech": (1, 1, 2, 2, 3),
+    "comp-navyki-delovoi-perepiski-i-soblyudenie-korporativnoi-etiki": (1, 1, 2, 2, 3),
+    "comp-samostoyatelnost": (1, 1, 2, 3, 3),
+    "comp-umenie-iskat-informaciyu-iz-tematicheskih-istochnikov": (None, 2, 2, 3, 3),
+    "comp-effektivnoe-vzaimodeistvie-v-komande": (None, 1, 2, 2, 3),
+    "comp-upravlenie-vremenem": (None, None, 1, 2, 3),
+    "comp-kommunikabelnost": (None, None, None, 2, 3),
+    "comp-upravlenie-komandoi": (None, None, None, None, 1),
+    "comp-nastavnichestvo-i-peredacha-znanii": (None, None, None, 1, 2),
+}
+
+# Профили, которых в drawio нет вообще: собраны из профстандартов.
+# Здесь уровень задаётся плоско, без лестницы грейдов.
+PROFILE_LEVELS: dict[str, dict[str, int]] = {
+    "architect": {
+        "comp-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3": 3,
+        "comp-navyki-programmirovaniya-na-yazyke-1s": 3,
+        "comp-znanie-yazyka-zaprosov-1s": 3,
+        "comp-znanie-tipovyh-konfiguracii": 3,
+        "comp-znanie-reglamenta-i-standartov-razrabotki": 3,
+        "comp-proizvoditelnost-zaprosov": 3,
+        "comp-blokirovki-i-tranzakcii": 3,
+        "comp-integracionnye-mehanizmy": 3,
+        "comp-rest-odata-http-servisy": 3,
+        "comp-rabota-s-brokerami-soobschenii": 3,
+        "comp-integracionnye-platformy-i-esb": 3,
+        "comp-rabota-s-pravami-dostupa-i-rls": 3,
+        "comp-personalnye-dannye-i-trebovaniya-bezopasnosti": 3,
+        "comp-proektirovanie-dorabotok-konfiguracii": 3,
+        "comp-dokumentirovanie-arhitektury": 3,
+        "comp-sistemy-kontrolya-versii": 3,
+        "comp-arhitektura-resheniya-granicy-sistem-i-konturov": 3,
+        "comp-nefunkcionalnye-trebovaniya-i-sravnenie-reshenii": 3,
+        "comp-model-dannyh-i-proektirovanie-registrov": 3,
+        "comp-tehnologicheskii-zhurnal-i-monitoring": 2,
+        "comp-linux-krossplatformennost": 2,
+        "comp-edt-i-rabota-s-ishodnikami": 2,
+        "comp-ci-cd-sborka-i-postavka-resheniya": 2,
+        "comp-avtomatizirovannoe-testirovanie": 2,
+        "comp-instrumenty-ii": 2,
+        "comp-opyt-raboty-s-interfeisami-v-upravlyaemom-prilozhenii": 2,
+        "comp-gramotnaya-pismennaya-rech": 3,
+        "comp-navyki-delovoi-perepiski-i-soblyudenie-korporativnoi-etiki": 3,
+        "comp-samostoyatelnost": 3,
+        "comp-obuchaemost": 2,
+        "comp-umenie-iskat-informaciyu-iz-tematicheskih-istochnikov": 3,
+        "comp-effektivnoe-vzaimodeistvie-v-komande": 3,
+        "comp-kommunikabelnost": 3,
+        "comp-upravlenie-vremenem": 2,
+        "comp-nastavnichestvo-i-peredacha-znanii": 2,
+    },
+    "team-lead": {
+        "comp-znanie-reglamenta-i-standartov-razrabotki": 3,
+        "comp-sistemy-kontrolya-versii": 3,
+        "comp-ci-cd-sborka-i-postavka-resheniya": 3,
+        "comp-avtomatizirovannoe-testirovanie": 3,
+        "comp-personalnye-dannye-i-trebovaniya-bezopasnosti": 3,
+        "comp-instrumenty-ii": 3,
+        "comp-infrastruktura-kollektivnoi-razrabotki": 3,
+        "comp-upravlenie-vypuskami-i-konfiguraciyami": 3,
+        "comp-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3": 2,
+        "comp-navyki-programmirovaniya-na-yazyke-1s": 2,
+        "comp-znanie-yazyka-zaprosov-1s": 2,
+        "comp-znanie-tipovyh-konfiguracii": 2,
+        "comp-proektirovanie-dorabotok-konfiguracii": 2,
+        "comp-proizvoditelnost-zaprosov": 2,
+        "comp-blokirovki-i-tranzakcii": 2,
+        "comp-tehnologicheskii-zhurnal-i-monitoring": 2,
+        "comp-rabota-s-pravami-dostupa-i-rls": 2,
+        "comp-integracionnye-mehanizmy": 2,
+        "comp-dokumentirovanie-arhitektury": 2,
+        "comp-edt-i-rabota-s-ishodnikami": 2,
+        "comp-upravlenie-komandoi": 3,
+        "comp-nastavnichestvo-i-peredacha-znanii": 3,
+        "comp-ocenka-trudoemkosti-i-planirovanie-rabot": 3,
+        "comp-postanovka-zadach-i-kontrol-ispolneniya": 3,
+        "comp-gramotnaya-pismennaya-rech": 3,
+        "comp-navyki-delovoi-perepiski-i-soblyudenie-korporativnoi-etiki": 3,
+        "comp-samostoyatelnost": 3,
+        "comp-effektivnoe-vzaimodeistvie-v-komande": 3,
+        "comp-kommunikabelnost": 3,
+        "comp-upravlenie-vremenem": 3,
+        "comp-obuchaemost": 2,
+        "comp-umenie-iskat-informaciyu-iz-tematicheskih-istochnikov": 2,
+    },
+}
+
+
+# В схемах коды трудовых функций записаны кириллицей и с лишним нулём
+# («А/01.03»), в приказе Минтруда — «A/01.3». По этим кодам сверяют профиль
+# с профстандартом, поэтому приводим к виду стандарта.
+CYRILLIC_TO_LATIN = {"А": "A", "В": "B", "С": "C", "Е": "E", "Д": "D"}
+TF_CODE_RE = re.compile(r"\(([АВСЕДABCDE])/(\d{1,2})\.0?(\d)\)")
+
+
+def normalize_tf_code(name: str) -> str:
+    def fix(m: re.Match[str]) -> str:
+        letter = CYRILLIC_TO_LATIN.get(m.group(1), m.group(1))
+        return f"({letter}/{int(m.group(2)):02d}.{m.group(3)})"
+
+    return TF_CODE_RE.sub(fix, name)
+
+
+def matrix_level(job_id: str, competency_id: str) -> int | None:
+    if job_id in PROFILE_LEVELS:
+        return PROFILE_LEVELS[job_id].get(competency_id)
+    row = LEVEL_MATRIX.get(competency_id)
+    if row is None or job_id not in GRADE_ORDER:
+        return None
+    return row[GRADE_ORDER.index(job_id)]
+
+
+def assert_profile_levels(profiles: list[dict], catalog: dict[str, dict]) -> None:
+    errors: list[str] = []
+    for profile in profiles:
+        job_id = profile["jobId"]
+        for skill in profile["skills"]:
+            cid = skill["competencyId"]
+            comp = catalog.get(cid)
+            if comp is None:
+                errors.append(f"{job_id}/{cid}: нет в каталоге компетенций")
+                continue
+            typ = comp["type"]
+            level = skill["level"]
+            if typ == "duty":
+                if level is not None:
+                    errors.append(f"{job_id}/{cid}: у duty level должен быть null")
+                continue
+            if typ not in ("professional", "universal"):
+                errors.append(f"{job_id}/{cid}: неизвестный type {typ}")
+                continue
+            if level not in (1, 2, 3):
+                errors.append(f"{job_id}/{cid}: у {typ} level должен быть 1–3, сейчас {level}")
+            expected = matrix_level(job_id, cid)
+            if expected is None:
+                errors.append(f"{job_id}/{cid}: нет в LEVEL_MATRIX/PROFILE_LEVELS для этого грейда")
+            elif expected != level:
+                errors.append(f"{job_id}/{cid}: level {level}, в таблице {expected}")
+    if errors:
+        raise SystemExit("сверка уровней не прошла:\n" + "\n".join(errors))
 
 
 def slug(text: str) -> str:
@@ -160,10 +427,14 @@ def extract_profile(path: Path, job_id: str) -> tuple[list[dict], list[dict]]:
         criteria = "\n".join(kids) if kids else None
         cid = "comp-" + slug(c["value"])
         parent = infostart_parent(c["value"], typ)
+        name = normalize_tf_code(c["value"].replace("\n", " "))
+        canon = CANONICAL_COMPETENCIES.get(cid)
+        if canon:
+            cid, name, parent = canon["id"], canon["name"], canon["parentId"]
         competencies.append(
             {
                 "id": cid,
-                "name": c["value"].replace("\n", " "),
+                "name": name,
                 "description": None,
                 "type": typ,
                 "parentId": parent,
@@ -196,8 +467,8 @@ def main() -> None:
         {"id": "mentor", "name": "Наставник", "rankOrder": 55, "lane": "executor", "yearsRequired": None, "professionalStandard": None},
         {"id": "devops", "name": "DevOps инженер", "rankOrder": 55, "lane": "executor", "yearsRequired": None, "professionalStandard": None},
         {"id": "functional-expert", "name": "Функциональный эксперт", "rankOrder": 55, "lane": "executor", "yearsRequired": None, "professionalStandard": None},
-        {"id": "architect", "name": "Системный архитектор", "rankOrder": 60, "lane": "other", "yearsRequired": None, "professionalStandard": None},
-        {"id": "team-lead", "name": "Руководитель команды разработки", "rankOrder": 65, "lane": "manager", "yearsRequired": None, "professionalStandard": None},
+        {"id": "architect", "name": "Системный архитектор", "rankOrder": 60, "lane": "other", "yearsRequired": 5, "professionalStandard": "06.003"},
+        {"id": "team-lead", "name": "Руководитель команды разработки", "rankOrder": 65, "lane": "manager", "yearsRequired": 5, "professionalStandard": "06.017"},
         {"id": "tech-pm", "name": "Технический руководитель проектов", "rankOrder": 66, "lane": "other", "yearsRequired": None, "professionalStandard": None},
         {"id": "pm", "name": "Руководитель проектов", "rankOrder": 67, "lane": "manager", "yearsRequired": None, "professionalStandard": None},
         {"id": "dept-head", "name": "Руководитель отдела", "rankOrder": 70, "lane": "manager", "yearsRequired": None, "professionalStandard": None},
@@ -242,6 +513,8 @@ def main() -> None:
     profiles = []
     for job_id, path in files.items():
         comps, skills = extract_profile(path, job_id)
+        for s in skills:
+            s["level"] = matrix_level(job_id, s["competencyId"])
         for s, c in zip(skills, comps):
             cid = c["id"]
             if cid in catalog and catalog[cid]["type"] != c["type"]:
@@ -259,6 +532,57 @@ def main() -> None:
         existing = json.loads(existing_path.read_text(encoding="utf-8"))
         jobs = existing.get("jobs") or jobs
         transitions = existing.get("transitions") or transitions
+        # Тексты ожиданий переписаны вручную под грейды и в drawio не возвращались:
+        # повторный разбор схем не должен их затирать.
+        manual_criteria = {
+            (p["jobId"], s["competencyId"]): s.get("criteria")
+            for p in existing.get("profiles", [])
+            for s in p["skills"]
+        }
+        for p in profiles:
+            for s in p["skills"]:
+                key = (p["jobId"], s["competencyId"])
+                if key in manual_criteria:
+                    s["criteria"] = manual_criteria[key]
+
+        # Часть компетенций и целые профили добавлены вручную (темы и должности,
+        # которых в схемах не было). Разбор drawio их не создаёт — переносим
+        # из существующего файла: генератор уточняет схемы и не удаляет остальное.
+        existing_rows = {
+            p["jobId"]: {s["competencyId"]: s for s in p["skills"]}
+            for p in existing.get("profiles", [])
+        }
+        generated_job_ids = {p["jobId"] for p in profiles}
+        for p in profiles:
+            generated = {s["competencyId"] for s in p["skills"]}
+            for cid, row in existing_rows.get(p["jobId"], {}).items():
+                if cid in generated:
+                    continue
+                p["skills"].append(
+                    {
+                        "competencyId": cid,
+                        "level": matrix_level(p["jobId"], cid),
+                        "criteria": row.get("criteria"),
+                        "sortOrder": row.get("sortOrder", 999),
+                    }
+                )
+            p["skills"].sort(key=lambda s: s["sortOrder"])
+        for p in existing.get("profiles", []):
+            if p["jobId"] in generated_job_ids:
+                continue
+            skills = [
+                {
+                    "competencyId": row["competencyId"],
+                    "level": matrix_level(p["jobId"], row["competencyId"]),
+                    "criteria": row.get("criteria"),
+                    "sortOrder": row.get("sortOrder", 999),
+                }
+                for row in p["skills"]
+            ]
+            skills.sort(key=lambda s: s["sortOrder"])
+            profiles.append({"jobId": p["jobId"], "skills": skills})
+        for c in existing.get("competencies", []):
+            catalog.setdefault(c["id"], c)
 
     data = {
         "jobs": jobs,
@@ -266,6 +590,7 @@ def main() -> None:
         "competencies": list(catalog.values()),
         "profiles": profiles,
     }
+    assert_profile_levels(profiles, catalog)
     existing_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     junior_profile = next(p for p in profiles if p["jobId"] == "junior")
@@ -276,7 +601,9 @@ def main() -> None:
         "competencies": [c for c in data["competencies"] if c["id"] in junior_comp_ids or c["id"].startswith("group-")],
         "profiles": [junior_profile],
     }
-    (OUT / "fixtures" / "junior.json").write_text(json.dumps(junior, ensure_ascii=False, indent=2), encoding="utf-8")
+    (OUT / "fixtures" / "junior.json").write_text(
+        json.dumps(junior, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(
         "jobs",
         len(jobs),
