@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS competencies (
   name TEXT NOT NULL,
   description TEXT,
   type TEXT NOT NULL,
-  parent_id TEXT,
+  parent_id TEXT REFERENCES competencies(id),
   updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS profiles (
@@ -29,8 +29,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id),
   updated_at INTEGER NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS competencies_parent_name
-  ON competencies (IFNULL(parent_id, ''), name);
 CREATE TABLE IF NOT EXISTS profile_skills (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   profile_id TEXT NOT NULL REFERENCES profiles(id),
@@ -43,6 +41,41 @@ CREATE TABLE IF NOT EXISTS profile_skills (
 );
 `;
 
+function ensureCompetenciesParentFk() {
+  const sqlite = getSqlite();
+  const row = sqlite
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'competencies'")
+    .get() as { sql?: string } | undefined;
+  const sql = row?.sql ?? "";
+  if (/parent_id TEXT REFERENCES competencies\(id\)/i.test(sql)) return;
+  sqlite.exec(`
+    PRAGMA foreign_keys = OFF;
+    CREATE TABLE competencies_new (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      type TEXT NOT NULL,
+      parent_id TEXT REFERENCES competencies_new(id),
+      updated_at INTEGER NOT NULL
+    );
+    INSERT INTO competencies_new SELECT id, name, description, type, parent_id, updated_at FROM competencies;
+    DROP TABLE competencies;
+    ALTER TABLE competencies_new RENAME TO competencies;
+    PRAGMA foreign_keys = ON;
+  `);
+}
+
+function ensureParentNameIndex() {
+  const sqlite = getSqlite();
+  sqlite.exec(`
+    DROP INDEX IF EXISTS competencies_parent_name;
+    CREATE UNIQUE INDEX competencies_parent_name
+      ON competencies (IFNULL(parent_id, ''), name);
+  `);
+}
+
 export function migrate() {
   getSqlite().exec(DDL);
+  ensureCompetenciesParentFk();
+  ensureParentNameIndex();
 }

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ActionForm } from "@/components/ActionForm";
 import { deleteCompetencyAction, saveCompetencyAction } from "@/app/actions";
 import { isAdmin } from "@/lib/auth";
 import { listCompetencies } from "@/lib/queries";
@@ -28,7 +29,7 @@ export default async function CompetenciesPage() {
         <span className="pulse-dot" />
         <h1 className="page-title">Компетенции</h1>
       </div>
-      <form action={saveCompetencyAction} className="panel panel-pad grid gap-3 text-sm md:grid-cols-2">
+      <ActionForm action={saveCompetencyAction} className="panel panel-pad grid gap-3 text-sm md:grid-cols-2">
         <input name="id" placeholder="id (латиница)" className="field" required />
         <input name="name" placeholder="Название" className="field" required />
         <select name="type" className="field">
@@ -50,7 +51,7 @@ export default async function CompetenciesPage() {
         <button className="btn-primary w-fit" type="submit">
           Добавить / сохранить
         </button>
-      </form>
+      </ActionForm>
       <ul className="space-y-2 text-sm">
         {items.map((c) => (
           <li key={c.id} className="panel panel-pad">
@@ -58,7 +59,7 @@ export default async function CompetenciesPage() {
               {c.name} <span className={typeChip(c.type)}>{c.type}</span>
             </div>
             {c.parentId ? <div className="mt-1 text-xs muted">родитель: {c.parentId}</div> : null}
-            <form action={saveCompetencyAction} className="mt-3 grid gap-2 md:grid-cols-4">
+            <ActionForm action={saveCompetencyAction} className="mt-3 grid gap-2 md:grid-cols-4">
               <input type="hidden" name="id" value={c.id} />
               <input name="name" defaultValue={c.name} className="field md:col-span-2" />
               <select name="type" defaultValue={c.type} className="field">
@@ -81,13 +82,13 @@ export default async function CompetenciesPage() {
               <button className="btn w-fit" type="submit">
                 Ок
               </button>
-            </form>
-            <form action={deleteCompetencyAction} className="mt-2">
+            </ActionForm>
+            <ActionForm action={deleteCompetencyAction} className="mt-2">
               <input type="hidden" name="id" value={c.id} />
               <button className="btn-danger" type="submit">
                 Удалить
               </button>
-            </form>
+            </ActionForm>
           </li>
         ))}
       </ul>

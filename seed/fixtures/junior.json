@@ -235,79 +235,79 @@
       "skills": [
         {
           "competencyId": "comp-gramotnaya-pismennaya-rech",
-          "level": 1,
+          "level": null,
           "criteria": "Умение писать согласно установленным нормам грамматики и правописания, без крупных ошибок",
           "sortOrder": 0
         },
         {
           "competencyId": "comp-samostoyatelnost",
-          "level": 1,
+          "level": null,
           "criteria": "Способность самому ставить свои цели и самому их достигать, способность решать проблемы самостоятельно, при необходимости привлекая компетентных людей",
           "sortOrder": 1
         },
         {
           "competencyId": "comp-obuchaemost",
-          "level": 1,
+          "level": null,
           "criteria": "Способность к целенаправленному освоению знаний, желание развиваться в сфере 1С",
           "sortOrder": 2
         },
         {
           "competencyId": "comp-navyki-delovoi-perepiski-i-soblyudenie-korporativnoi-etiki",
-          "level": 1,
+          "level": null,
           "criteria": "Умение формулировать свой мысли в понятной для коллег форме, уважительное отношение к клиентам и коллегам",
           "sortOrder": 3
         },
         {
           "competencyId": "comp-effektivnoe-vzaimodeistvie-v-komande",
-          "level": 1,
+          "level": null,
           "criteria": "Открытость к команде, умение спокойно дискутировать по спорным вопросам,обращаться за помощью и не скрывать трудности",
           "sortOrder": 4
         },
         {
           "competencyId": "comp-umenie-iskat-informaciyu-iz-tematicheskih-istochnikov",
-          "level": 1,
+          "level": null,
           "criteria": "Использование ресурсов по тематике 1С: ИТС, Infostart, группы в Telegram и др.",
           "sortOrder": 5
         },
         {
           "competencyId": "comp-bazovoe-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3",
-          "level": 1,
+          "level": null,
           "criteria": "Для чего нужны программы 1С;Что такое платформа 1С, конфигурация, информационная база, база данных в чем их отличие\nУстановка платформы и конфигурации, развертка базы; Какие бывают типы лицензий, как установить 1С себе чтобы она работала\nВыгрузка, загрузка базы/конфигурации;Чистка кэша, ТИИ\nУстановка и обновление типовой конфигурации;Настройки поддержки\nИспользование синтаксис-помощника\nУдаление помеченных объектов, работа с журналом регистрации",
           "sortOrder": 6
         },
         {
           "competencyId": "comp-bazovye-navyki-programmirovaniya-na-yazyke-1s",
-          "level": 1,
+          "level": null,
           "criteria": "Программный модуль, виды программных модулей; Переменные и константы; Процедуры, функции. Передача параметров\nОператоры и синтаксические конструкции, инструкции препроцессора\nУниверсальные коллекции значений: массив, структура, таблица значений\nПримитивные типы данных, функции для работы со значениями типа \"Строка\", \"Число\", \"Дата\" и др. Отличия Неопределено, NULL, \"\"",
           "sortOrder": 7
         },
         {
           "competencyId": "comp-bazovoe-znanie-yazyka-zaprosov-1s",
-          "level": 1,
+          "level": null,
           "criteria": "Источники данных запросов. Реальные (физические), виртуальные таблицы\nКонструкции языка и описание запроса\nСпецификации соединений таблиц, объединение таблиц\nГруппировка, упорядочивание результатов запроса\nУсловие на результат запроса",
           "sortOrder": 8
         },
         {
           "competencyId": "comp-znanie-reglamenta-i-standartov-razrabotki",
-          "level": 1,
+          "level": null,
           "criteria": "Знание основных стандартов разработки описанных на портале ИТС. Знание регламента разработки принятого в компании",
           "sortOrder": 9
         },
         {
           "competencyId": "comp-opyt-raboty-s-interfeisami-v-upravlyaemom-prilozhenii",
-          "level": 1,
+          "level": null,
           "criteria": "Различия обычных форм и управляемых форм. Понятие тонкого, толстого, веб-клиентов\nДирективы компиляции",
           "sortOrder": 10
         },
         {
           "competencyId": "comp-opyt-vypolneniya-zadach-po-razrabotke-pechatnyh-form-i-ili-otchetov-na-skd",
-          "level": 1,
+          "level": null,
           "criteria": "Общие сведения о системе компоновке данных\nОбщие сведения о макетах, их заполнении и выводе на форму\nУмение создавать отчеты и ПФ как дополнительные и добавлять в базу",
           "sortOrder": 11
         },
         {
           "competencyId": "comp-bazovoe-znanie-hotya-by-odnoi-tipovoi-konfiguracii",
-          "level": 1,
+          "level": null,
           "criteria": "Бухгалтерия предприятия, ERP, Управление Холдингом, Управление торговлей, Документооборот и т.д.",
           "sortOrder": 12
         },
@@ -355,13 +355,13 @@
         },
         {
           "competencyId": "comp-rabota-s-sistemami-kontrolya-versii-osnovy",
-          "level": 1,
+          "level": null,
           "criteria": "Работа с хранилищем конфигурации Понимание назначения Git: история изменений, откат, работа в команде Умение пользоваться интерфейсом Git",
           "sortOrder": 20
         },
         {
           "competencyId": "comp-instrumenty-ii",
-          "level": 1,
+          "level": null,
           "criteria": "Применение AI (чат-боты, агенты) для изучения платформы, написания простых конструкций и пояснения ошибок",
           "sortOrder": 21
         }

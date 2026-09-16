@@ -13,6 +13,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 type Job = {
@@ -27,6 +28,12 @@ type Transition = { fromJobId: string; toJobId: string; kind: "linear" | "level_
 type ClusterTone = "junior" | "middle" | "senior" | "architect" | "lead" | "pm" | "head";
 
 const JOB_W = 210;
+const ROW_H = 66;
+const LANE_X: Record<Job["lane"], number> = {
+  executor: 72,
+  manager: 668,
+  other: 1288,
+};
 
 const LAYOUT: Record<string, { x: number; y: number }> = {
   intern: { x: 72, y: 108 },
@@ -73,19 +80,25 @@ const EDGE_LABELS: Record<string, string> = {
   "consultant-team-lead": "хочет руководить",
 };
 
-function JobNode({ data }: NodeProps) {
+function JobNode({ id, data }: NodeProps) {
   const filled = Boolean((data as { filled?: boolean }).filled);
   const label = String((data as { label?: string }).label ?? "");
   return (
-    <div className={filled ? "job-card job-card--filled" : "job-card"}>
+    <Link
+      href={`/jobs/${id}`}
+      className={filled ? "job-card job-card--filled nopan" : "job-card nopan"}
+      onClick={(event) => event.stopPropagation()}
+    >
       <Handle id="t" type="target" position={Position.Top} />
       <Handle id="st" type="source" position={Position.Top} />
       <Handle id="b" type="source" position={Position.Bottom} />
       <Handle id="tb" type="target" position={Position.Bottom} />
       <Handle id="l" type="target" position={Position.Left} />
+      <Handle id="sl" type="source" position={Position.Left} />
       <Handle id="r" type="source" position={Position.Right} />
+      <Handle id="tr" type="target" position={Position.Right} />
       {label}
-    </div>
+    </Link>
   );
 }
 
@@ -104,6 +117,33 @@ function LaneNode({ data }: NodeProps) {
 }
 
 const nodeTypes = { job: JobNode, cluster: ClusterNode, lane: LaneNode };
+
+function extraJobPositions(jobs: Job[]): Record<string, { x: number; y: number }> {
+  const extras = jobs.filter((job) => !LAYOUT[job.id]);
+  const byLane: Record<Job["lane"], Job[]> = { executor: [], manager: [], other: [] };
+  for (const job of extras) byLane[job.lane].push(job);
+  const pos: Record<string, { x: number; y: number }> = {};
+  for (const lane of ["executor", "manager", "other"] as const) {
+    const list = byLane[lane].slice().sort((a, b) => a.rankOrder - b.rankOrder || a.id.localeCompare(b.id));
+    const knownYs = jobs.filter((job) => job.lane === lane && LAYOUT[job.id]).map((job) => LAYOUT[job.id].y);
+    let y = (knownYs.length ? Math.max(...knownYs) : 108) + ROW_H;
+    if (lane === "other") y = 108;
+    for (const job of list) {
+      pos[job.id] = { x: LANE_X[lane], y };
+      y += ROW_H;
+    }
+  }
+  return pos;
+}
+
+function inferHandles(from: { x: number; y: number }, to: { x: number; y: number }) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? { source: "r", target: "l" } : { source: "sl", target: "tr" };
+  }
+  return dy >= 0 ? { source: "b", target: "t" } : { source: "st", target: "tb" };
+}
 
 function useArchifyTheme(): "dark" | "light" {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -130,15 +170,19 @@ export function CareerGraph({
   const router = useRouter();
   const theme = useArchifyTheme();
   const hasProfile = new Set(profileJobIds);
+  const positions = useMemo(() => ({ ...LAYOUT, ...extraJobPositions(jobs) }), [jobs]);
 
   const nodes: Node[] = useMemo(() => {
+    const maxY = Math.max(808, ...jobs.map((job) => positions[job.id]?.y ?? 0));
+    const laneH = Math.max(920, maxY + 120);
+    const extraOther = jobs.some((job) => job.lane === "other" && !LAYOUT[job.id]);
     const lanes: Node[] = [
       {
         id: "lane-executor",
         type: "lane",
         position: { x: 16, y: 8 },
         data: { label: "Исполнитель" },
-        style: { width: 580, height: 920 },
+        style: { width: 580, height: laneH, pointerEvents: "none" },
         selectable: false,
         draggable: false,
         zIndex: 0,
@@ -148,41 +192,52 @@ export function CareerGraph({
         type: "lane",
         position: { x: 616, y: 8 },
         data: { label: "Руководитель" },
-        style: { width: 620, height: 920 },
+        style: { width: 620, height: laneH, pointerEvents: "none" },
         selectable: false,
         draggable: false,
         zIndex: 0,
       },
     ];
-    const clusters: Node[] = [
-      { id: "c-junior", type: "cluster", position: { x: 40, y: 56 }, data: { label: "Junior", tone: "junior" }, style: { width: 274, height: 196 }, selectable: false, draggable: false, zIndex: 1 },
-      { id: "c-middle", type: "cluster", position: { x: 40, y: 268 }, data: { label: "Middle", tone: "middle" }, style: { width: 274, height: 196 }, selectable: false, draggable: false, zIndex: 1 },
-      { id: "c-senior", type: "cluster", position: { x: 40, y: 480 }, data: { label: "Senior", tone: "senior" }, style: { width: 530, height: 256 }, selectable: false, draggable: false, zIndex: 1 },
-      { id: "c-architect", type: "cluster", position: { x: 40, y: 752 }, data: { label: "Architect", tone: "architect" }, style: { width: 274, height: 140 }, selectable: false, draggable: false, zIndex: 1 },
-      { id: "c-team-lead", type: "cluster", position: { x: 640, y: 424 }, data: { label: "Team lead", tone: "lead" }, style: { width: 268, height: 200 }, selectable: false, draggable: false, zIndex: 1 },
-      { id: "c-pm", type: "cluster", position: { x: 640, y: 660 }, data: { label: "Project manager", tone: "pm" }, style: { width: 268, height: 140 }, selectable: false, draggable: false, zIndex: 1 },
-      { id: "c-head", type: "cluster", position: { x: 940, y: 424 }, data: { label: "Head", tone: "head" }, style: { width: 268, height: 200 }, selectable: false, draggable: false, zIndex: 1 },
-    ];
-    const jobNodes: Node[] = jobs.map((job, index) => {
-      const pos = LAYOUT[job.id] ?? { x: 72, y: 940 + index * 66 };
-      return {
-        id: job.id,
-        type: "job",
-        position: pos,
-        data: { label: job.name, filled: hasProfile.has(job.id) },
-        style: { width: JOB_W },
+    if (extraOther) {
+      lanes.push({
+        id: "lane-other",
+        type: "lane",
+        position: { x: 1256, y: 8 },
+        data: { label: "Другое" },
+        style: { width: 300, height: laneH, pointerEvents: "none" },
+        selectable: false,
         draggable: false,
-        zIndex: 3,
-      };
-    });
+        zIndex: 0,
+      });
+    }
+    const clusters: Node[] = [
+      { id: "c-junior", type: "cluster", position: { x: 40, y: 56 }, data: { label: "Junior", tone: "junior" }, style: { width: 274, height: 196, pointerEvents: "none" }, selectable: false, draggable: false, zIndex: 1 },
+      { id: "c-middle", type: "cluster", position: { x: 40, y: 268 }, data: { label: "Middle", tone: "middle" }, style: { width: 274, height: 196, pointerEvents: "none" }, selectable: false, draggable: false, zIndex: 1 },
+      { id: "c-senior", type: "cluster", position: { x: 40, y: 480 }, data: { label: "Senior", tone: "senior" }, style: { width: 530, height: 256, pointerEvents: "none" }, selectable: false, draggable: false, zIndex: 1 },
+      { id: "c-architect", type: "cluster", position: { x: 40, y: 752 }, data: { label: "Architect", tone: "architect" }, style: { width: 274, height: 140, pointerEvents: "none" }, selectable: false, draggable: false, zIndex: 1 },
+      { id: "c-team-lead", type: "cluster", position: { x: 640, y: 424 }, data: { label: "Team lead", tone: "lead" }, style: { width: 268, height: 200, pointerEvents: "none" }, selectable: false, draggable: false, zIndex: 1 },
+      { id: "c-pm", type: "cluster", position: { x: 640, y: 660 }, data: { label: "Project manager", tone: "pm" }, style: { width: 268, height: 140, pointerEvents: "none" }, selectable: false, draggable: false, zIndex: 1 },
+      { id: "c-head", type: "cluster", position: { x: 940, y: 424 }, data: { label: "Head", tone: "head" }, style: { width: 268, height: 200, pointerEvents: "none" }, selectable: false, draggable: false, zIndex: 1 },
+    ];
+    const jobNodes: Node[] = jobs.map((job) => ({
+      id: job.id,
+      type: "job",
+      position: positions[job.id] ?? { x: LANE_X[job.lane], y: 108 },
+      data: { label: job.name, filled: hasProfile.has(job.id) },
+      style: { width: JOB_W },
+      draggable: false,
+      zIndex: 3,
+    }));
     return [...lanes, ...clusters, ...jobNodes];
-  }, [jobs, profileJobIds]);
+  }, [jobs, positions, profileJobIds]);
 
   const edges: Edge[] = useMemo(
     () =>
       transitions.map((tr) => {
         const key = `${tr.fromJobId}-${tr.toJobId}`;
-        const handles = EDGE_HANDLES[key];
+        const fromPos = positions[tr.fromJobId];
+        const toPos = positions[tr.toJobId];
+        const handles = EDGE_HANDLES[key] ?? (fromPos && toPos ? inferHandles(fromPos, toPos) : undefined);
         const change = tr.kind === "level_change";
         const color = change ? "var(--security-stroke)" : "var(--arrow)";
         return {
@@ -206,7 +261,7 @@ export function CareerGraph({
           markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
         };
       }),
-    [transitions],
+    [positions, transitions],
   );
 
   return (
@@ -225,6 +280,8 @@ export function CareerGraph({
           zoomOnScroll
           nodesDraggable={false}
           nodesConnectable={false}
+          elementsSelectable
+          noPanClassName="nopan"
           proOptions={{ hideAttribution: true }}
           onInit={(instance) => {
             instance.fitView({ padding: 0.1, minZoom: 0.35, maxZoom: 1.15 });

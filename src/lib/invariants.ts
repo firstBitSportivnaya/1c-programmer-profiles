@@ -22,6 +22,7 @@ export function assertSkillLevel(type: string, level: number | null) {
     }
     return;
   }
+  if (level === null) return;
   if (level !== 1 && level !== 2 && level !== 3) {
     throw new InvariantError("Уровень компетенции должен быть 1, 2 или 3");
   }

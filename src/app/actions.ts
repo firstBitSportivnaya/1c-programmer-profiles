@@ -17,6 +17,7 @@ import {
   assertTypeChangeAllowed,
 } from "@/lib/invariants";
 import { getCompetency } from "@/lib/queries";
+import type { ActionResult } from "@/lib/action-result";
 
 function isNextControlFlow(error: unknown) {
   return (
@@ -27,11 +28,16 @@ function isNextControlFlow(error: unknown) {
   );
 }
 
-function fail(error: unknown): never {
+function asActionError(error: unknown): ActionResult {
   if (isNextControlFlow(error)) throw error;
-  if (error instanceof InvariantError) throw error;
-  if (error instanceof Error) throw error;
-  throw new Error("Неизвестная ошибка");
+  if (error instanceof InvariantError || error instanceof Error) {
+    return { error: error.message };
+  }
+  return { error: "Неизвестная ошибка" };
+}
+
+function isUniqueConstraint(error: unknown) {
+  return error instanceof Error && /UNIQUE constraint failed/i.test(error.message);
 }
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -39,7 +45,11 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   if (!verifyPassword(password)) {
     return { ok: false as const, error: "Неверный пароль" };
   }
-  await setAdminCookie();
+  try {
+    await setAdminCookie();
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Нет SESSION_SECRET" };
+  }
   redirect("/");
 }
 
@@ -48,7 +58,7 @@ export async function logoutAction() {
   redirect("/");
 }
 
-export async function saveJobAction(formData: FormData) {
+export async function saveJobAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "").trim();
@@ -76,12 +86,14 @@ export async function saveJobAction(formData: FormData) {
     }
     revalidatePath("/");
     revalidatePath(`/jobs/${id}`);
+    return null;
   } catch (error) {
-    fail(error);
+    if (isUniqueConstraint(error)) return { error: "Должность с таким id или названием уже есть" };
+    return asActionError(error);
   }
 }
 
-export async function deleteJobAction(formData: FormData) {
+export async function deleteJobAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "");
@@ -90,11 +102,11 @@ export async function deleteJobAction(formData: FormData) {
     revalidatePath("/");
     redirect("/");
   } catch (error) {
-    fail(error);
+    return asActionError(error);
   }
 }
 
-export async function addTransitionAction(formData: FormData) {
+export async function addTransitionAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const fromJobId = String(formData.get("fromJobId") ?? "");
@@ -104,15 +116,24 @@ export async function addTransitionAction(formData: FormData) {
     if (kind !== "linear" && kind !== "level_change") {
       throw new InvariantError("Тип ребра: linear или level_change");
     }
-    getDb().insert(jobTransitions).values({ fromJobId, toJobId, kind }).run();
+    const db = getDb();
+    const dup = db
+      .select()
+      .from(jobTransitions)
+      .where(and(eq(jobTransitions.fromJobId, fromJobId), eq(jobTransitions.toJobId, toJobId)))
+      .get();
+    if (dup) throw new InvariantError("Такое ребро уже есть");
+    db.insert(jobTransitions).values({ fromJobId, toJobId, kind }).run();
     revalidatePath("/");
     revalidatePath(`/jobs/${fromJobId}`);
+    return null;
   } catch (error) {
-    fail(error);
+    if (isUniqueConstraint(error)) return { error: "Такое ребро уже есть" };
+    return asActionError(error);
   }
 }
 
-export async function deleteTransitionAction(formData: FormData) {
+export async function deleteTransitionAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const fromJobId = String(formData.get("fromJobId") ?? "");
@@ -123,12 +144,13 @@ export async function deleteTransitionAction(formData: FormData) {
       .run();
     revalidatePath("/");
     revalidatePath(`/jobs/${fromJobId}`);
+    return null;
   } catch (error) {
-    fail(error);
+    return asActionError(error);
   }
 }
 
-export async function saveCompetencyAction(formData: FormData) {
+export async function saveCompetencyAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "").trim();
@@ -153,24 +175,27 @@ export async function saveCompetencyAction(formData: FormData) {
         .run();
     }
     revalidatePath("/admin/competencies");
+    return null;
   } catch (error) {
-    fail(error);
+    if (isUniqueConstraint(error)) return { error: "Имя компетенции должно быть уникально среди соседей" };
+    return asActionError(error);
   }
 }
 
-export async function deleteCompetencyAction(formData: FormData) {
+export async function deleteCompetencyAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "");
     assertCompetencyDeletable(id);
     getDb().delete(competencies).where(eq(competencies.id, id)).run();
     revalidatePath("/admin/competencies");
+    return null;
   } catch (error) {
-    fail(error);
+    return asActionError(error);
   }
 }
 
-export async function upsertSkillAction(formData: FormData) {
+export async function upsertSkillAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const jobId = String(formData.get("jobId") ?? "");
@@ -182,7 +207,7 @@ export async function upsertSkillAction(formData: FormData) {
     if (!profile) throw new InvariantError("У должности нет профиля");
     const competency = getCompetency(competencyId);
     if (!competency) throw new InvariantError("Компетенция не найдена");
-    const level = competency.type === "duty" ? null : Number(levelRaw);
+    const level = competency.type === "duty" ? null : levelRaw === "" ? null : Number(levelRaw);
     assertSkillLevel(competency.type, level);
     const existing = db
       .select()
@@ -205,25 +230,36 @@ export async function upsertSkillAction(formData: FormData) {
     }
     revalidatePath(`/jobs/${jobId}/profile`);
     revalidatePath("/compare");
+    return null;
   } catch (error) {
-    fail(error);
+    return asActionError(error);
   }
 }
 
-export async function deleteSkillAction(formData: FormData) {
+export async function deleteSkillAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const jobId = String(formData.get("jobId") ?? "");
     const skillId = Number(formData.get("skillId"));
-    getDb().delete(profileSkills).where(eq(profileSkills.id, skillId)).run();
+    const db = getDb();
+    const profile = db.select().from(profiles).where(eq(profiles.jobId, jobId)).get();
+    if (!profile) throw new InvariantError("У должности нет профиля");
+    const row = db
+      .select()
+      .from(profileSkills)
+      .where(and(eq(profileSkills.id, skillId), eq(profileSkills.profileId, profile.id)))
+      .get();
+    if (!row) throw new InvariantError("Строка профиля не найдена");
+    db.delete(profileSkills).where(eq(profileSkills.id, skillId)).run();
     revalidatePath(`/jobs/${jobId}/profile`);
     revalidatePath("/compare");
+    return null;
   } catch (error) {
-    fail(error);
+    return asActionError(error);
   }
 }
 
-export async function createProfileAction(formData: FormData) {
+export async function createProfileAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const jobId = String(formData.get("jobId") ?? "");
@@ -235,6 +271,6 @@ export async function createProfileAction(formData: FormData) {
     revalidatePath(`/jobs/${jobId}`);
     redirect(`/jobs/${jobId}/profile`);
   } catch (error) {
-    fail(error);
+    return asActionError(error);
   }
 }

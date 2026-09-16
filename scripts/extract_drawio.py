@@ -21,7 +21,8 @@ SECTION_TITLES = {
     "Функциональные обязанности": "duty",
 }
 
-LEVEL_BY_JOB = {"intern": 1, "junior": 1, "programmer": 2, "senior": 2, "lead": 3}
+# Drawio stores grade in the job header (Junior/Middle/Senior), not per skill.
+# Per-competency 1–3 is filled in the app; extractor leaves it null.
 
 INFOSTART_GROUPS = [
     ("group-platform", "Платформа 1С", "professional", ("платформ", "конфигурац", "метаданн", "управляем", "скд", "печатн")),
@@ -135,7 +136,6 @@ def extract_profile(path: Path, job_id: str) -> tuple[list[dict], list[dict]]:
     competencies: list[dict] = []
     skills: list[dict] = []
     sort_i = 0
-    default_level = LEVEL_BY_JOB[job_id]
 
     for c in cells:
         if not c["vertex"] or not c["value"]:
@@ -169,7 +169,7 @@ def extract_profile(path: Path, job_id: str) -> tuple[list[dict], list[dict]]:
                 "parentId": parent,
             }
         )
-        level = None if typ == "duty" else default_level
+        level = None
         skills.append(
             {
                 "competencyId": cid,
@@ -214,9 +214,12 @@ def main() -> None:
         {"fromJobId": "lead", "toJobId": "mentor", "kind": "linear"},
         {"fromJobId": "lead", "toJobId": "functional-expert", "kind": "linear"},
         {"fromJobId": "lead", "toJobId": "architect", "kind": "level_change"},
-        {"fromJobId": "lead", "toJobId": "team-lead", "kind": "linear"},
+        {"fromJobId": "lead", "toJobId": "team-lead", "kind": "level_change"},
+        {"fromJobId": "lead", "toJobId": "tech-pm", "kind": "level_change"},
         {"fromJobId": "consultant", "toJobId": "team-lead", "kind": "level_change"},
+        {"fromJobId": "architect", "toJobId": "team-lead", "kind": "level_change"},
         {"fromJobId": "team-lead", "toJobId": "pm", "kind": "linear"},
+        {"fromJobId": "tech-pm", "toJobId": "pm", "kind": "linear"},
         {"fromJobId": "team-lead", "toJobId": "dept-head", "kind": "linear"},
         {"fromJobId": "pm", "toJobId": "dept-head", "kind": "linear"},
         {"fromJobId": "dept-head", "toJobId": "office-head", "kind": "linear"},
@@ -251,13 +254,19 @@ def main() -> None:
                 catalog[cid]["parentId"] = c["parentId"]
         profiles.append({"jobId": job_id, "skills": skills})
 
+    existing_path = OUT / "data.json"
+    if existing_path.exists():
+        existing = json.loads(existing_path.read_text(encoding="utf-8"))
+        jobs = existing.get("jobs") or jobs
+        transitions = existing.get("transitions") or transitions
+
     data = {
         "jobs": jobs,
         "transitions": transitions,
         "competencies": list(catalog.values()),
         "profiles": profiles,
     }
-    (OUT / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    existing_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     junior_profile = next(p for p in profiles if p["jobId"] == "junior")
     junior_comp_ids = {s["competencyId"] for s in junior_profile["skills"]}

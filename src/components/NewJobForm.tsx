@@ -1,10 +1,11 @@
+import { ActionForm } from "@/components/ActionForm";
 import { saveJobAction } from "@/app/actions";
 import { isAdmin } from "@/lib/auth";
 
 export async function NewJobForm() {
   if (!(await isAdmin())) return null;
   return (
-    <form action={saveJobAction} className="panel panel-pad mt-4 grid gap-3 text-sm md:grid-cols-2">
+    <ActionForm action={saveJobAction} className="panel panel-pad mt-4 grid gap-3 text-sm md:grid-cols-2">
       <h2 className="section-title md:col-span-2 mb-0">Новая должность</h2>
       <input name="id" placeholder="id" className="field" required />
       <input name="name" placeholder="Название" className="field" required />
@@ -17,6 +18,6 @@ export async function NewJobForm() {
       <button className="btn-primary md:col-span-2 w-fit" type="submit">
         Создать
       </button>
-    </form>
+    </ActionForm>
   );
 }

@@ -12,6 +12,13 @@ function changeLabel(change: string) {
   return "без изменений";
 }
 
+function formatPresence(type: string, present: boolean, level: number | null) {
+  if (!present) return "—";
+  if (type === "duty") return "есть";
+  if (level == null) return "уровень не задан";
+  return `ур. ${level}`;
+}
+
 export default async function ComparePage({
   searchParams,
 }: {
@@ -74,13 +81,13 @@ export default async function ComparePage({
                 <tr key={line.id} data-change={line.change}>
                   <td>{line.name}</td>
                   <td>
-                    {line.presentA ? (line.type === "duty" ? "есть" : `ур. ${line.levelA}`) : "—"}
+                    {formatPresence(line.type, line.presentA, line.levelA)}
                     {line.change === "criteria" && line.criteriaA ? (
                       <div className="mt-1 text-xs muted">{line.criteriaA}</div>
                     ) : null}
                   </td>
                   <td>
-                    {line.presentB ? (line.type === "duty" ? "есть" : `ур. ${line.levelB}`) : "—"}
+                    {formatPresence(line.type, line.presentB, line.levelB)}
                     {line.change === "criteria" && line.criteriaB ? (
                       <div className="mt-1 text-xs muted">{line.criteriaB}</div>
                     ) : null}

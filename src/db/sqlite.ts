@@ -52,6 +52,7 @@ export function openSqlite(filePath: string): { raw: DatabaseSync; client: Sqlit
   const raw = new DatabaseSync(filePath, { enableForeignKeyConstraints: true });
   raw.exec("PRAGMA journal_mode = WAL");
   raw.exec("PRAGMA foreign_keys = ON");
+  let txDepth = 0;
   const client: SqliteClient = {
     prepare(sql: string) {
       return wrapStatement(raw.prepare(sql));
@@ -61,13 +62,25 @@ export function openSqlite(filePath: string): { raw: DatabaseSync; client: Sqlit
     },
     transaction(fn) {
       const run = (tx: unknown) => {
-        raw.exec("BEGIN");
+        const nested = txDepth > 0;
+        const sp = `sp_${txDepth}`;
+        if (nested) raw.exec(`SAVEPOINT ${sp}`);
+        else raw.exec("BEGIN");
+        txDepth += 1;
         try {
           const result = fn(tx);
-          raw.exec("COMMIT");
+          txDepth -= 1;
+          if (nested) raw.exec(`RELEASE ${sp}`);
+          else raw.exec("COMMIT");
           return result;
         } catch (error) {
-          raw.exec("ROLLBACK");
+          txDepth -= 1;
+          if (nested) {
+            raw.exec(`ROLLBACK TO ${sp}`);
+            raw.exec(`RELEASE ${sp}`);
+          } else {
+            raw.exec("ROLLBACK");
+          }
           throw error;
         }
       };

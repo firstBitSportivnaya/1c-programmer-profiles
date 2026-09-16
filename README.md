@@ -6,19 +6,26 @@
 
 ```
 copy .env.example .env.local
+```
+
+В `.env.local` задайте `ADMIN_PASSWORD` и длинный случайный `SESSION_SECRET`. Пустые значения и плейсхолдеры `change-me` / `dev-only-change-me` код отклоняет: без секрета сессия администратора не выдаётся.
+
+```
 npm install
 npm run db:seed
 npm run dev
 ```
 
-Открыть http://127.0.0.1:3000 . Пароль админа — `ADMIN_PASSWORD` в `.env.local`.
+Открыть http://127.0.0.1:3000 .
 
 SQLite: `data/profiles.sqlite`. Перед повторным `db:seed` файл копируется в `*.bak`.
 
 ## Стек
 
-Next.js (App Router, только `localhost`) + Drizzle + SQLite через `node:sqlite` (Node 24). `better-sqlite3` на этой машине не собрался: нет Visual Studio C++, install-скрипты npm были пропущены. WAL и одно соединение сохранены.
+Next.js (App Router, только `localhost`) + Drizzle + SQLite через `node:sqlite` (Node 24). WAL и одно соединение; вложенные транзакции — через SAVEPOINT. Пакет `better-sqlite3` в зависимостях — локальная заглушка: drizzle-адаптер импортирует это имя, нативный модуль не ставится.
 
 ## Данные
 
 Карта узлов: `docs/node-map.md`. Контракт seed: `docs/seed-contract.md`. JSON: `seed/data.json`.
+
+Профиль стажёра входит в seed (mxfile 2022, страница 229982860). Уровни 1–3 у навыков в seed не заполнены: в drawio есть только грейд шапки должности, не уровень компетенции.

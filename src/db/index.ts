@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import { openSqlite, type SqliteClient } from "./sqlite";
 
-const WRAPPER_VERSION = 3;
+const WRAPPER_VERSION = 4;
 
 const globalForDb = globalThis as unknown as {
   sqliteClient?: SqliteClient;

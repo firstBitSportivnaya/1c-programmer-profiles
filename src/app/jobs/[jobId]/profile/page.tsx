@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ActionForm } from "@/components/ActionForm";
 import { deleteSkillAction, upsertSkillAction } from "@/app/actions";
 import { isAdmin } from "@/lib/auth";
 import { Fragment } from "react";
@@ -43,7 +44,7 @@ function SkillCard({
       <summary className="skill-summary">
         <span className="skill-summary-body">
           <span className="skill-name">{row.competency.name}</span>
-          {row.competency.type !== "duty" ? (
+          {row.competency.type !== "duty" && row.skill.level != null ? (
             <span className="skill-level">
               Уровень {row.skill.level}: {levelLabel(row.skill.level)}
             </span>
@@ -51,11 +52,12 @@ function SkillCard({
         </span>
       </summary>
       {admin ? (
-        <form action={upsertSkillAction} className="mt-2 space-y-2 text-sm">
+        <ActionForm action={upsertSkillAction} className="mt-2 space-y-2 text-sm">
           <input type="hidden" name="jobId" value={jobId} />
           <input type="hidden" name="competencyId" value={row.competency.id} />
           {row.competency.type !== "duty" ? (
-            <select name="level" defaultValue={String(row.skill.level ?? 1)} className="field">
+            <select name="level" defaultValue={row.skill.level == null ? "" : String(row.skill.level)} className="field">
+              <option value="">уровень не задан</option>
               {LEVELS.map((l) => (
                 <option key={l.value} value={l.value}>
                   {l.label}
@@ -69,18 +71,18 @@ function SkillCard({
           <button className="btn-primary" type="submit">
             Сохранить
           </button>
-        </form>
+        </ActionForm>
       ) : row.skill.criteria ? (
         <p className="skill-criteria">{row.skill.criteria}</p>
       ) : null}
       {admin ? (
-        <form action={deleteSkillAction} className="mt-2">
+        <ActionForm action={deleteSkillAction} className="mt-2">
           <input type="hidden" name="jobId" value={jobId} />
           <input type="hidden" name="skillId" value={row.skill.id} />
           <button className="btn-quiet" type="submit">
             Убрать строку
           </button>
-        </form>
+        </ActionForm>
       ) : null}
     </details>
   );
@@ -133,7 +135,7 @@ function Section({
         )}
       </div>
       {admin && unused.length > 0 ? (
-        <form action={upsertSkillAction} className="mt-4 space-y-2 text-sm">
+        <ActionForm action={upsertSkillAction} className="mt-4 space-y-2 text-sm">
           <input type="hidden" name="jobId" value={jobId} />
           {type === "duty" ? <input type="hidden" name="level" value="" /> : null}
           <select name="competencyId" className="field">
@@ -144,7 +146,8 @@ function Section({
             ))}
           </select>
           {type !== "duty" ? (
-            <select name="level" defaultValue="1" className="field">
+            <select name="level" defaultValue="" className="field">
+              <option value="">уровень не задан</option>
               {LEVELS.map((l) => (
                 <option key={l.value} value={l.value}>
                   {l.label}
@@ -156,7 +159,7 @@ function Section({
           <button className="btn" type="submit">
             Добавить
           </button>
-        </form>
+        </ActionForm>
       ) : null}
     </section>
   );

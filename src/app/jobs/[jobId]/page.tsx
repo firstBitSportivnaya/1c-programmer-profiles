@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ActionForm } from "@/components/ActionForm";
 import { addTransitionAction, createProfileAction, deleteJobAction, deleteTransitionAction, saveJobAction } from "@/app/actions";
 import { isAdmin } from "@/lib/auth";
 import { getJob, getProfileByJob, listJobs, outgoingTransitions } from "@/lib/queries";
@@ -50,12 +51,12 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
         <div className="panel panel-pad" style={{ borderStyle: "dashed" }}>
           <p className="mb-3 muted">Профиль не заполнен.</p>
           {admin ? (
-            <form action={createProfileAction}>
+            <ActionForm action={createProfileAction}>
               <input type="hidden" name="jobId" value={jobId} />
               <button className="btn-primary" type="submit">
                 Создать пустой профиль
               </button>
-            </form>
+            </ActionForm>
           ) : null}
         </div>
       )}
@@ -74,13 +75,13 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
                 </span>
               </div>
               {admin ? (
-                <form action={deleteTransitionAction}>
+                <ActionForm action={deleteTransitionAction}>
                   <input type="hidden" name="fromJobId" value={tr.fromJobId} />
                   <input type="hidden" name="toJobId" value={tr.toJobId} />
                   <button className="btn-quiet" type="submit">
                     Убрать
                   </button>
-                </form>
+                </ActionForm>
               ) : null}
             </li>
           ))}
@@ -91,7 +92,7 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
       {admin ? (
         <section className="panel panel-pad space-y-4">
           <h2 className="section-title">Правка должности</h2>
-          <form action={saveJobAction} className="grid grid-cols-2 gap-3 text-sm">
+          <ActionForm action={saveJobAction} className="grid grid-cols-2 gap-3 text-sm">
             <input type="hidden" name="id" value={job.id} />
             <label className="lbl">
               Название
@@ -120,8 +121,8 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
             <button className="btn-primary w-fit" type="submit">
               Сохранить
             </button>
-          </form>
-          <form action={addTransitionAction} className="flex flex-wrap items-end gap-3 text-sm">
+          </ActionForm>
+          <ActionForm action={addTransitionAction} className="flex flex-wrap items-end gap-3 text-sm">
             <input type="hidden" name="fromJobId" value={job.id} />
             <label className="lbl">
               Куда
@@ -145,13 +146,13 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
             <button className="btn" type="submit">
               Добавить ребро
             </button>
-          </form>
-          <form action={deleteJobAction}>
+          </ActionForm>
+          <ActionForm action={deleteJobAction}>
             <input type="hidden" name="id" value={job.id} />
             <button className="btn-danger" type="submit">
               Удалить должность
             </button>
-          </form>
+          </ActionForm>
         </section>
       ) : null}
     </article>

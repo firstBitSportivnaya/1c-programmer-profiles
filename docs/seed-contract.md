@@ -32,7 +32,7 @@
       "skills": [
         {
           "competencyId": "comp-platform-basics",
-          "level": 1,
+          "level": null,
           "criteria": "Для чего нужны программы 1С; …",
           "sortOrder": 0
         }
@@ -47,7 +47,7 @@
 - `lane`: `executor` | `manager` | `other`
 - `kind`: `linear` | `level_change`
 - `type`: `professional` | `universal` | `duty`
-- `level`: `1` | `2` | `3` или `null` (только `duty`)
+- `level`: `1` | `2` | `3` или `null`. Для `duty` всегда `null`. Для `professional` / `universal` в текущем seed `null`: drawio хранит грейд должности, не уровень навыка.
 
 ## Правила
 
@@ -56,5 +56,6 @@
 - `parentId` только корень (глубина ≤ 1), `unique(parentId, name)` среди компетенций
 - `type` родителя и потомка совпадают
 - Профиль только если в `profiles[]` есть объект с этим `jobId`
-- Для `professional` / `universal` `level` обязателен; для `duty` — `null`
+- Для `duty` `level` всегда `null`. Для `professional` / `universal` `level` необязателен (`1`/`2`/`3` или `null`)
 - Фикстура одного профиля: `seed/fixtures/junior.json` (подмножество `data.json`)
+- `extract_drawio.py` не перезаписывает `jobs` и `transitions`, если `seed/data.json` уже есть; граф карьеры правится в JSON, не в генераторе

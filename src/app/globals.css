@@ -398,6 +398,11 @@ details[open] > .skill-summary::before {
   border-bottom: 0;
 }
 
+.form-error {
+  color: var(--security-stroke);
+  font-size: 0.8125rem;
+}
+
 .muted {
   color: var(--text-muted);
 }
@@ -455,6 +460,16 @@ details[open] > .skill-summary::before {
   font-family: inherit;
 }
 
+.graph-shell .react-flow__node-lane,
+.graph-shell .react-flow__node-cluster {
+  pointer-events: none !important;
+}
+
+.graph-shell .react-flow__node-job {
+  pointer-events: all;
+  cursor: pointer;
+}
+
 .graph-shell .react-flow__node-default {
   padding: 0;
   border: 0;
@@ -468,6 +483,7 @@ details[open] > .skill-summary::before {
   background: var(--arrow);
   border: 0;
   opacity: 0.4;
+  pointer-events: none;
 }
 
 .graph-shell .react-flow__edge-path {
@@ -489,6 +505,7 @@ details[open] > .skill-summary::before {
   font-size: 12px;
   line-height: 1.35;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .job-card--filled {

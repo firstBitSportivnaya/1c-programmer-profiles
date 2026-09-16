@@ -1,4 +1,5 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { integer, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export const jobs = sqliteTable("jobs", {
   id: text("id").primaryKey(),
@@ -31,10 +32,10 @@ export const competencies = sqliteTable(
     name: text("name").notNull(),
     description: text("description"),
     type: text("type", { enum: ["professional", "universal", "duty"] }).notNull(),
-    parentId: text("parent_id"),
+    parentId: text("parent_id").references((): AnySQLiteColumn => competencies.id),
     updatedAt: integer("updated_at").notNull(),
   },
-  (t) => [uniqueIndex("competencies_parent_name").on(t.parentId, t.name)],
+  (t) => [uniqueIndex("competencies_parent_name").on(sql`IFNULL(${t.parentId}, '')`, t.name)],
 );
 
 export const profiles = sqliteTable("profiles", {

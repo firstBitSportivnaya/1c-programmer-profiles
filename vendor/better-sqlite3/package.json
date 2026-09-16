@@ -1,0 +1,9 @@
+{
+  "name": "better-sqlite3",
+  "version": "7.0.0",
+  "description": "Shim so drizzle-orm/better-sqlite3 can load. Runtime driver is node:sqlite.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "UNLICENSED",
+  "private": true
+}
