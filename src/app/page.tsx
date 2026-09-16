@@ -24,7 +24,6 @@ export default function HomePage() {
           <span className="pulse-dot" />
           <h1 className="page-title">Схема развития</h1>
         </div>
-        <p className="page-sub">Как на схеме OKP2: колонки исполнитель / руководитель, группы грейдов. Циан — заполненный профиль.</p>
         <CareerGraphView jobs={jobs} transitions={transitions} profileJobIds={profileJobIds} />
       </section>
       <section>
@@ -37,7 +36,7 @@ export default function HomePage() {
                   {job.name}
                 </Link>
                 <div className="mt-1 text-xs muted">
-                  {LANE[job.lane]} · порядок {job.rankOrder}
+                  {LANE[job.lane]}
                   {profileJobIds.includes(job.id) ? " · профиль есть" : " · профиль не заполнен"}
                 </div>
               </div>

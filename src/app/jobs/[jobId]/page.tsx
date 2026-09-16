@@ -33,8 +33,6 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
       <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <dt className="muted">Ветка</dt>
         <dd>{LANE[job.lane]}</dd>
-        <dt className="muted">Порядок</dt>
-        <dd>{job.rankOrder}</dd>
         <dt className="muted">Требуемый опыт, лет</dt>
         <dd>{job.yearsRequired ?? "—"}</dd>
         <dt className="muted">Профстандарт</dt>

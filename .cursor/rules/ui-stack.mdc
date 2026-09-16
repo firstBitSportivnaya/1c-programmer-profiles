@@ -1,0 +1,24 @@
+---
+description: UI, SQLite driver, auth defaults, and career graph behaviour
+globs: src/**/*.{ts,tsx,css},vendor/**,package.json
+alwaysApply: false
+---
+
+# UI и стек
+
+- SQLite через `node:sqlite` (`src/db/sqlite.ts`). `better-sqlite3` — только `file:vendor/better-sqlite3`. Нативный модуль не ставить.
+- Вложенные транзакции — SAVEPOINT. Seed чистит таблицы `DELETE`, не unlink файла БД.
+- `ADMIN_PASSWORD` / `SESSION_SECRET`: пусто и `change-me` / `dev-only-change-me` отклонять. Дефолтов в коде нет.
+- Мутации форм — `ActionForm` + `useActionState`, ошибки инвариантов на экране.
+
+```tsx
+// ❌ BAD: порядок на карточке должности
+<dt>Порядок</dt><dd>{job.rankOrder}</dd>
+
+// ✅ GOOD: rankOrder только в админке и в раскладке графа
+```
+
+- `rankOrder` пользователю не показывать (карточка, список на главной). Граф раскладывает по `lane` + `rankOrder`.
+- На главной нет текста про колонки OKP2 и «циан — заполненный профиль».
+- Узел графа — `Link` с `nopan`. Lanes/handles: `pointer-events: none`, иначе клики не доходят.
+- Стиль — Archify Classic в `globals.css`. После UI-правок проверить сценарий в браузере.

@@ -1,0 +1,18 @@
+---
+description: Product constraints and working agreements for the OKP2 job-profiles app
+alwaysApply: true
+---
+
+# Профили должностей (OKP2)
+
+Локальный справочник карьеры программистов 1С. Только `localhost` (`127.0.0.1:3000`).
+
+Перед правкой продукта или данных прочитать `docs/engineering-decisions.md`. Перед правкой профилей — `docs/content-decisions.md` и `docs/seed-contract.md`.
+
+- Профиль стажёра остаётся в seed. Не выкидывать «по плану было четыре грейда».
+- Заполненных профилей семь: intern … lead, architect, team-lead. Остальные узлы — должности без профиля.
+- Приложенный план реализации не править, пока владелец сам его не откроет.
+- Уровни компетенций не выводить из шапки drawio и не нумеровать по грейду.
+- Коммитить только по явной просьбе. Секреты, `.env.local`, sqlite и `tmp/` в git не класть.
+- После изменения `seed/data.json` — `npm run db:seed`.
+- Если порт 3000 слушает, но страница не открывается (`CloseWait`) — убить `start-server.js` и поднять `npm run dev` на 3000, не оставлять 3001.
