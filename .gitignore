@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+data/*.sqlite
+data/*.sqlite-*
+data/*.bak
+tmp/
+.env
+.env.local
+*.log
+tsconfig.tsbuildinfo
+__pycache__/
+*.pyc

@@ -1,0 +1,371 @@
+{
+  "jobs": [
+    {
+      "id": "junior",
+      "name": "Младший программист",
+      "rankOrder": 20,
+      "lane": "executor",
+      "yearsRequired": 1,
+      "professionalStandard": "06.001"
+    }
+  ],
+  "transitions": [],
+  "competencies": [
+    {
+      "id": "group-platform",
+      "name": "Платформа 1С",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "group-db",
+      "name": "СУБД",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "group-integrations",
+      "name": "Интеграции",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "group-devops",
+      "name": "DevOps",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "group-testing",
+      "name": "Тестирование",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "group-security",
+      "name": "Безопасность",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "group-communication",
+      "name": "Коммуникация",
+      "description": null,
+      "type": "universal",
+      "parentId": null
+    },
+    {
+      "id": "group-mentoring",
+      "name": "Менторинг",
+      "description": null,
+      "type": "universal",
+      "parentId": null
+    },
+    {
+      "id": "group-leadership",
+      "name": "Лидерство",
+      "description": null,
+      "type": "universal",
+      "parentId": null
+    },
+    {
+      "id": "comp-gramotnaya-pismennaya-rech",
+      "name": "Грамотная письменная речь",
+      "description": null,
+      "type": "universal",
+      "parentId": "group-communication"
+    },
+    {
+      "id": "comp-samostoyatelnost",
+      "name": "Самостоятельность",
+      "description": null,
+      "type": "universal",
+      "parentId": "group-leadership"
+    },
+    {
+      "id": "comp-obuchaemost",
+      "name": "Обучаемость",
+      "description": null,
+      "type": "universal",
+      "parentId": null
+    },
+    {
+      "id": "comp-navyki-delovoi-perepiski-i-soblyudenie-korporativnoi-etiki",
+      "name": "Навыки деловой переписки и соблюдение корпоративной этики",
+      "description": null,
+      "type": "universal",
+      "parentId": "group-communication"
+    },
+    {
+      "id": "comp-effektivnoe-vzaimodeistvie-v-komande",
+      "name": "Эффективное взаимодействие в команде",
+      "description": null,
+      "type": "universal",
+      "parentId": "group-communication"
+    },
+    {
+      "id": "comp-umenie-iskat-informaciyu-iz-tematicheskih-istochnikov",
+      "name": "Умение искать информацию из тематических источников",
+      "description": null,
+      "type": "universal",
+      "parentId": null
+    },
+    {
+      "id": "comp-bazovoe-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3",
+      "name": "Базовое владение средствами разработки и администрирования Платформы 1С 8.3",
+      "description": null,
+      "type": "professional",
+      "parentId": "group-platform"
+    },
+    {
+      "id": "comp-bazovye-navyki-programmirovaniya-na-yazyke-1s",
+      "name": "Базовые навыки программирования на языке 1С",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "comp-bazovoe-znanie-yazyka-zaprosov-1s",
+      "name": "Базовое знание языка запросов 1С",
+      "description": null,
+      "type": "professional",
+      "parentId": "group-db"
+    },
+    {
+      "id": "comp-znanie-reglamenta-i-standartov-razrabotki",
+      "name": "Знание регламента и стандартов разработки",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "comp-opyt-raboty-s-interfeisami-v-upravlyaemom-prilozhenii",
+      "name": "Опыт работы с интерфейсами в Управляемом приложении",
+      "description": null,
+      "type": "professional",
+      "parentId": "group-platform"
+    },
+    {
+      "id": "comp-opyt-vypolneniya-zadach-po-razrabotke-pechatnyh-form-i-ili-otchetov-na-skd",
+      "name": "Опыт выполнения задач по разработке Печатных форм и/или отчетов на СКД",
+      "description": null,
+      "type": "professional",
+      "parentId": "group-platform"
+    },
+    {
+      "id": "comp-bazovoe-znanie-hotya-by-odnoi-tipovoi-konfiguracii",
+      "name": "Базовое знание хотя бы одной типовой конфигурации",
+      "description": null,
+      "type": "professional",
+      "parentId": "group-platform"
+    },
+    {
+      "id": "comp-obuchenie-razrabotke-na-yazyke-1s-pod-kontrolem-nastavnika",
+      "name": "Обучение разработке на языке 1С под контролем наставника",
+      "description": null,
+      "type": "duty",
+      "parentId": null
+    },
+    {
+      "id": "comp-izuchenie-i-ispolnenie-vnutrennih-pravil-raboty-v-kompanii",
+      "name": "Изучение и исполнение внутренних правил работы в компании",
+      "description": null,
+      "type": "duty",
+      "parentId": null
+    },
+    {
+      "id": "comp-algoritmizaciya-postavlennyh-zadach-a-01-03",
+      "name": "Алгоритмизация поставленных задач (А/01.03)",
+      "description": null,
+      "type": "duty",
+      "parentId": null
+    },
+    {
+      "id": "comp-napisanie-programmnogo-koda-na-yazyke-1s-po-tehnicheskomu-zadaniyu-a-02-03",
+      "name": "Написание программного кода на языке 1С по техническому заданию (А/02.03)",
+      "description": null,
+      "type": "duty",
+      "parentId": null
+    },
+    {
+      "id": "comp-oformlenie-programmnogo-koda-v-sootvetstvii-s-reglamentom-a-03-03",
+      "name": "Оформление программного кода в соответствии с регламентом (А/03.03)",
+      "description": null,
+      "type": "duty",
+      "parentId": null
+    },
+    {
+      "id": "comp-rabota-s-sistemoi-upravleniya-versiyami-programmnogo-koda-a-04-03",
+      "name": "Работа с системой управления версиями программного кода (А/04.03)",
+      "description": null,
+      "type": "duty",
+      "parentId": null
+    },
+    {
+      "id": "comp-proverka-i-otladka-programmnogo-koda-a-05-03",
+      "name": "Проверка и отладка программного кода (А/05.03)",
+      "description": null,
+      "type": "duty",
+      "parentId": null
+    },
+    {
+      "id": "comp-rabota-s-sistemami-kontrolya-versii-osnovy",
+      "name": "Работа с системами контроля версий (основы)",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    },
+    {
+      "id": "comp-instrumenty-ii",
+      "name": "Инструменты ИИ",
+      "description": null,
+      "type": "professional",
+      "parentId": null
+    }
+  ],
+  "profiles": [
+    {
+      "jobId": "junior",
+      "skills": [
+        {
+          "competencyId": "comp-gramotnaya-pismennaya-rech",
+          "level": 1,
+          "criteria": "Умение писать согласно установленным нормам грамматики и правописания, без крупных ошибок",
+          "sortOrder": 0
+        },
+        {
+          "competencyId": "comp-samostoyatelnost",
+          "level": 1,
+          "criteria": "Способность самому ставить свои цели и самому их достигать, способность решать проблемы самостоятельно, при необходимости привлекая компетентных людей",
+          "sortOrder": 1
+        },
+        {
+          "competencyId": "comp-obuchaemost",
+          "level": 1,
+          "criteria": "Способность к целенаправленному освоению знаний, желание развиваться в сфере 1С",
+          "sortOrder": 2
+        },
+        {
+          "competencyId": "comp-navyki-delovoi-perepiski-i-soblyudenie-korporativnoi-etiki",
+          "level": 1,
+          "criteria": "Умение формулировать свой мысли в понятной для коллег форме, уважительное отношение к клиентам и коллегам",
+          "sortOrder": 3
+        },
+        {
+          "competencyId": "comp-effektivnoe-vzaimodeistvie-v-komande",
+          "level": 1,
+          "criteria": "Открытость к команде, умение спокойно дискутировать по спорным вопросам,обращаться за помощью и не скрывать трудности",
+          "sortOrder": 4
+        },
+        {
+          "competencyId": "comp-umenie-iskat-informaciyu-iz-tematicheskih-istochnikov",
+          "level": 1,
+          "criteria": "Использование ресурсов по тематике 1С: ИТС, Infostart, группы в Telegram и др.",
+          "sortOrder": 5
+        },
+        {
+          "competencyId": "comp-bazovoe-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3",
+          "level": 1,
+          "criteria": "Для чего нужны программы 1С;Что такое платформа 1С, конфигурация, информационная база, база данных в чем их отличие\nУстановка платформы и конфигурации, развертка базы; Какие бывают типы лицензий, как установить 1С себе чтобы она работала\nВыгрузка, загрузка базы/конфигурации;Чистка кэша, ТИИ\nУстановка и обновление типовой конфигурации;Настройки поддержки\nИспользование синтаксис-помощника\nУдаление помеченных объектов, работа с журналом регистрации",
+          "sortOrder": 6
+        },
+        {
+          "competencyId": "comp-bazovye-navyki-programmirovaniya-na-yazyke-1s",
+          "level": 1,
+          "criteria": "Программный модуль, виды программных модулей; Переменные и константы; Процедуры, функции. Передача параметров\nОператоры и синтаксические конструкции, инструкции препроцессора\nУниверсальные коллекции значений: массив, структура, таблица значений\nПримитивные типы данных, функции для работы со значениями типа \"Строка\", \"Число\", \"Дата\" и др. Отличия Неопределено, NULL, \"\"",
+          "sortOrder": 7
+        },
+        {
+          "competencyId": "comp-bazovoe-znanie-yazyka-zaprosov-1s",
+          "level": 1,
+          "criteria": "Источники данных запросов. Реальные (физические), виртуальные таблицы\nКонструкции языка и описание запроса\nСпецификации соединений таблиц, объединение таблиц\nГруппировка, упорядочивание результатов запроса\nУсловие на результат запроса",
+          "sortOrder": 8
+        },
+        {
+          "competencyId": "comp-znanie-reglamenta-i-standartov-razrabotki",
+          "level": 1,
+          "criteria": "Знание основных стандартов разработки описанных на портале ИТС. Знание регламента разработки принятого в компании",
+          "sortOrder": 9
+        },
+        {
+          "competencyId": "comp-opyt-raboty-s-interfeisami-v-upravlyaemom-prilozhenii",
+          "level": 1,
+          "criteria": "Различия обычных форм и управляемых форм. Понятие тонкого, толстого, веб-клиентов\nДирективы компиляции",
+          "sortOrder": 10
+        },
+        {
+          "competencyId": "comp-opyt-vypolneniya-zadach-po-razrabotke-pechatnyh-form-i-ili-otchetov-na-skd",
+          "level": 1,
+          "criteria": "Общие сведения о системе компоновке данных\nОбщие сведения о макетах, их заполнении и выводе на форму\nУмение создавать отчеты и ПФ как дополнительные и добавлять в базу",
+          "sortOrder": 11
+        },
+        {
+          "competencyId": "comp-bazovoe-znanie-hotya-by-odnoi-tipovoi-konfiguracii",
+          "level": 1,
+          "criteria": "Бухгалтерия предприятия, ERP, Управление Холдингом, Управление торговлей, Документооборот и т.д.",
+          "sortOrder": 12
+        },
+        {
+          "competencyId": "comp-obuchenie-razrabotke-na-yazyke-1s-pod-kontrolem-nastavnika",
+          "level": null,
+          "criteria": "Изучение материалов по Индивидуальному плану развития\nСовместное решение задач с наставником\nПрохождение проверки задач наставником",
+          "sortOrder": 13
+        },
+        {
+          "competencyId": "comp-izuchenie-i-ispolnenie-vnutrennih-pravil-raboty-v-kompanii",
+          "level": null,
+          "criteria": "Работа с корпоративным порталом\nРабота с почтой и мессенджерами\nСвоевременное заполнение табелей учета рабочего времени в Документообороте",
+          "sortOrder": 14
+        },
+        {
+          "competencyId": "comp-algoritmizaciya-postavlennyh-zadach-a-01-03",
+          "level": null,
+          "criteria": "Разработка алгоритмов решения поставленных задач в соответствии с требованиями технического задания или внутренних документов организации\nПроверка корректности алгоритмов решения поставленных задач",
+          "sortOrder": 15
+        },
+        {
+          "competencyId": "comp-napisanie-programmnogo-koda-na-yazyke-1s-po-tehnicheskomu-zadaniyu-a-02-03",
+          "level": null,
+          "criteria": "Конфигурирование на платформе 1С в соответствии с техническим заданием (готовыми спецификациями): написание программного кода, работа над составом метаданных конфигурации, разработка визуальных форм",
+          "sortOrder": 16
+        },
+        {
+          "competencyId": "comp-oformlenie-programmnogo-koda-v-sootvetstvii-s-reglamentom-a-03-03",
+          "level": null,
+          "criteria": "Приведение наименований переменных, функций, структур данных и файлов в соответствие с регламентом и стандартами разработки\nСтруктурирование, комментирование и разметка, форматирование исходного программного кода в соответствие с регламентом и стандартами разработки",
+          "sortOrder": 17
+        },
+        {
+          "competencyId": "comp-rabota-s-sistemoi-upravleniya-versiyami-programmnogo-koda-a-04-03",
+          "level": null,
+          "criteria": "Регистрация изменений исходного текста программного кода в системе управления версиями (хранилище)\nСлияние, разделение и сравнение исходных текстов программного кода\nСохранение сделанных изменений программного кода в соответствии с регламентом разработки",
+          "sortOrder": 18
+        },
+        {
+          "competencyId": "comp-proverka-i-otladka-programmnogo-koda-a-05-03",
+          "level": null,
+          "criteria": "Анализ и проверка исходного программного кода\nОтладка программного кода на уровне программных модулей",
+          "sortOrder": 19
+        },
+        {
+          "competencyId": "comp-rabota-s-sistemami-kontrolya-versii-osnovy",
+          "level": 1,
+          "criteria": "Работа с хранилищем конфигурации Понимание назначения Git: история изменений, откат, работа в команде Умение пользоваться интерфейсом Git",
+          "sortOrder": 20
+        },
+        {
+          "competencyId": "comp-instrumenty-ii",
+          "level": 1,
+          "criteria": "Применение AI (чат-боты, агенты) для изучения платформы, написания простых конструкций и пояснения ошибок",
+          "sortOrder": 21
+        }
+      ]
+    }
+  ]
+}
