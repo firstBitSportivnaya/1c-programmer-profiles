@@ -7,7 +7,7 @@ alwaysApply: true
 
 Локальный справочник карьеры программистов 1С. Только `localhost` (`127.0.0.1:3000`).
 
-Перед правкой продукта или данных прочитать `docs/engineering-decisions.md`. Перед правкой профилей — `docs/content-decisions.md` и `docs/seed-contract.md`.
+Перед правкой продукта или данных прочитать `CONTEXT.md` и `docs/engineering-decisions.md`. Перед правкой профилей — `docs/content-decisions.md` и `docs/seed-contract.md`.
 
 - Профиль стажёра остаётся в seed. Не выкидывать «по плану было четыре грейда».
 - Заполненных профилей семь: intern … lead, architect, team-lead. Остальные узлы — должности без профиля.
