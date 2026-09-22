@@ -5,6 +5,7 @@ data/*.sqlite
 data/*.sqlite-*
 data/*.bak
 tmp/
+.cursor/case-inbox.jsonl
 .env
 .env.local
 *.log

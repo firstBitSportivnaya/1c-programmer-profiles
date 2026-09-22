@@ -1,0 +1,16 @@
+---
+description: Drizzle and node:sqlite access for this local app
+globs: src/db/**/*.ts,src/lib/**/*.ts,src/app/**/*actions.ts
+alwaysApply: false
+---
+
+# Drizzle и SQLite
+
+Адаптация гайда Drizzle в Next.js: одно соединение на процесс и запросы только на сервере. Здесь не Postgres и не нативный `better-sqlite3`.
+
+- `@/db` импортируют только серверные модули. Файл с `"use client"` базу не открывает.
+- Соединение одно, на `globalThis`, через `getDb()` и `getSqlite()`. Драйвер — `node:sqlite` в `src/db/sqlite.ts`.
+- `Connection closed` после HMR: если `isOpen === false`, вызвать `resetDbConnection()` и повторить запись один раз.
+- Таблицы описывать в `src/db/schema.ts` и тем же изменением в `src/db/migrate.ts`.
+- Вложенная транзакция — SAVEPOINT, не второй `BEGIN`.
+- Данные запроса не писать в модульную переменную. Передавать аргументом функции.

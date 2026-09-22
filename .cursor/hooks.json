@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUseFailure": [
+      {
+        "command": "node .cursor/hooks/stack-cases.mjs failure"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/stack-cases.mjs stop",
+        "loop_limit": 1
+      }
+    ]
+  }
+}
