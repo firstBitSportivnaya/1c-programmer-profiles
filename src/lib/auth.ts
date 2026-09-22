@@ -7,7 +7,14 @@ import { migrate } from "@/db/migrate";
 
 const COOKIE = "pp_session";
 export const SESSION_COOKIE = COOKIE;
+const LEGACY_ADMIN_COOKIE = "pp_admin";
 const PLACEHOLDERS = new Set(["", "dev-only-change-me", "change-me-to-a-long-random-string"]);
+const COOKIE_ATTRS = {
+  httpOnly: true as const,
+  sameSite: "lax" as const,
+  path: "/",
+  secure: false,
+};
 
 function readEnv(name: "ADMIN_PASSWORD" | "SESSION_SECRET"): string | null {
   const value = process.env[name]?.trim() ?? "";
@@ -105,12 +112,18 @@ export function buildSessionCookie(employeeId: string) {
   return {
     name: COOKIE,
     value: `${employeeId}.${token}.${sign(`${employeeId}.${token}`, key)}`,
-    httpOnly: true as const,
-    sameSite: "lax" as const,
-    path: "/",
+    ...COOKIE_ATTRS,
     maxAge: 60 * 60 * 12,
-    secure: false,
   };
+}
+
+/** Same name/path/HttpOnly/SameSite as login, otherwise the browser keeps pp_session. */
+export function expiredSessionCookies() {
+  const gone = { ...COOKIE_ATTRS, value: "", maxAge: 0, expires: new Date(0) };
+  return [
+    { name: COOKIE, ...gone },
+    { name: LEGACY_ADMIN_COOKIE, ...gone },
+  ];
 }
 
 export async function setSessionCookie(employeeId: string) {
@@ -127,8 +140,16 @@ export async function setSessionCookie(employeeId: string) {
 
 export async function clearAdminCookie() {
   const jar = await cookies();
-  jar.delete(COOKIE);
-  jar.delete("pp_admin");
+  for (const cookie of expiredSessionCookies()) {
+    jar.set(cookie.name, cookie.value, {
+      httpOnly: cookie.httpOnly,
+      sameSite: cookie.sameSite,
+      path: cookie.path,
+      maxAge: cookie.maxAge,
+      expires: cookie.expires,
+      secure: cookie.secure,
+    });
+  }
 }
 
 export async function requireEmployee() {

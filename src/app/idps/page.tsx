@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
-import { createIdpAction } from "@/app/people-actions";
+import { createIdpAction } from "@/app/idp-actions";
 import { getSessionEmployee } from "@/lib/auth";
 import { canManageEmployee } from "@/lib/invariants";
 import {
@@ -59,6 +59,14 @@ export default async function IdpsPage() {
               ))}
             </select>
           </label>
+          <label className="lbl">
+            Начало
+            <input className="field" type="date" name="periodStart" required />
+          </label>
+          <label className="lbl">
+            Конец
+            <input className="field" type="date" name="periodEnd" required />
+          </label>
           <button className="btn-primary" type="submit">
             Создать
           </button>
@@ -71,7 +79,7 @@ export default async function IdpsPage() {
           const source = getJob(idp.sourceJobId);
           const target = getJob(idp.targetJobId);
           const items = listIdpItems(idp.id);
-          const done = items.filter((item) => item.status === "done").length;
+          const accepted = items.filter((item) => item.acceptedAt != null).length;
           return (
             <li key={idp.id} className="list-row">
               <div>
@@ -81,7 +89,8 @@ export default async function IdpsPage() {
                 <div className="mt-1 text-xs muted">
                   {owner?.name ?? idp.employeeId}
                   {creator ? ` · создал ${creator.name}` : ""}
-                  {idp.status === "active" ? ` · ${done} из ${items.length}` : ""}
+                  {idp.periodStart && idp.periodEnd ? ` · ${idp.periodStart} — ${idp.periodEnd}` : ""}
+                  {idp.status === "active" ? ` · принято ${accepted} из ${items.length}` : ""}
                 </div>
               </div>
               <span className="chip">{IDP_STATUS[idp.status] ?? idp.status}</span>

@@ -14,12 +14,13 @@ export function gapSnapshot(currentJobId: string, targetJobId: string): GapSnaps
   }
   const currentGrouped = groupedProfile(currentJobId);
   const current = new Map(
-    (currentGrouped ? currentGrouped.technical.concat(currentGrouped.personal, currentGrouped.duties) : []).map(
-      (row) => [row.competency.id, row],
-    ),
+    (currentGrouped ? currentGrouped.technical.concat(currentGrouped.personal) : []).map((row) => [
+      row.competency.id,
+      row,
+    ]),
   );
   const items: GapSnapshotItem[] = [];
-  for (const row of target.technical.concat(target.personal, target.duties)) {
+  for (const row of target.technical.concat(target.personal)) {
     const have = current.get(row.competency.id);
     if (!have) {
       items.push({
@@ -29,7 +30,6 @@ export function gapSnapshot(currentJobId: string, targetJobId: string): GapSnaps
       });
       continue;
     }
-    if (row.competency.type === "duty") continue;
     const need = row.skill.level ?? 0;
     const got = have.skill.level ?? 0;
     if (need > got) {

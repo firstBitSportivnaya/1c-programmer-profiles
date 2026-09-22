@@ -56,18 +56,41 @@ CREATE TABLE IF NOT EXISTS idps (
   source_job_id TEXT NOT NULL REFERENCES jobs(id),
   target_job_id TEXT NOT NULL REFERENCES jobs(id),
   created_by_id TEXT NOT NULL REFERENCES employees(id),
+  period_start TEXT NOT NULL DEFAULT '1970-01-01',
+  period_end TEXT NOT NULL DEFAULT '1970-01-01',
   status TEXT NOT NULL,
   updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS idp_assignments (
+  id TEXT PRIMARY KEY,
+  competency_id TEXT NOT NULL REFERENCES competencies(id),
+  name TEXT NOT NULL,
+  learn_text TEXT NOT NULL,
+  verify_text TEXT NOT NULL,
+  archived INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS idp_pool (
+  idp_id TEXT NOT NULL REFERENCES idps(id),
+  competency_id TEXT NOT NULL,
+  competency_name TEXT NOT NULL,
+  required_level INTEGER,
+  UNIQUE (idp_id, competency_id)
 );
 CREATE TABLE IF NOT EXISTS idp_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   idp_id TEXT NOT NULL REFERENCES idps(id),
-  kind TEXT NOT NULL,
-  competency_id TEXT,
-  competency_name TEXT,
+  assignment_id TEXT REFERENCES idp_assignments(id),
+  competency_id TEXT NOT NULL,
+  competency_name TEXT NOT NULL,
   required_level INTEGER,
-  body TEXT,
+  assignment_name TEXT NOT NULL,
+  learn_text TEXT NOT NULL,
+  verify_text TEXT NOT NULL,
+  due_on TEXT,
   status TEXT NOT NULL,
+  accepted_by_id TEXT REFERENCES employees(id),
+  accepted_at INTEGER,
   sort_order INTEGER NOT NULL
 );
 `;
@@ -141,10 +164,117 @@ function ensureIdpDocumentColumns() {
   `);
 }
 
+function addColumnIfMissing(table: string, name: string, ddl: string) {
+  const sqlite = getSqlite();
+  const names = new Set(
+    (sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((row) => row.name),
+  );
+  if (!names.has(name)) {
+    sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+
+function isoDateFromUnix(unix: number) {
+  const d = new Date(unix * 1000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(iso: string, days: number) {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function ensureIdpPeriodColumns() {
+  addColumnIfMissing("idps", "period_start", "period_start TEXT NOT NULL DEFAULT '1970-01-01'");
+  addColumnIfMissing("idps", "period_end", "period_end TEXT NOT NULL DEFAULT '1970-01-01'");
+  const sqlite = getSqlite();
+  const rows = sqlite.prepare("SELECT id, updated_at, period_start, period_end FROM idps").all() as {
+    id: string;
+    updated_at: number;
+    period_start: string;
+    period_end: string;
+  }[];
+  for (const row of rows) {
+    if (row.period_start !== "1970-01-01" && row.period_end !== "1970-01-01") continue;
+    const start = isoDateFromUnix(row.updated_at || Math.floor(Date.now() / 1000));
+    sqlite
+      .prepare("UPDATE idps SET period_start = ?, period_end = ? WHERE id = ?")
+      .run(start, addDays(start, 120), row.id);
+  }
+}
+
+function ensureAssignmentTables() {
+  const sqlite = getSqlite();
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS idp_assignments (
+      id TEXT PRIMARY KEY,
+      competency_id TEXT NOT NULL REFERENCES competencies(id),
+      name TEXT NOT NULL,
+      learn_text TEXT NOT NULL,
+      verify_text TEXT NOT NULL,
+      archived INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idp_assignments_active_name
+      ON idp_assignments (competency_id, name) WHERE archived = 0;
+    CREATE TABLE IF NOT EXISTS idp_pool (
+      idp_id TEXT NOT NULL REFERENCES idps(id),
+      competency_id TEXT NOT NULL,
+      competency_name TEXT NOT NULL,
+      required_level INTEGER,
+      UNIQUE (idp_id, competency_id)
+    );
+  `);
+}
+
+function idpItemHasKind() {
+  const sqlite = getSqlite();
+  const names = new Set(
+    (sqlite.prepare("PRAGMA table_info(idp_items)").all() as { name: string }[]).map((row) => row.name),
+  );
+  return names.has("kind") || !names.has("assignment_name");
+}
+
+function rebuildIdpItems() {
+  if (!idpItemHasKind()) return;
+  const sqlite = getSqlite();
+  sqlite.exec(`
+    PRAGMA foreign_keys = OFF;
+    DROP TABLE IF EXISTS idp_items;
+    CREATE TABLE idp_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      idp_id TEXT NOT NULL REFERENCES idps(id),
+      assignment_id TEXT REFERENCES idp_assignments(id),
+      competency_id TEXT NOT NULL,
+      competency_name TEXT NOT NULL,
+      required_level INTEGER,
+      assignment_name TEXT NOT NULL,
+      learn_text TEXT NOT NULL,
+      verify_text TEXT NOT NULL,
+      due_on TEXT,
+      status TEXT NOT NULL,
+      accepted_by_id TEXT REFERENCES employees(id),
+      accepted_at INTEGER,
+      sort_order INTEGER NOT NULL
+    );
+    PRAGMA foreign_keys = ON;
+  `);
+}
+
 export function migrate() {
   getSqlite().exec(DDL);
   ensureCompetenciesParentFk();
   ensureParentNameIndex();
   ensureIdpActiveIndex();
   ensureIdpDocumentColumns();
+  ensureIdpPeriodColumns();
+  ensureAssignmentTables();
+  rebuildIdpItems();
 }

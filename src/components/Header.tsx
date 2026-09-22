@@ -1,7 +1,13 @@
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { SessionEmployee } from "@/lib/auth";
 
-export function Header({ employee }: { employee: SessionEmployee | null }) {
+export function Header({
+  employee,
+  catalog,
+}: {
+  employee: SessionEmployee | null;
+  catalog: boolean;
+}) {
   return (
     <header className="toolbar">
       <div className="toolbar-inner">
@@ -24,6 +30,11 @@ export function Header({ employee }: { employee: SessionEmployee | null }) {
           {employee ? (
             <a href="/idps" className="nav-link">
               ИПР
+            </a>
+          ) : null}
+          {catalog ? (
+            <a href="/assignments" className="nav-link">
+              Задания
             </a>
           ) : null}
           {employee?.isAdmin || employee ? (

@@ -93,21 +93,53 @@ export const idps = sqliteTable("idps", {
   createdById: text("created_by_id")
     .notNull()
     .references(() => employees.id),
+  periodStart: text("period_start").notNull(),
+  periodEnd: text("period_end").notNull(),
   status: text("status", { enum: ["active", "completed", "cancelled"] }).notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
+
+export const idpAssignments = sqliteTable("idp_assignments", {
+  id: text("id").primaryKey(),
+  competencyId: text("competency_id")
+    .notNull()
+    .references(() => competencies.id),
+  name: text("name").notNull(),
+  learnText: text("learn_text").notNull(),
+  verifyText: text("verify_text").notNull(),
+  archived: integer("archived").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const idpPool = sqliteTable(
+  "idp_pool",
+  {
+    idpId: text("idp_id")
+      .notNull()
+      .references(() => idps.id),
+    competencyId: text("competency_id").notNull(),
+    competencyName: text("competency_name").notNull(),
+    requiredLevel: integer("required_level"),
+  },
+  (t) => [uniqueIndex("idp_pool_unique").on(t.idpId, t.competencyId)],
+);
 
 export const idpItems = sqliteTable("idp_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   idpId: text("idp_id")
     .notNull()
     .references(() => idps.id),
-  kind: text("kind", { enum: ["gap", "free"] }).notNull(),
-  competencyId: text("competency_id"),
-  competencyName: text("competency_name"),
+  assignmentId: text("assignment_id").references(() => idpAssignments.id),
+  competencyId: text("competency_id").notNull(),
+  competencyName: text("competency_name").notNull(),
   requiredLevel: integer("required_level"),
-  body: text("body"),
+  assignmentName: text("assignment_name").notNull(),
+  learnText: text("learn_text").notNull(),
+  verifyText: text("verify_text").notNull(),
+  dueOn: text("due_on"),
   status: text("status", { enum: ["not_started", "in_progress", "done"] }).notNull(),
+  acceptedById: text("accepted_by_id").references(() => employees.id),
+  acceptedAt: integer("accepted_at"),
   sortOrder: integer("sort_order").notNull(),
 });
 
@@ -116,4 +148,3 @@ export type TransitionKind = "linear" | "level_change";
 export type CompetencyType = "professional" | "universal" | "duty";
 export type IdpStatus = "active" | "completed" | "cancelled";
 export type IdpItemStatus = "not_started" | "in_progress" | "done";
-export type IdpItemKind = "gap" | "free";

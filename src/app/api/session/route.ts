@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE, buildSessionCookie } from "@/lib/auth";
+import { buildSessionCookie, expiredSessionCookies } from "@/lib/auth";
 import { bootstrapFirstAdmin, loginWithPassword } from "@/lib/session-login";
 
 export const runtime = "nodejs";
@@ -17,8 +17,16 @@ export async function POST(req: Request) {
 
   if (intent === "logout") {
     const res = redirectTo(req, "/");
-    res.cookies.set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
-    res.cookies.set("pp_admin", "", { path: "/", maxAge: 0 });
+    for (const cookie of expiredSessionCookies()) {
+      res.cookies.set(cookie.name, cookie.value, {
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite,
+        path: cookie.path,
+        maxAge: cookie.maxAge,
+        expires: cookie.expires,
+        secure: cookie.secure,
+      });
+    }
     return res;
   }
 

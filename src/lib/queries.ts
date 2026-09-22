@@ -1,10 +1,10 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { migrate } from "@/db/migrate";
-import { competencies, employees, idpItems, idps, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
+import { competencies, employees, idpAssignments, idpItems, idpPool, idps, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
 import { sectionForType } from "@/lib/invariants";
 
-const SCHEMA_TICK = 2;
+const SCHEMA_TICK = 3;
 let appliedTick = 0;
 export function ensureSchema() {
   if (appliedTick !== SCHEMA_TICK) {
@@ -220,6 +220,38 @@ export function getIdp(id: string) {
 export function listIdpItems(idpId: string) {
   ensureSchema();
   return getDb().select().from(idpItems).where(eq(idpItems.idpId, idpId)).orderBy(asc(idpItems.sortOrder)).all();
+}
+
+export function listIdpPool(idpId: string) {
+  ensureSchema();
+  return getDb().select().from(idpPool).where(eq(idpPool.idpId, idpId)).orderBy(asc(idpPool.competencyName)).all();
+}
+
+export function listIdpAssignments(competencyId?: string) {
+  ensureSchema();
+  if (competencyId) {
+    return getDb()
+      .select()
+      .from(idpAssignments)
+      .where(eq(idpAssignments.competencyId, competencyId))
+      .orderBy(asc(idpAssignments.name))
+      .all();
+  }
+  return getDb().select().from(idpAssignments).orderBy(asc(idpAssignments.name)).all();
+}
+
+export function listActiveIdpAssignments(competencyId: string) {
+  return listIdpAssignments(competencyId).filter((row) => row.archived === 0);
+}
+
+export function getIdpAssignment(id: string) {
+  ensureSchema();
+  return getDb().select().from(idpAssignments).where(eq(idpAssignments.id, id)).get();
+}
+
+export function assignmentCompetencies() {
+  const all = listCompetencies();
+  return all.filter((c) => c.type !== "duty" && !all.some((x) => x.parentId === c.id));
 }
 
 export function jobsWithProfiles() {

@@ -1,5 +1,5 @@
 import { eq, or } from "drizzle-orm";
-import { competencies, employees, idps, jobTransitions, profileSkills, profiles } from "@/db/schema";
+import { competencies, employees, idpAssignments, idpItems, idpPool, idps, jobTransitions, profileSkills, profiles } from "@/db/schema";
 import { getDb } from "@/db";
 import type { SessionEmployee } from "@/lib/auth";
 
@@ -72,6 +72,10 @@ export function assertTypeChangeAllowed(id: string, nextType: string) {
   const used = db.select().from(profileSkills).where(eq(profileSkills.competencyId, id)).get();
   if (used) {
     throw new InvariantError("Тип нельзя менять: компетенция уже в профиле");
+  }
+  const assignment = db.select().from(idpAssignments).where(eq(idpAssignments.competencyId, id)).get();
+  if (assignment) {
+    throw new InvariantError("Тип нельзя менять: есть задания ИПР");
   }
 }
 
@@ -167,6 +171,11 @@ export function canTickIdpItem(actor: SessionEmployee, employeeId: string): bool
   return canManageEmployee(actor, employeeId);
 }
 
+export function canEditAssignmentCatalog(actor: SessionEmployee): boolean {
+  if (actor.isAdmin) return true;
+  return Boolean(getDb().select().from(employees).where(eq(employees.managerId, actor.id)).get());
+}
+
 export function assertCompetencyDeletable(id: string) {
   const db = getDb();
   const used = db.select().from(profileSkills).where(eq(profileSkills.competencyId, id)).get();
@@ -176,5 +185,17 @@ export function assertCompetencyDeletable(id: string) {
   const child = db.select().from(competencies).where(eq(competencies.parentId, id)).get();
   if (child) {
     throw new InvariantError("Нельзя удалить компетенцию: есть дочерние элементы");
+  }
+  const assignment = db.select().from(idpAssignments).where(eq(idpAssignments.competencyId, id)).get();
+  if (assignment) {
+    throw new InvariantError("Нельзя удалить компетенцию: есть задания ИПР");
+  }
+  const pool = db.select().from(idpPool).where(eq(idpPool.competencyId, id)).get();
+  if (pool) {
+    throw new InvariantError("Нельзя удалить компетенцию: она в пуле ИПР");
+  }
+  const item = db.select().from(idpItems).where(eq(idpItems.competencyId, id)).get();
+  if (item) {
+    throw new InvariantError("Нельзя удалить компетенцию: есть строки ИПР");
   }
 }

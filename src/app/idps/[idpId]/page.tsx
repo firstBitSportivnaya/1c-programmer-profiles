@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { IdpBlock } from "@/components/IdpBlock";
 import { getSessionEmployee, type SessionEmployee } from "@/lib/auth";
 import { canViewEmployee } from "@/lib/invariants";
-import { getEmployee, getIdp, getJob, listIdpItems } from "@/lib/queries";
+import { getEmployee, getIdp, getJob, listIdpItems, listIdpPool } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +38,7 @@ export default async function IdpPage({ params }: { params: Promise<{ idpId: str
   if (!canViewEmployee(actor, idp.employeeId)) notFound();
   const target = getJob(idp.targetJobId);
   const items = listIdpItems(idp.id);
+  const pool = listIdpPool(idp.id);
 
   return (
     <article className="space-y-6">
@@ -67,8 +68,12 @@ export default async function IdpPage({ params }: { params: Promise<{ idpId: str
         <dd>
           <PersonName actor={actor} employeeId={idp.createdById} />
         </dd>
+        <dt className="muted">Период</dt>
+        <dd>
+          {idp.periodStart} — {idp.periodEnd}
+        </dd>
       </dl>
-      <IdpBlock actor={actor} idp={idp} items={items} />
+      <IdpBlock actor={actor} idp={idp} items={items} pool={pool} />
     </article>
   );
 }

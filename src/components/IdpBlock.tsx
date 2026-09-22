@@ -1,19 +1,23 @@
 import { ActionForm } from "@/components/ActionForm";
+import { AddIdpItemForm } from "@/components/AddIdpItemForm";
 import {
-  addFreeIdpItemAction,
-  closeIdpAction,
-  refreshIdpSnapshotAction,
+  acceptIdpItemAction,
+  cancelIdpAction,
+  deleteIdpItemAction,
+  refreshIdpPoolAction,
   setIdpItemStatusAction,
-} from "@/app/people-actions";
+  unacceptIdpItemAction,
+  updateIdpItemAction,
+} from "@/app/idp-actions";
 import type { SessionEmployee } from "@/lib/auth";
 import { canManageEmployee, canTickIdpItem } from "@/lib/invariants";
-import { getActiveIdp, getJob, listIdpItems, listIdps } from "@/lib/queries";
-import type { idpItems, idps } from "@/db/schema";
+import { getActiveIdp, getJob, listActiveIdpAssignments, listIdpItems, listIdpPool, listIdps } from "@/lib/queries";
+import type { idpItems, idpPool, idps } from "@/db/schema";
 
 const ITEM_STATUS: Record<string, string> = {
   not_started: "не начат",
   in_progress: "в работе",
-  done: "закрыт",
+  done: "сделал",
 };
 
 const IDP_STATUS: Record<string, string> = {
@@ -26,7 +30,7 @@ export function EmployeeIdpSummary({ employeeId }: { employeeId: string }) {
   const active = getActiveIdp(employeeId);
   const history = listIdps(employeeId).filter((row) => row.id !== active?.id);
   const items = active ? listIdpItems(active.id) : [];
-  const done = items.filter((item) => item.status === "done").length;
+  const accepted = items.filter((item) => item.acceptedAt != null).length;
   return (
     <section className="space-y-3">
       <h2 className="section-title">ИПР</h2>
@@ -37,7 +41,7 @@ export function EmployeeIdpSummary({ employeeId }: { employeeId: string }) {
             {getJob(active.targetJobId)?.name ?? active.targetJobId}
           </a>
           <span className="muted ml-2">
-            {done} из {items.length}
+            принято {accepted} из {items.length}
           </span>
         </p>
       ) : (
@@ -65,19 +69,46 @@ export function EmployeeIdpSummary({ employeeId }: { employeeId: string }) {
   );
 }
 
+function groupItems(items: (typeof idpItems.$inferSelect)[]) {
+  const order: string[] = [];
+  const byComp = new Map<string, (typeof idpItems.$inferSelect)[]>();
+  for (const item of items) {
+    if (!byComp.has(item.competencyId)) {
+      byComp.set(item.competencyId, []);
+      order.push(item.competencyId);
+    }
+    byComp.get(item.competencyId)!.push(item);
+  }
+  return order.map((competencyId) => {
+    const rows = byComp.get(competencyId)!;
+    const confirmed = rows.length > 0 && rows.every((row) => row.acceptedAt != null);
+    return { competencyId, name: rows[0].competencyName, requiredLevel: rows[0].requiredLevel, confirmed, rows };
+  });
+}
+
 export function IdpBlock({
   actor,
   idp,
   items,
+  pool,
 }: {
   actor: SessionEmployee;
   idp: typeof idps.$inferSelect;
   items: (typeof idpItems.$inferSelect)[];
+  pool: (typeof idpPool.$inferSelect)[];
 }) {
   const open = idp.status === "active";
   const manage = open && canManageEmployee(actor, idp.employeeId);
+  const reopen = idp.status === "completed" && canManageEmployee(actor, idp.employeeId);
   const tick = open && canTickIdpItem(actor, idp.employeeId);
-  const doneCount = items.filter((item) => item.status === "done").length;
+  const accepted = items.filter((item) => item.acceptedAt != null).length;
+  const groups = groupItems(items);
+  const catalog = pool.flatMap((row) =>
+    listActiveIdpAssignments(row.competencyId).map((assignment) => ({
+      ...assignment,
+      competencyName: row.competencyName,
+    })),
+  );
 
   return (
     <section className="space-y-4">
@@ -85,72 +116,141 @@ export function IdpBlock({
         <p>
           <span className="chip">{IDP_STATUS[idp.status] ?? idp.status}</span>
           <span className="muted ml-2">
-            {doneCount} из {items.length} пунктов закрыто
+            принято {accepted} из {items.length}
           </span>
         </p>
         {manage ? (
           <div className="flex flex-wrap gap-2">
-            <ActionForm action={refreshIdpSnapshotAction}>
+            <ActionForm action={refreshIdpPoolAction}>
               <input type="hidden" name="idpId" value={idp.id} />
               <button className="btn" type="submit">
-                Обновить снимок
+                Обновить разрыв
               </button>
             </ActionForm>
-            <ActionForm action={closeIdpAction}>
+            <ActionForm action={cancelIdpAction}>
               <input type="hidden" name="idpId" value={idp.id} />
-              <input type="hidden" name="status" value="completed" />
-              <button className="btn" type="submit">
-                Выполнен
-              </button>
-            </ActionForm>
-            <ActionForm action={closeIdpAction}>
-              <input type="hidden" name="idpId" value={idp.id} />
-              <input type="hidden" name="status" value="cancelled" />
               <button className="btn-quiet" type="submit">
                 Отменить
               </button>
             </ActionForm>
           </div>
         ) : null}
-        <ul className="space-y-2">
-          {items.map((item) => (
-            <li key={item.id} className="list-row text-sm">
-              <div>
-                <div>{item.kind === "free" ? item.body : item.competencyName}</div>
-                {item.kind === "gap" && item.requiredLevel != null ? (
-                  <div className="muted text-xs">нужен уровень {item.requiredLevel}</div>
-                ) : null}
-              </div>
-              {tick ? (
-                <ActionForm action={setIdpItemStatusAction} className="flex items-center gap-2">
-                  <input type="hidden" name="itemId" value={item.id} />
-                  <select className="field" name="status" defaultValue={item.status}>
-                    <option value="not_started">не начат</option>
-                    <option value="in_progress">в работе</option>
-                    <option value="done">закрыт</option>
-                  </select>
-                  <button className="btn-quiet" type="submit">
-                    Ок
-                  </button>
-                </ActionForm>
-              ) : (
-                <span className="chip">{ITEM_STATUS[item.status] ?? item.status}</span>
-              )}
-            </li>
-          ))}
-          {items.length === 0 ? <li className="muted text-sm">Пунктов нет</li> : null}
-        </ul>
-        {manage ? (
-          <ActionForm action={addFreeIdpItemAction} className="flex flex-wrap items-end gap-2 text-sm">
-            <input type="hidden" name="idpId" value={idp.id} />
-            <label className="lbl grow">
-              Свободный пункт
-              <input className="field" name="body" />
-            </label>
-            <button className="btn" type="submit">
-              Добавить
-            </button>
-          </ActionForm>
+        {groups.map((group) => (
+          <div key={group.competencyId} className="space-y-2">
+            <h3 className="section-title mb-0">
+              {group.name}
+              {group.requiredLevel != null ? (
+                <span className="muted font-normal"> · уровень {group.requiredLevel}</span>
+              ) : null}
+              <span className="chip ml-2">{group.confirmed ? "компетенция подтверждена" : "не подтверждена"}</span>
+            </h3>
+            <ul className="space-y-3">
+              {group.rows.map((item) => {
+                const acceptedRow = item.acceptedAt != null;
+                const canTickRow = tick && !acceptedRow;
+                return (
+                  <li key={item.id} className="panel panel-pad space-y-3 text-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium">{item.assignmentName}</div>
+                        {item.dueOn ? <div className="muted text-xs">срок {item.dueOn}</div> : null}
+                      </div>
+                      <span className="chip">{acceptedRow ? "принято" : ITEM_STATUS[item.status] ?? item.status}</span>
+                    </div>
+                    <div>
+                      <div className="muted text-xs">Узнать</div>
+                      <p className="whitespace-pre-wrap">{item.learnText}</p>
+                    </div>
+                    <div>
+                      <div className="muted text-xs">Проверить</div>
+                      <p className="whitespace-pre-wrap">{item.verifyText}</p>
+                    </div>
+                    {canTickRow ? (
+                      <ActionForm action={setIdpItemStatusAction} className="flex flex-wrap items-end gap-2">
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <label className="lbl">
+                          Ход
+                          <select className="field" name="status" defaultValue={item.status}>
+                            <option value="not_started">не начат</option>
+                            <option value="in_progress">в работе</option>
+                            <option value="done">сделал</option>
+                          </select>
+                        </label>
+                        <button className="btn-quiet" type="submit">
+                          Ок
+                        </button>
+                      </ActionForm>
+                    ) : null}
+                    {manage && !acceptedRow ? (
+                      <ActionForm action={acceptIdpItemAction}>
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <button className="btn" type="submit">
+                          Принять
+                        </button>
+                      </ActionForm>
+                    ) : null}
+                    {(manage || reopen) && acceptedRow ? (
+                      <ActionForm action={unacceptIdpItemAction}>
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <button className="btn-quiet" type="submit">
+                          Снять приёмку
+                        </button>
+                      </ActionForm>
+                    ) : null}
+                    {manage ? (
+                      <ActionForm action={updateIdpItemAction} className="grid gap-2">
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <label className="lbl">
+                          Название
+                          <input className="field" name="name" defaultValue={item.assignmentName} />
+                        </label>
+                        <label className="lbl">
+                          Узнать
+                          <textarea className="field" name="learnText" rows={3} defaultValue={item.learnText} />
+                        </label>
+                        <label className="lbl">
+                          Проверить
+                          <textarea className="field" name="verifyText" rows={3} defaultValue={item.verifyText} />
+                        </label>
+                        <label className="lbl">
+                          Срок
+                          <input className="field" type="date" name="dueOn" defaultValue={item.dueOn ?? ""} />
+                        </label>
+                        <button className="btn w-fit" type="submit">
+                          Сохранить тексты
+                        </button>
+                      </ActionForm>
+                    ) : null}
+                    {manage ? (
+                      <ActionForm action={deleteIdpItemAction}>
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <button className="btn-danger" type="submit">
+                          Убрать из плана
+                        </button>
+                      </ActionForm>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+        {items.length === 0 ? (
+          <p className="muted text-sm">
+            Заданий пока нет. ИПР станет выполненным, когда добавите хотя бы одно и примете все.
+          </p>
+        ) : null}
+        {manage && pool.length > 0 ? (
+          <AddIdpItemForm
+            idpId={idp.id}
+            periodStart={idp.periodStart}
+            periodEnd={idp.periodEnd}
+            pool={pool}
+            catalog={catalog}
+          />
+        ) : null}
+        {manage && pool.length === 0 ? (
+          <p className="muted text-sm">В пуле нет компетенций. Нажмите «Обновить разрыв».</p>
         ) : null}
       </div>
     </section>
