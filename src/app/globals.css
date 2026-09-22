@@ -398,6 +398,13 @@ details[open] > .skill-summary::before {
   border-bottom: 0;
 }
 
+.form-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
 .form-error {
   color: var(--security-stroke);
   font-size: 0.8125rem;

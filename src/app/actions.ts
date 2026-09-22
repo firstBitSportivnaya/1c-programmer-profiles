@@ -1,11 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { getDb, now } from "@/db";
+import { getDb, now, retryIfClosed } from "@/db";
 import { competencies, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
-import { clearAdminCookie, requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import {
   InvariantError,
   assertCompetencyDeletable,
@@ -40,12 +39,11 @@ function isUniqueConstraint(error: unknown) {
   return error instanceof Error && /UNIQUE constraint failed/i.test(error.message);
 }
 
-export async function logoutAction() {
-  await clearAdminCookie();
-  redirect("/");
-}
-
-export async function saveJobAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function saveJobAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "").trim();
@@ -75,25 +73,36 @@ export async function saveJobAction(_prev: ActionResult, formData: FormData): Pr
     revalidatePath(`/jobs/${id}`);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return saveJobAction(_prev, formData, true);
     if (isUniqueConstraint(error)) return { error: "Должность с таким id или названием уже есть" };
     return asActionError(error);
   }
 }
 
-export async function deleteJobAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function deleteJobAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "");
     assertJobDeletable(id);
     getDb().delete(jobs).where(eq(jobs.id, id)).run();
     revalidatePath("/");
-    redirect("/");
+    revalidatePath(`/jobs/${id}`);
+    return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return deleteJobAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function addTransitionAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function addTransitionAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const fromJobId = String(formData.get("fromJobId") ?? "");
@@ -115,12 +124,17 @@ export async function addTransitionAction(_prev: ActionResult, formData: FormDat
     revalidatePath(`/jobs/${fromJobId}`);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return addTransitionAction(_prev, formData, true);
     if (isUniqueConstraint(error)) return { error: "Такое ребро уже есть" };
     return asActionError(error);
   }
 }
 
-export async function deleteTransitionAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function deleteTransitionAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const fromJobId = String(formData.get("fromJobId") ?? "");
@@ -133,11 +147,16 @@ export async function deleteTransitionAction(_prev: ActionResult, formData: Form
     revalidatePath(`/jobs/${fromJobId}`);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return deleteTransitionAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function saveCompetencyAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function saveCompetencyAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "").trim();
@@ -164,12 +183,17 @@ export async function saveCompetencyAction(_prev: ActionResult, formData: FormDa
     revalidatePath("/admin/competencies");
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return saveCompetencyAction(_prev, formData, true);
     if (isUniqueConstraint(error)) return { error: "Имя компетенции должно быть уникально среди соседей" };
     return asActionError(error);
   }
 }
 
-export async function deleteCompetencyAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function deleteCompetencyAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "");
@@ -178,11 +202,16 @@ export async function deleteCompetencyAction(_prev: ActionResult, formData: Form
     revalidatePath("/admin/competencies");
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return deleteCompetencyAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function upsertSkillAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function upsertSkillAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const jobId = String(formData.get("jobId") ?? "");
@@ -219,11 +248,16 @@ export async function upsertSkillAction(_prev: ActionResult, formData: FormData)
     revalidatePath("/compare");
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return upsertSkillAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function deleteSkillAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function deleteSkillAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const jobId = String(formData.get("jobId") ?? "");
@@ -242,11 +276,16 @@ export async function deleteSkillAction(_prev: ActionResult, formData: FormData)
     revalidatePath("/compare");
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return deleteSkillAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function createProfileAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function createProfileAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const jobId = String(formData.get("jobId") ?? "");
@@ -256,8 +295,10 @@ export async function createProfileAction(_prev: ActionResult, formData: FormDat
     }
     db.insert(profiles).values({ id: `profile-${jobId}`, jobId, updatedAt: now() }).run();
     revalidatePath(`/jobs/${jobId}`);
-    redirect(`/jobs/${jobId}/profile`);
+    revalidatePath(`/jobs/${jobId}/profile`);
+    return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return createProfileAction(_prev, formData, true);
     return asActionError(error);
   }
 }

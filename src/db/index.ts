@@ -69,3 +69,9 @@ export function getSqlite() {
 export function now() {
   return Math.floor(Date.now() / 1000);
 }
+
+export function retryIfClosed(error: unknown, retried: boolean) {
+  if (retried || !isSqliteClosedError(error)) return false;
+  resetDbConnection();
+  return true;
+}

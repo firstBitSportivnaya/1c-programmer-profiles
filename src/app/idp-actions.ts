@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { getDb, isSqliteClosedError, now, resetDbConnection } from "@/db";
+import { getDb, now, retryIfClosed } from "@/db";
 import { idpAssignments, idpItems, idps } from "@/db/schema";
 import { requireEmployee, type SessionEmployee } from "@/lib/auth";
 import {
@@ -100,7 +100,7 @@ function poolRow(idpId: string, competencyId: string) {
   return row;
 }
 
-export async function createIdpAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function createIdpAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const employeeId = String(formData.get("employeeId") ?? "");
@@ -135,12 +135,13 @@ export async function createIdpAction(_prev: ActionResult, formData: FormData): 
     revalidateIdp(employeeId, id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return createIdpAction(_prev, formData, true);
     if (isUniqueConstraint(error)) return { error: "У сотрудника уже есть активный ИПР" };
     return asActionError(error);
   }
 }
 
-export async function refreshIdpPoolAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function refreshIdpPoolAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const idp = requireActiveManagedIdp(actor, String(formData.get("idpId") ?? ""));
@@ -149,11 +150,12 @@ export async function refreshIdpPoolAction(_prev: ActionResult, formData: FormDa
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return refreshIdpPoolAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function cancelIdpAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function cancelIdpAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const idp = requireActiveManagedIdp(actor, String(formData.get("idpId") ?? ""));
@@ -161,12 +163,12 @@ export async function cancelIdpAction(_prev: ActionResult, formData: FormData): 
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return cancelIdpAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function addIdpItemAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+export async function addIdpItemAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
     try {
       const actor = await requireEmployee();
       const idp = requireActiveManagedIdp(actor, String(formData.get("idpId") ?? ""));
@@ -230,18 +232,13 @@ export async function addIdpItemAction(_prev: ActionResult, formData: FormData):
       revalidateIdp(idp.employeeId, idp.id);
       return null;
     } catch (error) {
-      if (attempt === 0 && isSqliteClosedError(error)) {
-        resetDbConnection();
-        continue;
-      }
+      if (retryIfClosed(error, retried)) return addIdpItemAction(_prev, formData, true);
       if (isUniqueConstraint(error)) return { error: "Такое задание уже есть в справочнике этой компетенции" };
       return asActionError(error);
     }
-  }
-  return { error: "Не удалось записать задание, нажмите «Добавить» ещё раз" };
 }
 
-export async function updateIdpItemAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function updateIdpItemAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const item = getIdpItem(Number(formData.get("itemId")));
@@ -262,11 +259,12 @@ export async function updateIdpItemAction(_prev: ActionResult, formData: FormDat
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return updateIdpItemAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function deleteIdpItemAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function deleteIdpItemAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const item = getIdpItem(Number(formData.get("itemId")));
@@ -277,11 +275,12 @@ export async function deleteIdpItemAction(_prev: ActionResult, formData: FormDat
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return deleteIdpItemAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function setIdpItemStatusAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function setIdpItemStatusAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const item = getIdpItem(Number(formData.get("itemId")));
@@ -302,11 +301,12 @@ export async function setIdpItemStatusAction(_prev: ActionResult, formData: Form
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return setIdpItemStatusAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function acceptIdpItemAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function acceptIdpItemAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const item = getIdpItem(Number(formData.get("itemId")));
@@ -327,11 +327,12 @@ export async function acceptIdpItemAction(_prev: ActionResult, formData: FormDat
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return acceptIdpItemAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function unacceptIdpItemAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function unacceptIdpItemAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const item = getIdpItem(Number(formData.get("itemId")));
@@ -355,6 +356,7 @@ export async function unacceptIdpItemAction(_prev: ActionResult, formData: FormD
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return unacceptIdpItemAction(_prev, formData, true);
     return asActionError(error);
   }
 }
@@ -384,7 +386,7 @@ function insertCatalogAssignment(
   return { id, ...texts };
 }
 
-export async function saveAssignmentAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function saveAssignmentAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     if (!canEditAssignmentCatalog(actor)) {
@@ -414,12 +416,13 @@ export async function saveAssignmentAction(_prev: ActionResult, formData: FormDa
     revalidatePath("/assignments");
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return saveAssignmentAction(_prev, formData, true);
     if (isUniqueConstraint(error)) return { error: "Такое задание уже есть в справочнике этой компетенции" };
     return asActionError(error);
   }
 }
 
-export async function archiveAssignmentAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function archiveAssignmentAction(_prev: ActionResult, formData: FormData, retried = false): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     if (!canEditAssignmentCatalog(actor)) {
@@ -436,6 +439,7 @@ export async function archiveAssignmentAction(_prev: ActionResult, formData: For
     revalidatePath("/assignments");
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return archiveAssignmentAction(_prev, formData, true);
     if (isUniqueConstraint(error)) return { error: "Такое задание уже есть в справочнике этой компетенции" };
     return asActionError(error);
   }

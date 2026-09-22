@@ -150,6 +150,9 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
               Удалить должность
             </button>
           </ActionForm>
+          <a className="link-accent text-sm" href="/">
+            К схеме
+          </a>
         </section>
       ) : null}
     </article>

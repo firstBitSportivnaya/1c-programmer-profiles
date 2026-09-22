@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { getDb, now } from "@/db";
+import { getDb, now, retryIfClosed } from "@/db";
 import { employees, idps } from "@/db/schema";
 import { requireAdmin, requireEmployee } from "@/lib/auth";
 import {
@@ -65,7 +65,11 @@ function revalidatePeople(employeeId: string, idpId?: string) {
   if (idpId) revalidatePath(`/idps/${idpId}`);
 }
 
-export async function saveEmployeeAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function saveEmployeeAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const idRaw = String(formData.get("id") ?? "").trim();
@@ -130,12 +134,17 @@ export async function saveEmployeeAction(_prev: ActionResult, formData: FormData
     revalidatePeople(idRaw);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return saveEmployeeAction(_prev, formData, true);
     if (isUniqueConstraint(error)) return { error: "Такой логин уже есть" };
     return asActionError(error);
   }
 }
 
-export async function assignJobAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function assignJobAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     const actor = await requireEmployee();
     const employeeId = String(formData.get("employeeId") ?? "");
@@ -149,11 +158,16 @@ export async function assignJobAction(_prev: ActionResult, formData: FormData): 
     revalidatePeople(employeeId);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return assignJobAction(_prev, formData, true);
     return asActionError(error);
   }
 }
 
-export async function deactivateEmployeeAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function deactivateEmployeeAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const employeeId = String(formData.get("employeeId") ?? "");
@@ -177,6 +191,7 @@ export async function deactivateEmployeeAction(_prev: ActionResult, formData: Fo
     revalidatePeople(employeeId);
     return null;
   } catch (error) {
+    if (retryIfClosed(error, retried)) return deactivateEmployeeAction(_prev, formData, true);
     return asActionError(error);
   }
 }
