@@ -25,7 +25,7 @@ npm run dev
 
 Открыть http://127.0.0.1:3000 . База — `data/profiles.sqlite`, в git её нет. Пароли тоже остаются только на машине, где запущено приложение.
 
-Выкладка на сервер Windows: [docs/deploy-iis.md](docs/deploy-iis.md).
+Выкладка на сервер Windows: [docs/deploy-iis.md](docs/deploy-iis.md). Повторное обновление уже выложенного сайта: [docs/update-server.md](docs/update-server.md).
 
 ## Документация
 

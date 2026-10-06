@@ -232,13 +232,13 @@ Start-Service ProfilesNext
 
 ## 14. Как обновлять потом
 
-1. Остановить службу: `Stop-Service ProfilesNext`.
-2. Скопировать новые исходники поверх, не затирая `.env.local` и папку `data`.
-3. В папке приложения: `npm ci`, затем `npm run build`.
-4. `Start-Service ProfilesNext`.
-5. Обновить страницу в браузере с очисткой (Ctrl+F5).
+Пошагово: [docs/update-server.md](update-server.md). После появления коммита в GitHub на сервере от администратора:
 
-Базу при обычном обновлении кода не перезаписывать и `npm run db:seed` не запускать.
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\apps\programming-profiles\scripts\update-server.ps1
+```
+
+Скрипт останавливает службу `ProfilesNext`, подтягивает изменившиеся файлы, собирает сайт и запускает службу. Файл `.env.local` и папку `data` он не трогает. `npm run db:seed` на живой базе не запускать.
 
 ## Если что-то пошло не так
 
