@@ -11,7 +11,7 @@ alwaysApply: false
 - Одна компетенция на все грейды. Различие — `level` и `criteria`, не имя и не копия в справочнике.
 - `duty`: `level` всегда `null`. `professional` / `universal` в seed всегда 1–3.
 - Пять грейдов из схем — `LEVEL_MATRIX`. Architect и team-lead — `PROFILE_LEVELS`. Генератор сверяет и падает при расхождении.
-- `extract_drawio.py` не затирает `jobs`/`transitions`, ручные критерии и профили вне mxfile. Холодный шаблон должностей для architect/team-lead: стаж 5, стандарты 06.003 / 06.017.
+- `extract_drawio.py` не затирает `jobs`/`transitions`, ручные критерии и профили вне схем грейдов. Холодный шаблон должностей для architect/team-lead: стаж 5, стандарты 06.003 / 06.017.
 - JSON, матрица в генераторе и `seed/fixtures/junior.json` правятся вместе. Фикстура пишется с перевод строки, как `data.json`.
 - После правки — `npm run db:seed`. Разовые скрипты — в `tmp/`, после применения удалить.
 

@@ -1,9 +1,9 @@
 ---
-description: Product constraints and working agreements for the OKP2 job-profiles app
+description: Product constraints and working agreements for the job-profiles app of the development department
 alwaysApply: true
 ---
 
-# Профили должностей (OKP2)
+# Профили должностей (Отдел разработки)
 
 Локальный справочник карьеры программистов 1С. Только `localhost` (`127.0.0.1:3000`).
 

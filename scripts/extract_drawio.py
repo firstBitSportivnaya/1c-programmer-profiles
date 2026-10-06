@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Parse OKP2 profile drawio files into seed/data.json."""
+"""Parse development-department profile drawio files into seed/data.json."""
 from __future__ import annotations
 
 import base64
@@ -12,7 +12,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DRAWIO = ROOT / "tmp" / "confluence"
+DRAWIO = ROOT / "tmp" / "drawio"
 OUT = ROOT / "seed"
 
 SECTION_TITLES = {
