@@ -9,6 +9,10 @@ tmp/
 .env
 .env.local
 *.log
+logs/
+Thumbs.db
+Desktop.ini
+.DS_Store
 tsconfig.tsbuildinfo
 __pycache__/
 *.pyc

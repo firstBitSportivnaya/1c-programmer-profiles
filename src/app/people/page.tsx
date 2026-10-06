@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
 import { saveEmployeeAction } from "@/app/people-actions";
 import { getSessionEmployee } from "@/lib/auth";
-import { getJob, listDirectReports, listEmployees, listJobs } from "@/lib/queries";
+import { listDirectReports, listEmployees, listJobs } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ export default async function PeoplePage() {
   if (!actor) redirect("/login");
   const rows = actor.isAdmin ? listEmployees() : listDirectReports(actor.id);
   const jobs = listJobs();
+  const jobName = new Map(jobs.map((job) => [job.id, job.name]));
   const people = listEmployees().filter((row) => row.isActive === 1);
   return (
     <div className="space-y-8">
@@ -27,7 +28,7 @@ export default async function PeoplePage() {
                 {row.name}
               </a>
               <div className="mt-1 text-xs muted">
-                {getJob(row.jobId)?.name ?? row.jobId}
+                {jobName.get(row.jobId) ?? row.jobId}
                 {row.isActive !== 1 ? " · не активен" : ""}
                 {row.isAdmin === 1 ? " · админ" : ""}
               </div>

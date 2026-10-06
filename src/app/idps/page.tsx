@@ -4,13 +4,13 @@ import { createIdpAction } from "@/app/idp-actions";
 import { getSessionEmployee } from "@/lib/auth";
 import { canManageEmployee } from "@/lib/invariants";
 import {
-  getActiveIdp,
-  getEmployee,
-  getJob,
+  activeIdpEmployeeIds,
   jobsWithProfiles,
+  listEmployees,
   listEmployeesVisibleTo,
-  listIdpItems,
+  listIdpAcceptance,
   listIdpsVisibleTo,
+  listJobs,
 } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -28,7 +28,17 @@ export default async function IdpsPage() {
   const plans = listIdpsVisibleTo(actor);
   const people = listEmployeesVisibleTo(actor);
   const targets = jobsWithProfiles().map((job) => ({ id: job.id, name: job.name }));
-  const creatable = people.filter((row) => canManageEmployee(actor, row.id) && !getActiveIdp(row.id));
+  const busy = activeIdpEmployeeIds();
+  const creatable = people.filter((row) => canManageEmployee(actor, row.id) && !busy.has(row.id));
+  const employeesById = new Map(listEmployees().map((row) => [row.id, row]));
+  const jobsById = new Map(listJobs().map((row) => [row.id, row]));
+  const counts = new Map<string, { total: number; accepted: number }>();
+  for (const row of listIdpAcceptance(plans.map((idp) => idp.id))) {
+    const current = counts.get(row.idpId) ?? { total: 0, accepted: 0 };
+    current.total += 1;
+    if (row.acceptedAt != null) current.accepted += 1;
+    counts.set(row.idpId, current);
+  }
 
   return (
     <div className="space-y-8">
@@ -74,12 +84,11 @@ export default async function IdpsPage() {
       ) : null}
       <ul className="panel">
         {plans.map((idp) => {
-          const owner = getEmployee(idp.employeeId);
-          const creator = getEmployee(idp.createdById);
-          const source = getJob(idp.sourceJobId);
-          const target = getJob(idp.targetJobId);
-          const items = listIdpItems(idp.id);
-          const accepted = items.filter((item) => item.acceptedAt != null).length;
+          const owner = employeesById.get(idp.employeeId);
+          const creator = employeesById.get(idp.createdById);
+          const source = jobsById.get(idp.sourceJobId);
+          const target = jobsById.get(idp.targetJobId);
+          const progress = counts.get(idp.id) ?? { total: 0, accepted: 0 };
           return (
             <li key={idp.id} className="list-row">
               <div>
@@ -90,7 +99,7 @@ export default async function IdpsPage() {
                   {owner?.name ?? idp.employeeId}
                   {creator ? ` · создал ${creator.name}` : ""}
                   {idp.periodStart && idp.periodEnd ? ` · ${idp.periodStart} — ${idp.periodEnd}` : ""}
-                  {idp.status === "active" ? ` · принято ${accepted} из ${items.length}` : ""}
+                  {idp.status === "active" ? ` · принято ${progress.accepted} из ${progress.total}` : ""}
                 </div>
               </div>
               <span className="chip">{IDP_STATUS[idp.status] ?? idp.status}</span>

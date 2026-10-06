@@ -11,7 +11,7 @@ import {
 } from "@/app/idp-actions";
 import type { SessionEmployee } from "@/lib/auth";
 import { canManageEmployee, canTickIdpItem } from "@/lib/invariants";
-import { getActiveIdp, getJob, listActiveIdpAssignments, listIdpItems, listIdpPool, listIdps } from "@/lib/queries";
+import { getActiveIdp, getJob, listActiveIdpAssignmentsFor, listIdpItems, listIdps } from "@/lib/queries";
 import type { idpItems, idpPool, idps } from "@/db/schema";
 
 const ITEM_STATUS: Record<string, string> = {
@@ -103,12 +103,11 @@ export function IdpBlock({
   const tick = open && canTickIdpItem(actor, idp.employeeId);
   const accepted = items.filter((item) => item.acceptedAt != null).length;
   const groups = groupItems(items);
-  const catalog = pool.flatMap((row) =>
-    listActiveIdpAssignments(row.competencyId).map((assignment) => ({
-      ...assignment,
-      competencyName: row.competencyName,
-    })),
-  );
+  const competencyName = new Map(pool.map((row) => [row.competencyId, row.competencyName]));
+  const catalog = listActiveIdpAssignmentsFor(pool.map((row) => row.competencyId)).map((assignment) => ({
+    ...assignment,
+    competencyName: competencyName.get(assignment.competencyId) ?? assignment.competencyId,
+  }));
 
   return (
     <section className="space-y-4">

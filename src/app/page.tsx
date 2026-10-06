@@ -1,6 +1,6 @@
 import { CareerGraphView } from "@/components/CareerGraphView";
 import { NewJobForm } from "@/components/NewJobForm";
-import { getProfileByJob, listJobs, listTransitions } from "@/lib/queries";
+import { jobsWithProfiles, listJobs, listTransitions } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +14,8 @@ const LANE: Record<string, string> = {
 export default function HomePage() {
   const jobs = listJobs();
   const transitions = listTransitions();
-  const profileJobIds = jobs.filter((j) => getProfileByJob(j.id)).map((j) => j.id);
+  const profiled = new Set(jobsWithProfiles().map((job) => job.id));
+  const profileJobIds = jobs.filter((job) => profiled.has(job.id)).map((job) => job.id);
 
   return (
     <div className="space-y-10">

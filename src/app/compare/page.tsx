@@ -1,4 +1,4 @@
-import { compareJobs, getJob, getProfileByJob, listJobs } from "@/lib/queries";
+import { compareJobs, getJob, jobsWithProfiles } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function ComparePage({
 }: {
   searchParams: Promise<{ a?: string; b?: string }>;
 }) {
-  const jobs = listJobs().filter((j) => getProfileByJob(j.id));
+  const jobs = jobsWithProfiles();
   const sp = await searchParams;
   const a = sp.a ?? jobs[0]?.id ?? "";
   const b = sp.b ?? jobs[1]?.id ?? "";

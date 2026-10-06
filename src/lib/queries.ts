@@ -1,4 +1,5 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { cache } from "react";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { migrate } from "@/db/migrate";
 import { competencies, employees, idpAssignments, idpItems, idpPool, idps, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
@@ -13,10 +14,10 @@ export function ensureSchema() {
   }
 }
 
-export function listJobs() {
+export const listJobs = cache(function listJobs() {
   ensureSchema();
   return getDb().select().from(jobs).orderBy(asc(jobs.rankOrder), asc(jobs.name)).all();
-}
+});
 
 export function getJob(id: string) {
   ensureSchema();
@@ -38,10 +39,10 @@ export function getProfileByJob(jobId: string) {
   return getDb().select().from(profiles).where(eq(profiles.jobId, jobId)).get();
 }
 
-export function listCompetencies() {
+export const listCompetencies = cache(function listCompetencies() {
   ensureSchema();
   return getDb().select().from(competencies).orderBy(asc(competencies.name)).all();
-}
+});
 
 export function getCompetency(id: string) {
   ensureSchema();
@@ -134,27 +135,27 @@ export function compareJobs(aId: string, bId: string) {
   return { aJobId: aId, bJobId: bId, lines };
 }
 
-export function unusedCompetencies(profileId: string, type: string) {
+const usedSkillIds = cache(function usedSkillIds(profileId: string) {
   ensureSchema();
-  const used = getDb()
-    .select()
+  return getDb()
+    .select({ competencyId: profileSkills.competencyId })
     .from(profileSkills)
     .where(eq(profileSkills.profileId, profileId))
     .all()
-    .map((s) => s.competencyId);
+    .map((row) => row.competencyId);
+});
+
+export function unusedCompetencies(profileId: string, type: string) {
   const all = listCompetencies();
-  return all.filter((c) => {
-    if (c.type !== type) return false;
-    if (used.includes(c.id)) return false;
-    if (all.some((x) => x.parentId === c.id)) return false;
-    return true;
-  });
+  const used = new Set(usedSkillIds(profileId));
+  const parentIds = new Set(all.flatMap((row) => (row.parentId ? [row.parentId] : [])));
+  return all.filter((row) => row.type === type && !used.has(row.id) && !parentIds.has(row.id));
 }
 
-export function listEmployees() {
+export const listEmployees = cache(function listEmployees() {
   ensureSchema();
   return getDb().select().from(employees).orderBy(asc(employees.name)).all();
-}
+});
 
 export function getEmployee(id: string) {
   ensureSchema();
@@ -205,11 +206,20 @@ export function listIdpsVisibleTo(actor: { id: string; isAdmin: boolean }) {
   ensureSchema();
   const rows = getDb().select().from(idps).orderBy(desc(idps.updatedAt)).all();
   if (actor.isAdmin) return rows;
-  return rows.filter((idp) => {
-    if (idp.employeeId === actor.id) return true;
-    const owner = getEmployee(idp.employeeId);
-    return owner?.managerId === actor.id;
-  });
+  const managerByEmployee = new Map(listEmployees().map((row) => [row.id, row.managerId]));
+  return rows.filter((idp) => idp.employeeId === actor.id || managerByEmployee.get(idp.employeeId) === actor.id);
+}
+
+export function activeIdpEmployeeIds() {
+  ensureSchema();
+  return new Set(
+    getDb()
+      .select({ employeeId: idps.employeeId })
+      .from(idps)
+      .where(eq(idps.status, "active"))
+      .all()
+      .map((row) => row.employeeId),
+  );
 }
 
 export function getIdp(id: string) {
@@ -220,6 +230,16 @@ export function getIdp(id: string) {
 export function listIdpItems(idpId: string) {
   ensureSchema();
   return getDb().select().from(idpItems).where(eq(idpItems.idpId, idpId)).orderBy(asc(idpItems.sortOrder)).all();
+}
+
+export function listIdpAcceptance(idpIds: string[]) {
+  ensureSchema();
+  if (idpIds.length === 0) return [];
+  return getDb()
+    .select({ idpId: idpItems.idpId, acceptedAt: idpItems.acceptedAt })
+    .from(idpItems)
+    .where(inArray(idpItems.idpId, idpIds))
+    .all();
 }
 
 export function listIdpPool(idpId: string) {
@@ -242,6 +262,17 @@ export function listIdpAssignments(competencyId?: string) {
 
 export function listActiveIdpAssignments(competencyId: string) {
   return listIdpAssignments(competencyId).filter((row) => row.archived === 0);
+}
+
+export function listActiveIdpAssignmentsFor(competencyIds: string[]) {
+  ensureSchema();
+  if (competencyIds.length === 0) return [];
+  return getDb()
+    .select()
+    .from(idpAssignments)
+    .where(and(inArray(idpAssignments.competencyId, competencyIds), eq(idpAssignments.archived, 0)))
+    .orderBy(asc(idpAssignments.name))
+    .all();
 }
 
 export function getIdpAssignment(id: string) {

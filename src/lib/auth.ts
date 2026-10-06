@@ -1,9 +1,10 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { employees } from "@/db/schema";
-import { migrate } from "@/db/migrate";
+import { ensureSchema } from "@/lib/queries";
 
 const COOKIE = "pp_session";
 export const SESSION_COOKIE = COOKIE;
@@ -57,7 +58,7 @@ export function verifyEnvAdminPassword(password: string) {
 }
 
 export function hasCatalogAdmin(): boolean {
-  migrate();
+  ensureSchema();
   return Boolean(getDb().select().from(employees).where(eq(employees.isAdmin, 1)).get());
 }
 
@@ -83,7 +84,7 @@ function toSession(row: typeof employees.$inferSelect): SessionEmployee {
   };
 }
 
-export async function getSessionEmployee(): Promise<SessionEmployee | null> {
+export const getSessionEmployee = cache(async function getSessionEmployee(): Promise<SessionEmployee | null> {
   const key = secret();
   if (!key) return null;
   const jar = await cookies();
@@ -92,11 +93,11 @@ export async function getSessionEmployee(): Promise<SessionEmployee | null> {
   const [employeeId, token, mac] = raw.split(".");
   if (!employeeId || !token || !mac) return null;
   if (!safeEqual(mac, sign(`${employeeId}.${token}`, key))) return null;
-  migrate();
+  ensureSchema();
   const row = getDb().select().from(employees).where(eq(employees.id, employeeId)).get();
   if (!row || row.isActive !== 1) return null;
   return toSession(row);
-}
+});
 
 export async function isAdmin() {
   const employee = await getSessionEmployee();

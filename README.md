@@ -20,6 +20,12 @@ npm run dev
 
 SQLite: `data/profiles.sqlite`. Перед повторным `db:seed` файл копируется в `*.bak`.
 
+Выкладка на сервер Windows с IIS: `docs/deploy-iis.md`.
+
+## Что не попадает в GitHub
+
+В репозитории нет паролей и базы. `.env.local`, `data/*.sqlite`, журналы и `node_modules` перечислены в `.gitignore`. После клонирования секреты и база создаются заново по шагам выше. Файл `.env.example` только называет переменные, значений в нём нет.
+
 ## Стек
 
 Next.js (App Router, только `localhost`) + Drizzle + SQLite через `node:sqlite` (Node 24). WAL и одно соединение; вложенные транзакции — через SAVEPOINT. Пакет `better-sqlite3` в зависимостях — локальная заглушка: drizzle-адаптер импортирует это имя, нативный модуль не ставится.
