@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Профили должностей",
+    "output": ".archify/architecture-runtime-20261006-1224/runtime.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/firstBitSportivnaya/1c-programmer-profiles.git",
+      "provider": "github",
+      "revision": "253d143922cd75c314299be62ee0bc1c13c89fc9"
+    }
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Браузер",
+      "sublabel": "сотрудник",
+      "icon": "person",
+      "pos": [40, 80],
+      "size": [160, 64]
+    },
+    {
+      "id": "pages",
+      "type": "frontend",
+      "label": "Страницы",
+      "sublabel": "Next.js :3000",
+      "pos": [280, 80],
+      "size": [170, 64],
+      "sources": [
+        { "path": "package.json", "line": 7, "end_line": 7, "label": "слушает 127.0.0.1" },
+        { "path": "src/app/layout.tsx", "line": 24, "end_line": 26, "label": "сессия на каждый заход" },
+        { "path": "src/app/page.tsx", "line": 14, "end_line": 16, "label": "главная читает должности" }
+      ]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "node:sqlite",
+      "pos": [540, 80],
+      "size": [170, 64],
+      "sources": [
+        { "path": "src/db/index.ts", "line": 17, "end_line": 28, "label": "файл и одно соединение" },
+        { "path": "src/db/sqlite.ts", "line": 1, "end_line": 1, "label": "DatabaseSync" },
+        { "path": "src/lib/queries.ts", "line": 10, "end_line": 14, "label": "схема до чтения" }
+      ]
+    },
+    {
+      "id": "actions",
+      "type": "backend",
+      "label": "Действия",
+      "sublabel": "server actions",
+      "pos": [40, 280],
+      "size": [170, 64],
+      "sources": [
+        { "path": "src/app/actions.ts", "line": 1, "end_line": 7, "label": "запись каталога после requireAdmin" },
+        { "path": "src/app/idp-actions.ts", "line": 1, "end_line": 8, "label": "запись ИПР после requireEmployee" },
+        { "path": "src/app/api/session/route.ts", "line": 14, "end_line": 16, "label": "вход отдельным POST" }
+      ]
+    },
+    {
+      "id": "session",
+      "type": "security",
+      "label": "Сессия",
+      "sublabel": "cookie HMAC",
+      "pos": [280, 280],
+      "size": [170, 64],
+      "sources": [
+        { "path": "src/lib/auth.ts", "line": 9, "end_line": 17, "label": "cookie pp_session" },
+        { "path": "src/lib/auth.ts", "line": 87, "end_line": 99, "label": "проверка подписи" },
+        { "path": "src/lib/auth.ts", "line": 164, "end_line": 169, "label": "доступ админа" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Один процесс Node",
+      "wraps": ["pages", "actions", "session"]
+    }
+  ],
+  "connections": [
+    { "id": "open-page", "from": "browser", "to": "pages", "label": "HTTP", "variant": "emphasis" },
+    { "id": "read-db", "from": "pages", "to": "sqlite", "label": "чтение" },
+    { "id": "page-session", "from": "pages", "to": "session", "label": "cookie", "fromSide": "bottom", "toSide": "top" },
+    { "id": "submit", "from": "browser", "to": "actions", "label": "POST", "fromSide": "bottom", "toSide": "top" },
+    { "id": "authorize", "from": "actions", "to": "session", "label": "проверка" },
+    { "id": "write-db", "from": "actions", "to": "sqlite", "label": "запись", "fromSide": "right", "toSide": "bottom" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Запрос страницы",
+      "items": [
+        "Страница читает SQLite в том же процессе",
+        "Макет на каждом заходе смотрит cookie сессии"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Запись",
+      "items": [
+        "Форма идёт в server action, вход — в POST /api/session",
+        "Запись каталога требует админа, запись ИПР — сотрудника"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Граница схемы",
+      "items": [
+        "IIS из инструкции только проксирует на 127.0.0.1:3000",
+        "npm run db:seed заливает справочник отдельно от запроса"
+      ]
+    }
+  ]
+}

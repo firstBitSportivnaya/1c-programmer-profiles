@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\GIT\\programming-profiles\\.archify\\architecture-runtime-20261006-1224\\candidate.json",
+    "sha256": "1371ae1fc1cb317a14f76f1fa552ef80e019efdbaf51e8ae265ceb781902817e",
+    "bytes": 4546
+  },
+  "artifact": {
+    "path": "C:\\GIT\\programming-profiles\\.archify\\architecture-runtime-20261006-1224\\runtime.html",
+    "sha256": "94184e9679b0cd7bb799bbff96e44ba3a529f9ae5173aa2c1e0f500bd5b40d91",
+    "bytes": 758177
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\GIT\\programming-profiles\\.archify\\architecture-runtime-20261006-1224\\review-3\\runtime.finalize.json",
+    "summaryReceipt": "C:\\GIT\\programming-profiles\\.archify\\architecture-runtime-20261006-1224\\review-3\\runtime.finalize-summary.json",
+    "browserCheckReceipt": "C:\\GIT\\programming-profiles\\.archify\\architecture-runtime-20261006-1224\\review-3\\runtime.browser-check.json"
+  },
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-valid"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3564,
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 1,
+      "routesOverSuggestedBends": 2
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "page-session",
+            "from": "pages",
+            "to": "session",
+            "label": "cookie",
+            "collectionIndex": 2,
+            "artifactIndex": 3
+          },
+          "right": {
+            "id": "write-db",
+            "from": "actions",
+            "to": "sqlite",
+            "label": "запись",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "point": [
+            365,
+            168
+          ]
+        }
+      ],
+      "detours": [
+        {
+          "relationship": {
+            "id": "submit",
+            "from": "browser",
+            "to": "actions",
+            "label": "POST",
+            "collectionIndex": 3,
+            "artifactIndex": 4
+          },
+          "bends": 4,
+          "stretch": 1.227
+        },
+        {
+          "relationship": {
+            "id": "write-db",
+            "from": "actions",
+            "to": "sqlite",
+            "label": "запись",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "bends": 3,
+          "stretch": 1
+        }
+      ],
+      "truncated": false
+    },
+    "hints": [
+      "pages → session crosses actions → sqlite: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "browser → actions needs 4 bends: move node browser or actions so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "actions → sqlite needs 3 bends: move node actions or sqlite so they share a row or column with matching centers, or sit diagonally with a clear corner."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}
