@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Reviews run on pull requests after the CodeRabbit GitHub App is installed
+# on firstBitSportivnaya/1c-programmer-profiles.
+language: ru-RU
+tone_instructions: "Пиши по-русски, коротко и по делу. Замечание — только если правка может сломать поведение, данные или договорённости проекта."
+reviews:
+  profile: chill
+  poem: false
+  in_progress_fortune: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!data/**"
+    - "!tmp/**"
+    - "!.next/**"
+    - "!node_modules/**"
+    - "!**/*.sqlite"
+    - "!**/*.sqlite-*"
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        Next.js 15 App Router, React 19. Внутренние переходы — обычный <a href>, не next/link.
+        База — node:sqlite (DatabaseSync) через одно соединение на globalThis. Пакет better-sqlite3 — заглушка vendor/better-sqlite3. Не предлагать нативный better-sqlite3, Redis или Postgres.
+        При isOpen === false соединение закрыть и открыть заново. Запись после «Connection closed» повторить один раз.
+        Действия форм возвращают { error: string } | null. Не вызывать redirect() внутри useActionState: кнопка зависает. Вход, выход и первый администратор — POST /api/session.
+        Срок вводить как ДД.ММ.ГГГГ. Не вешать на input type="date" одновременно min и max: браузер молча блокирует отправку.
+        Ошибку формы показывать в самой форме. revalidatePath перемонтирует форму и стирает state.error.
+        force-dynamic не снимать. ИПР — отдельный документ /idps, задания — /assignments. Не встраивать ИПР в карточку сотрудника.
+        Грейд — назначенная должность. Не добавлять вторую шкалу личного уровня навыка.
+        Секреты, .env.local, sqlite и tmp/ не коммитить и не логировать.
+    - path: "seed/**"
+      instructions: |
+        Профиль стажёра (intern) остаётся в seed. Не удалять его и не сужать набор до четырёх грейдов.
+        Заполненных профилей семь: intern, junior, programmer, senior, lead, architect, team-lead. Остальные должности без профиля.
+        Уровни компетенций не выводить из шапки схемы и не нумеровать по грейду.
+        Если меняется seed/data.json, в ревью напомнить, что локально нужен npm run db:seed. На живой базе сервера db:seed не запускать: команда удаляет должности, компетенции и профили.
+    - path: "scripts/**"
+      instructions: |
+        scripts/update-server.ps1 обновляет уже выложенный сайт. Не затирать .env.local и папку data. Не добавлять вызов npm run db:seed. Служба — ProfilesNext, каталог — C:\apps\programming-profiles.
+        В .ps1 с кириллицей нужна кодировка UTF-8 с BOM, иначе Windows PowerShell 5.1 ломает строки.
+    - path: "docs/**"
+      instructions: |
+        Не возвращать внутренние имена лестницы и номера страниц Confluence. Не вписывать боевой IP сервера. Пример адреса в инструкции по IIS — документальная заглушка.
+        Адрес приложения для разработки — http://127.0.0.1:3000. Схема Archify не является темой экранов.
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - files: "CONTEXT.md"
+        applyTo: "**"
+      - files: "docs/engineering-decisions.md"
+        applyTo: "src/**"
+      - files: "docs/adr/**"
+        applyTo: "src/**"
+      - files: "docs/content-decisions.md"
+        applyTo: "seed/**"
+      - files: "docs/seed-contract.md"
+        applyTo: "seed/**"
+      - files: ".cursor/rules/**"
+        applyTo: "**"
