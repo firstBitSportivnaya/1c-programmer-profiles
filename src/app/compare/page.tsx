@@ -3,6 +3,12 @@ import { compareJobs, getJob, jobsWithProfiles } from "@/lib/queries";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const SECTIONS = [
+  { key: "technical", title: "Технические навыки" },
+  { key: "personal", title: "Личные навыки" },
+  { key: "duties", title: "Функциональные обязанности" },
+] as const;
+
 function changeLabel(change: string) {
   if (change === "added") return "появилось";
   if (change === "removed") return "пропало";
@@ -75,26 +81,43 @@ export default async function ComparePage({
                 <th>Изменение</th>
               </tr>
             </thead>
-            <tbody>
-              {result.lines.map((line) => (
-                <tr key={line.id} data-change={line.change}>
-                  <td>{line.name}</td>
-                  <td>
-                    {formatPresence(line.type, line.presentA, line.levelA)}
-                    {line.change === "criteria" && line.criteriaA ? (
-                      <div className="mt-1 text-xs muted">{line.criteriaA}</div>
-                    ) : null}
-                  </td>
-                  <td>
-                    {formatPresence(line.type, line.presentB, line.levelB)}
-                    {line.change === "criteria" && line.criteriaB ? (
-                      <div className="mt-1 text-xs muted">{line.criteriaB}</div>
-                    ) : null}
-                  </td>
-                  <td>{changeLabel(line.change)}</td>
-                </tr>
-              ))}
-            </tbody>
+            {SECTIONS.map((section) => {
+              const lines = result.lines.filter((line) => line.section === section.key);
+              return (
+                <tbody key={section.key}>
+                  <tr className={`compare-group compare-group--${section.key}`}>
+                    <th colSpan={4} scope="rowgroup">
+                      {section.title}
+                    </th>
+                  </tr>
+                  {lines.map((line) => (
+                    <tr key={line.id} data-change={line.change}>
+                      <td>{line.name}</td>
+                      <td>
+                        {formatPresence(line.type, line.presentA, line.levelA)}
+                        {line.change === "criteria" && line.criteriaA ? (
+                          <div className="mt-1 text-xs muted">{line.criteriaA}</div>
+                        ) : null}
+                      </td>
+                      <td>
+                        {formatPresence(line.type, line.presentB, line.levelB)}
+                        {line.change === "criteria" && line.criteriaB ? (
+                          <div className="mt-1 text-xs muted">{line.criteriaB}</div>
+                        ) : null}
+                      </td>
+                      <td>{changeLabel(line.change)}</td>
+                    </tr>
+                  ))}
+                  {lines.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="muted">
+                        Отличий нет
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              );
+            })}
           </table>
         </div>
       ) : (

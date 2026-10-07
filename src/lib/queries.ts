@@ -134,7 +134,8 @@ export function compareJobs(aId: string, bId: string) {
     else if (!presentA && presentB) change = "added";
     else if (type !== "duty" && levelA !== levelB) change = "level";
     else if ((criteriaA ?? "") !== (criteriaB ?? "")) change = "criteria";
-    return { id, name, type, presentA, presentB, levelA, levelB, criteriaA, criteriaB, change };
+    const section = sectionForType(type);
+    return { id, name, type, section, presentA, presentB, levelA, levelB, criteriaA, criteriaB, change };
   });
   lines.sort((x, y) => x.name.localeCompare(y.name, "ru"));
   return { aJobId: aId, bJobId: bId, lines };
