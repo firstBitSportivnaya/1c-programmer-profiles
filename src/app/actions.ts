@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getDb, now, retryIfClosed } from "@/db";
-import { competencies, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
+import { competencies, employeeCompetencyMarks, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import {
   InvariantError,
@@ -198,7 +198,9 @@ export async function deleteCompetencyAction(
     await requireAdmin();
     const id = String(formData.get("id") ?? "");
     assertCompetencyDeletable(id);
-    getDb().delete(competencies).where(eq(competencies.id, id)).run();
+    const db = getDb();
+    db.delete(employeeCompetencyMarks).where(eq(employeeCompetencyMarks.competencyId, id)).run();
+    db.delete(competencies).where(eq(competencies.id, id)).run();
     revalidatePath("/admin/competencies");
     return null;
   } catch (error) {

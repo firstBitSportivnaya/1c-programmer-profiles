@@ -8,7 +8,7 @@
  */
 import { getDb, getSqlite, now } from "../src/db";
 import { migrate } from "../src/db/migrate";
-import { employees, idpAssignments, idpItems, idpPool, idps } from "../src/db/schema";
+import { employeeCompetencyMarks, employees, idpAssignments, idpItems, idpPool, idps } from "../src/db/schema";
 import { hashPassword } from "../src/lib/password";
 
 type TargetSkill = { competencyId: string; competencyName: string; level: number | null };
@@ -107,11 +107,20 @@ function main() {
           },
         ])
         .run();
+
+      db.insert(employeeCompetencyMarks)
+        .values([
+          { employeeId: "emp-junior", competencyId: skills[0].competencyId, status: "has", updatedAt: t },
+          { employeeId: "emp-junior", competencyId: skills[1].competencyId, status: "in_progress", updatedAt: t },
+        ])
+        .run();
       return true;
     })
     .deferred(null);
 
-  console.log("upgrade base: employees=4 idps=2 idp_assignments=2 idp_pool=3 idp_items=2");
+  console.log(
+    "upgrade base: employees=4 idps=2 idp_assignments=2 idp_pool=3 idp_items=2 employee_competency_marks=2",
+  );
 }
 
 main();

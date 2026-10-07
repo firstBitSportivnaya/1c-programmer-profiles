@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { CompetencyMarks } from "@/components/CompetencyMarks";
 import { EmployeeIdpSummary } from "@/components/IdpBlock";
 import { getSessionEmployee } from "@/lib/auth";
 import { getJob } from "@/lib/queries";
@@ -30,6 +31,7 @@ export default async function MePage() {
           )}
         </dd>
       </dl>
+      <CompetencyMarks employeeId={employee.id} jobId={employee.jobId} />
       <EmployeeIdpSummary employeeId={employee.id} />
     </article>
   );

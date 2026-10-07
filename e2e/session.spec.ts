@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN_PASSWORD } from "./env";
+import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
 
-const ADMIN = { login: "e2e.admin", name: "Админ E2E", password: "e2e-account-password" };
+const ADMIN = E2E_ADMIN;
 
 // Шаги идут по одной базе: первый админ создаётся один раз, дальше вход его учёткой.
 test.describe.configure({ mode: "serial" });
