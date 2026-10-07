@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { IdpBlock } from "@/components/IdpBlock";
 import { getSessionEmployee, type SessionEmployee } from "@/lib/auth";
 import { canViewEmployee } from "@/lib/invariants";
-import { getEmployee, getIdp, getJob, listIdpItems, listIdpPool } from "@/lib/queries";
+import { getEmployee, getIdp, getJob, jobHref, listIdpItems, listIdpPool } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ function JobName({ jobId }: { jobId: string }) {
   const job = getJob(jobId);
   if (!job) return jobId;
   return (
-    <a className="link-accent" href={`/jobs/${job.id}`}>
+    <a className="link-accent" href={jobHref(job.id)}>
       {job.name}
     </a>
   );

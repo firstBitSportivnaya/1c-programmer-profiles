@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
+import { JobAdminPanel, JobFacts, NextJobs } from "@/components/JobOverview";
 import { deleteSkillAction, upsertSkillAction } from "@/app/actions";
 import { isAdmin } from "@/lib/auth";
 import { Fragment } from "react";
@@ -178,16 +179,13 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
   const unusedDuty = unusedCompetencies(grouped.profile.id, "duty");
 
   return (
-    <div className="space-y-6">
-      <p className="text-sm">
-        <a href={`/jobs/${jobId}`} className="link-accent">
-          ← {job.name}
-        </a>
-      </p>
+    <article className="space-y-6">
       <div className="page-kicker">
         <span className="pulse-dot" />
-        <h1 className="page-title">Профиль: {job.name}</h1>
+        <h1 className="page-title">{job.name}</h1>
       </div>
+      <JobFacts job={job} />
+      <NextJobs jobId={jobId} admin={admin} />
       <div className="grid gap-4 md:grid-cols-3">
         <Section
           title="Технические навыки"
@@ -217,6 +215,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
           unused={unusedDuty}
         />
       </div>
-    </div>
+      {admin ? <JobAdminPanel job={job} /> : null}
+    </article>
   );
 }

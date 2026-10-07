@@ -71,6 +71,7 @@ export async function saveJobAction(
     }
     revalidatePath("/");
     revalidatePath(`/jobs/${id}`);
+    revalidatePath(`/jobs/${id}/profile`);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return saveJobAction(_prev, formData, true);
@@ -91,6 +92,7 @@ export async function deleteJobAction(
     getDb().delete(jobs).where(eq(jobs.id, id)).run();
     revalidatePath("/");
     revalidatePath(`/jobs/${id}`);
+    revalidatePath(`/jobs/${id}/profile`);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return deleteJobAction(_prev, formData, true);
@@ -122,6 +124,7 @@ export async function addTransitionAction(
     db.insert(jobTransitions).values({ fromJobId, toJobId, kind }).run();
     revalidatePath("/");
     revalidatePath(`/jobs/${fromJobId}`);
+    revalidatePath(`/jobs/${fromJobId}/profile`);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return addTransitionAction(_prev, formData, true);
@@ -145,6 +148,7 @@ export async function deleteTransitionAction(
       .run();
     revalidatePath("/");
     revalidatePath(`/jobs/${fromJobId}`);
+    revalidatePath(`/jobs/${fromJobId}/profile`);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return deleteTransitionAction(_prev, formData, true);

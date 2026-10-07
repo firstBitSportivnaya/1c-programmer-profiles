@@ -4,7 +4,7 @@ import { EmployeeIdpSummary } from "@/components/IdpBlock";
 import { assignJobAction, deactivateEmployeeAction, saveEmployeeAction } from "@/app/people-actions";
 import { getSessionEmployee } from "@/lib/auth";
 import { canManageEmployee, canViewEmployee } from "@/lib/invariants";
-import { getEmployee, getJob, listEmployees, listJobs } from "@/lib/queries";
+import { getEmployee, getJob, jobHref, listEmployees, listJobs } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
         <dt className="muted">Должность</dt>
         <dd>
           {job ? (
-            <a className="link-accent" href={`/jobs/${job.id}`}>
+            <a className="link-accent" href={jobHref(job.id)}>
               {job.name}
             </a>
           ) : (

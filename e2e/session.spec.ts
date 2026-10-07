@@ -64,13 +64,34 @@ test("неверный пароль учётки — ошибка на стра�
   await expect(page.getByRole("alert")).toHaveText("Неверный логин или пароль");
 });
 
-test("админ входит учёткой и видит раздел компетенций", async ({ page }) => {
+async function loginAsAdmin(page: Page) {
   await page.goto("/login");
   const form = loginForm(page);
   await form.getByLabel("Логин").fill(ADMIN.login);
   await form.getByLabel("Пароль", { exact: true }).fill(ADMIN.password);
   await form.getByRole("button", { name: "Войти" }).click();
-
   await expect(page).toHaveURL(/\/me$/);
+}
+
+test("админ входит учёткой и видит раздел компетенций", async ({ page }) => {
+  await loginAsAdmin(page);
   await expect(page.getByRole("link", { name: "Компетенции" })).toBeVisible();
+});
+
+test("из кабинета должность открывается сразу профилем, админ правит её там же", async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.getByRole("link", { name: "Руководитель команды разработки" }).click();
+
+  await expect(page).toHaveURL(/\/jobs\/team-lead\/profile$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Руководитель команды разработки" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Технические навыки" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Правка должности" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Добавить ребро" })).toBeVisible();
+});
+
+test("админ на должности без профиля видит создание пустого профиля", async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.goto("/jobs/consultant");
+  await expect(page.getByRole("button", { name: "Создать пустой профиль" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Правка должности" })).toBeVisible();
 });

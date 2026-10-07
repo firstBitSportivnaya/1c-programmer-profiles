@@ -32,21 +32,18 @@ export default function HomePage() {
           {jobs.map((job) => (
             <li key={job.id} className="list-row">
               <div>
-                <a href={`/jobs/${job.id}`} className="link-accent font-medium">
+                <a
+                  href={profiled.has(job.id) ? `/jobs/${job.id}/profile` : `/jobs/${job.id}`}
+                  className="link-accent font-medium"
+                >
                   {job.name}
                 </a>
                 <div className="mt-1 text-xs muted">
                   {LANE[job.lane]}
-                  {profileJobIds.includes(job.id) ? " · профиль есть" : " · профиль не заполнен"}
+                  {profiled.has(job.id) ? " · профиль есть" : " · профиль не заполнен"}
                 </div>
               </div>
-              {profileJobIds.includes(job.id) ? (
-                <a href={`/jobs/${job.id}/profile`} className="nav-link">
-                  Профиль
-                </a>
-              ) : (
-                <span className="chip">пусто</span>
-              )}
+              {profiled.has(job.id) ? null : <span className="chip">пусто</span>}
             </li>
           ))}
         </ul>
