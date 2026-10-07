@@ -8,6 +8,11 @@
     "start": "next start --hostname 127.0.0.1",
     "lint": "next lint",
     "db:seed": "tsx scripts/seed.ts",
+    "check:seed": "tsx scripts/check-seed.ts",
+    "db:snapshot": "tsx scripts/db-snapshot.ts",
+    "db:upgrade-base": "tsx scripts/upgrade-base.ts",
+    "check:upgrade": "tsx scripts/check-upgrade.ts",
+    "test:e2e": "playwright test",
     "db:spike": "tsx scripts/sqlite-spike.ts"
   },
   "dependencies": {
@@ -19,6 +24,7 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.3",
     "@types/react": "^19.3.0",

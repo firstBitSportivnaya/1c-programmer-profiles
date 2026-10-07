@@ -1,0 +1,52 @@
+name: Доработка или ошибка
+description: Что поменять в приложении или профилях и как понять, что сделано
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Область
+      description: От области зависит, какие документы агент читает перед правкой (AGENTS.md)
+      multiple: true
+      options:
+        - content — профили и seed/data.json
+        - ui — экраны и формы
+        - db — таблицы и миграции
+        - domain — новое правило предметной области
+        - deploy — выкладка и сервер
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Кто сталкивается
+      description: Не заполнять, если роль ни при чём, например для deploy
+      multiple: true
+      options:
+        - гость каталога (без входа)
+        - сотрудник
+        - руководитель
+        - админ
+    validations:
+      required: false
+  - type: textarea
+    id: now
+    attributes:
+      label: Что сейчас
+      description: Для ошибки — шаги, адрес страницы, что видно на экране
+    validations:
+      required: true
+  - type: textarea
+    id: want
+    attributes:
+      label: Что должно быть
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: 2–5 пунктов «Дано / Когда / Тогда», каждый станет e2e-тестом. Хотя бы один — про ошибочный ввод или отказ в доступе
+      placeholder: |
+        1. Дано: руководитель вошёл. Когда: создаёт ИПР без срока. Тогда: форма показывает ошибку, план не создан.
+    validations:
+      required: true

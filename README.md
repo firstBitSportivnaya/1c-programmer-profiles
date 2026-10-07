@@ -52,6 +52,7 @@ npm run dev
 - [Стек, сессия, база, интерфейс и ограничения сборки](docs/engineering-decisions.md)
 - [Схема процесса: браузер, Next.js, сессия, SQLite](.archify/architecture-runtime-20261006-1224/runtime.html). Исходник — [candidate.json](.archify/architecture-runtime-20261006-1224/candidate.json). К оформлению экранов схема не относится.
 - Те же ограничения для правок в Cursor: [.cursor/rules/](.cursor/rules/).
+- [Доработка по issue: роли, проверки, pull request, выкладка](docs/workflow.md). Инструкции агентам — [AGENTS.md](AGENTS.md).
 
 ## Лицензия
 

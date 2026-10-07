@@ -1,0 +1,79 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Seed по контракту
+        run: npm run check:seed
+      - name: Типы
+        run: npx tsc --noEmit
+      - name: Сборка
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Сценарии в браузере
+        run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  upgrade:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: head
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            head/package-lock.json
+            base/package-lock.json
+      - name: База версии ${{ github.base_ref }}
+        working-directory: base
+        run: |
+          npm ci
+          # Пока в базовой ветке нет скрипта заполнения, берётся скрипт из pull request.
+          [ -f scripts/upgrade-base.ts ] || cp ../head/scripts/upgrade-base.ts scripts/
+          DB_PATH="$RUNNER_TEMP/upgrade-base.sqlite" npm run db:seed
+          DB_PATH="$RUNNER_TEMP/upgrade-base.sqlite" npx tsx scripts/upgrade-base.ts
+      - name: Та же база кодом pull request
+        working-directory: head
+        run: |
+          npm ci
+          npm run check:upgrade -- "$RUNNER_TEMP/upgrade-base.sqlite"

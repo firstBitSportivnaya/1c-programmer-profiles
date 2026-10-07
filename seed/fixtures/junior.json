@@ -181,35 +181,35 @@
     },
     {
       "id": "comp-algoritmizaciya-postavlennyh-zadach-a-01-03",
-      "name": "Алгоритмизация поставленных задач (А/01.03)",
+      "name": "Алгоритмизация поставленных задач (A/01.3)",
       "description": null,
       "type": "duty",
       "parentId": null
     },
     {
       "id": "comp-napisanie-programmnogo-koda-na-yazyke-1s-po-tehnicheskomu-zadaniyu-a-02-03",
-      "name": "Написание программного кода на языке 1С по техническому заданию (А/02.03)",
+      "name": "Написание программного кода на языке 1С по техническому заданию (A/02.3)",
       "description": null,
       "type": "duty",
       "parentId": null
     },
     {
       "id": "comp-oformlenie-programmnogo-koda-v-sootvetstvii-s-reglamentom-a-03-03",
-      "name": "Оформление программного кода в соответствии с регламентом (А/03.03)",
+      "name": "Оформление программного кода в соответствии с регламентом (A/03.3)",
       "description": null,
       "type": "duty",
       "parentId": null
     },
     {
       "id": "comp-rabota-s-sistemoi-upravleniya-versiyami-programmnogo-koda-a-04-03",
-      "name": "Работа с системой управления версиями программного кода (А/04.03)",
+      "name": "Работа с системой управления версиями программного кода (A/04.3)",
       "description": null,
       "type": "duty",
       "parentId": null
     },
     {
       "id": "comp-proverka-i-otladka-programmnogo-koda-a-05-03",
-      "name": "Проверка и отладка программного кода (А/05.03)",
+      "name": "Проверка и отладка программного кода (A/05.3)",
       "description": null,
       "type": "duty",
       "parentId": null
