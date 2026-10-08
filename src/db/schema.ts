@@ -143,8 +143,24 @@ export const idpItems = sqliteTable("idp_items", {
   sortOrder: integer("sort_order").notNull(),
 });
 
+export const employeeCompetencyMarks = sqliteTable(
+  "employee_competency_marks",
+  {
+    employeeId: text("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    competencyId: text("competency_id")
+      .notNull()
+      .references(() => competencies.id),
+    status: text("status", { enum: ["has", "lacks", "in_progress"] }).notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("employee_competency_marks_unique").on(t.employeeId, t.competencyId)],
+);
+
 export type JobLane = "executor" | "manager" | "other";
 export type TransitionKind = "linear" | "level_change";
 export type CompetencyType = "professional" | "universal" | "duty";
 export type IdpStatus = "active" | "completed" | "cancelled";
 export type IdpItemStatus = "not_started" | "in_progress" | "done";
+export type CompetencyMarkStatus = "has" | "lacks" | "in_progress";

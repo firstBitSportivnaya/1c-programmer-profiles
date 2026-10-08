@@ -2,9 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, now, retryIfClosed } from "@/db";
-import { employees, idps } from "@/db/schema";
+import { employeeCompetencyMarks, employees, idps, type CompetencyMarkStatus } from "@/db/schema";
 import { requireAdmin, requireEmployee } from "@/lib/auth";
 import {
   InvariantError,
@@ -18,6 +18,7 @@ import {
   getEmployee,
   getEmployeeByLogin,
   getJob,
+  markableCompetencies,
 } from "@/lib/queries";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -159,6 +160,49 @@ export async function assignJobAction(
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return assignJobAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+const MARK_STATUSES: CompetencyMarkStatus[] = ["has", "lacks", "in_progress"];
+
+/** Ставит или снимает личную пометку навыка у вошедшего сотрудника (ADR 0007). Пустой статус снимает пометку. */
+export async function setCompetencyMarkAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireEmployee();
+    const competencyId = String(formData.get("competencyId") ?? "");
+    const status = String(formData.get("status") ?? "");
+    if (status !== "" && !MARK_STATUSES.includes(status as CompetencyMarkStatus)) {
+      throw new InvariantError("Пометка: есть, нет или в процессе");
+    }
+    if (!markableCompetencies(actor.id, actor.jobId).some((row) => row.id === competencyId)) {
+      throw new InvariantError("Пометить можно только навык своей должности или цели ИПР");
+    }
+    const db = getDb();
+    const own = and(
+      eq(employeeCompetencyMarks.employeeId, actor.id),
+      eq(employeeCompetencyMarks.competencyId, competencyId),
+    );
+    if (status === "") {
+      db.delete(employeeCompetencyMarks).where(own).run();
+    } else {
+      const t = now();
+      db.insert(employeeCompetencyMarks)
+        .values({ employeeId: actor.id, competencyId, status: status as CompetencyMarkStatus, updatedAt: t })
+        .onConflictDoUpdate({
+          target: [employeeCompetencyMarks.employeeId, employeeCompetencyMarks.competencyId],
+          set: { status: status as CompetencyMarkStatus, updatedAt: t },
+        })
+        .run();
+    }
+    revalidatePath("/me");
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return setCompetencyMarkAction(_prev, formData, true);
     return asActionError(error);
   }
 }

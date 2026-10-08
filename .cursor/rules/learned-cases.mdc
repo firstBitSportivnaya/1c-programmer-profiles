@@ -13,4 +13,5 @@ alwaysApply: true
 - `Error: Connection closed` у `node:sqlite` после пересборки. Соединение держать на `globalThis`; при `isOpen === false` закрыть и открыть заново, запись повторить один раз.
 - Порт 3000 слушает, страницы висят, в `netstat` много `CloseWait` у `start-server.js`. Процесс убить и поднять `npm run dev` снова на 3000.
 - `npm run build` падает: `next/font` не скачал JetBrains Mono, `SELF_SIGNED_CERT_IN_CHAIN`. Корпоративный прокси подменяет сертификат, код ни при чём. Задать `NODE_EXTRA_CA_CERTS` на корневой сертификат прокси; разово — `$env:NODE_TLS_REJECT_UNAUTHORIZED="0"` только на эту сборку.
+- e2e: `getByLabel("Руководитель")` находит два `select` или не находит с `exact`. У `<label>` вокруг `<select>` в подпись попадает текст вариантов. Списки искать по началу подписи: `getByLabel(/^Руководитель/)` внутри формы.
 - `npx playwright install chromium` падает с `Download failure` за корпоративным прокси. Браузер не качать: `playwright.config.ts` на Windows берёт установленный Edge (`channel: "msedge"`), в CI — Chromium.

@@ -2,10 +2,23 @@ import { cache } from "react";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { migrate } from "@/db/migrate";
-import { competencies, employees, idpAssignments, idpItems, idpPool, idps, jobTransitions, jobs, profileSkills, profiles } from "@/db/schema";
+import {
+  competencies,
+  employeeCompetencyMarks,
+  employees,
+  idpAssignments,
+  idpItems,
+  idpPool,
+  idps,
+  jobTransitions,
+  jobs,
+  profileSkills,
+  profiles,
+  type CompetencyMarkStatus,
+} from "@/db/schema";
 import { sectionForType } from "@/lib/invariants";
 
-const SCHEMA_TICK = 3;
+const SCHEMA_TICK = 4;
 let appliedTick = 0;
 export function ensureSchema() {
   if (appliedTick !== SCHEMA_TICK) {
@@ -195,6 +208,49 @@ export function getActiveIdp(employeeId: string) {
     .where(eq(idps.employeeId, employeeId))
     .all()
     .find((row) => row.status === "active");
+}
+
+export type MarkableCompetency = {
+  id: string;
+  name: string;
+  section: "technical" | "personal";
+  onlyInTarget: boolean;
+};
+
+/**
+ * Навыки, которые сотрудник может пометить для себя (ADR 0007): профиль текущей должности
+ * и профиль цели активного ИПР, без обязанностей. `onlyInTarget` — навыка нет в текущей должности.
+ */
+export function markableCompetencies(employeeId: string, jobId: string): MarkableCompetency[] {
+  const rows = new Map<string, MarkableCompetency>();
+  const add = (profileJobId: string, onlyInTarget: boolean) => {
+    const grouped = groupedProfile(profileJobId);
+    if (!grouped) return;
+    for (const row of grouped.technical.concat(grouped.personal)) {
+      if (rows.has(row.competency.id)) continue;
+      rows.set(row.competency.id, {
+        id: row.competency.id,
+        name: row.competency.name,
+        section: sectionForType(row.competency.type) === "technical" ? "technical" : "personal",
+        onlyInTarget,
+      });
+    }
+  };
+  add(jobId, false);
+  const active = getActiveIdp(employeeId);
+  if (active) add(active.targetJobId, true);
+  return [...rows.values()].sort((x, y) => x.name.localeCompare(y.name, "ru"));
+}
+
+/** Личные пометки сотрудника: компетенция → статус. */
+export function listCompetencyMarks(employeeId: string) {
+  ensureSchema();
+  const rows = getDb()
+    .select()
+    .from(employeeCompetencyMarks)
+    .where(eq(employeeCompetencyMarks.employeeId, employeeId))
+    .all();
+  return new Map<string, CompetencyMarkStatus>(rows.map((row) => [row.competencyId, row.status]));
 }
 
 export function listIdps(employeeId: string) {

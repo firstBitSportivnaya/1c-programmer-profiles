@@ -93,6 +93,13 @@ CREATE TABLE IF NOT EXISTS idp_items (
   accepted_at INTEGER,
   sort_order INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS employee_competency_marks (
+  employee_id TEXT NOT NULL REFERENCES employees(id),
+  competency_id TEXT NOT NULL REFERENCES competencies(id),
+  status TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (employee_id, competency_id)
+);
 `;
 
 function ensureCompetenciesParentFk() {
