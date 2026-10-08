@@ -614,6 +614,24 @@ details[open] > .skill-summary::before {
   padding: 0.65rem 0.5rem;
 }
 
+.compare-table .compare-group th {
+  padding-top: 1.25rem;
+  color: var(--text);
+  border-bottom-width: 2px;
+}
+
+.compare-table .compare-group--technical th {
+  border-bottom-color: var(--frontend-stroke);
+}
+
+.compare-table .compare-group--personal th {
+  border-bottom-color: var(--backend-stroke);
+}
+
+.compare-table .compare-group--duties th {
+  border-bottom-color: var(--cloud-stroke);
+}
+
 .compare-table td {
   border-bottom: 1px solid var(--panel-border);
   padding: 0.7rem 0.5rem;

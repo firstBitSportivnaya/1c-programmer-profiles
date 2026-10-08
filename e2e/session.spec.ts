@@ -135,3 +135,21 @@ test("админ на должности без профиля видит соз
   await expect(page.getByRole("button", { name: "Создать пустой профиль" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Правка должности" })).toBeVisible();
 });
+
+test("сравнение двух пустых профилей: в каждой группе «Отличий нет»", async ({ page }) => {
+  await loginAsAdmin(page);
+  for (const jobId of ["mentor", "devops"]) {
+    await page.goto(`/jobs/${jobId}`);
+    await page.getByRole("button", { name: "Создать пустой профиль" }).click();
+    await expect(page.getByRole("button", { name: "Создать пустой профиль" })).toHaveCount(0);
+  }
+
+  await page.goto("/compare?a=mentor&b=devops");
+  await expect(page.locator("tr.compare-group th")).toHaveText([
+    "Технические навыки",
+    "Личные навыки",
+    "Функциональные обязанности",
+  ]);
+  await expect(page.locator("table.compare-table tbody").getByText("Отличий нет")).toHaveCount(3);
+  await expect(page.locator("tr[data-change]")).toHaveCount(0);
+});
