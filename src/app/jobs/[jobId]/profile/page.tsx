@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
+import { ExpandAll } from "@/components/ExpandAll";
 import { JobAdminPanel, JobFacts, NextJobs } from "@/components/JobOverview";
 import { deleteSkillAction, upsertSkillAction } from "@/app/actions";
 import { CompetencyLinks } from "@/components/CompetencyLinks";
@@ -51,7 +52,7 @@ function SkillCard({
   links: Map<string, CompetencyLink[]>;
 }) {
   return (
-    <details className="skill-card" open>
+    <details className="skill-card">
       <summary className="skill-summary">
         <span className="skill-summary-body">
           <span className="skill-name">{row.competency.name}</span>
@@ -126,7 +127,7 @@ function Section({
       <div className="space-y-3">
         {clusters.map((cluster) =>
           cluster.title ? (
-            <details key={cluster.key} className="skill-card" open>
+            <details key={cluster.key} className="skill-card">
               <summary className="skill-summary">
                 <span className="skill-summary-body">
                   <span className="skill-name">{cluster.title}</span>
@@ -203,7 +204,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
       </div>
       <JobFacts job={job} />
       <NextJobs jobId={jobId} admin={admin} />
-      <div className="grid gap-4 md:grid-cols-3">
+      <ExpandAll className="grid gap-4 md:grid-cols-3">
         <Section
           title="Технические навыки"
           className="lane-tech"
@@ -234,7 +235,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
           unused={unusedDuty}
           links={links}
         />
-      </div>
+      </ExpandAll>
       {admin ? <JobAdminPanel job={job} /> : null}
     </article>
   );
