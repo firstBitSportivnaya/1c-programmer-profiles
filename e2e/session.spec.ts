@@ -95,11 +95,12 @@ test("из карточки сотрудника и ИПР должность о
 
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
-  await form.locator('input[name="login"]').fill(person.login);
-  await form.locator('input[name="name"]').fill(person.name);
-  await form.locator('input[name="password"]').fill(person.password);
-  await form.locator('select[name="jobId"]').selectOption("junior");
-  await form.locator('select[name="managerId"]').selectOption({ label: ADMIN.name });
+  await form.getByLabel("Логин").fill(person.login);
+  await form.getByLabel("Имя").fill(person.name);
+  await form.getByLabel("Пароль").fill(person.password);
+  // В подпись <select> внутри <label> попадает текст вариантов, поэтому подпись сверяется с началом строки.
+  await form.getByLabel(/^Должность/).selectOption("junior");
+  await form.getByLabel(/^Руководитель/).selectOption({ label: ADMIN.name });
   await form.getByRole("button", { name: "Создать" }).click();
 
   await page.getByRole("link", { name: person.name, exact: true }).click();
@@ -110,10 +111,10 @@ test("из карточки сотрудника и ИПР должность о
   );
 
   await page.goto("/idps");
-  await page.locator('select[name="employeeId"]').selectOption({ label: person.name });
-  await page.locator('select[name="targetJobId"]').selectOption("programmer");
-  await page.locator('input[name="periodStart"]').fill("2026-01-01");
-  await page.locator('input[name="periodEnd"]').fill("2026-12-31");
+  await page.getByLabel(/^Сотрудник/).selectOption({ label: person.name });
+  await page.getByLabel(/^Цель/).selectOption("programmer");
+  await page.getByLabel("Начало").fill("2026-01-01");
+  await page.getByLabel("Конец").fill("2026-12-31");
   await page.getByRole("button", { name: "Создать" }).click();
   await page.locator("li", { hasText: person.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
 
