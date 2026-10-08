@@ -1,12 +1,31 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+const PROFILED = [
+  ["intern", "Программист-стажер"],
+  ["junior", "Младший программист"],
+  ["programmer", "Программист"],
+  ["senior", "Старший программист"],
+  ["lead", "Ведущий программист"],
+  ["architect", "Системный архитектор"],
+  ["team-lead", "Руководитель команды разработки"],
+] as const;
+
+/** Ссылки на должность со схемы и из списка на главной: обе должны вести на `href`. */
+async function expectJobLinks(page: Page, name: string, href: string) {
+  const links = page.getByRole("link", { name, exact: true });
+  await expect(links).toHaveCount(2);
+  for (const link of await links.all()) {
+    await expect(link).toHaveAttribute("href", href);
+  }
+}
 
 test("гость видит схему, ссылки на семь заполненных профилей ведут сразу на профиль", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Схема развития" })).toBeVisible();
-  await expect(page.locator("a.job-card[href$='/profile']")).toHaveCount(7);
-  await expect(page.locator("ul a[href$='/profile']")).toHaveCount(7);
-  await expect(page.locator("a.job-card[href='/jobs/consultant']")).toHaveCount(1);
-  await expect(page.locator("ul a[href='/jobs/consultant']")).toHaveCount(1);
+  for (const [id, name] of PROFILED) {
+    await expectJobLinks(page, name, `/jobs/${id}/profile`);
+  }
+  await expectJobLinks(page, "Программист-консультант", "/jobs/consultant");
 });
 
 test("должность с профилем — одна страница: сведения, следующие должности и три блока", async ({ page }) => {

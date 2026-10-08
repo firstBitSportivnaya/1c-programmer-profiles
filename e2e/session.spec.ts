@@ -89,6 +89,45 @@ test("из кабинета должность открывается сразу
   await expect(page.getByRole("button", { name: "Добавить ребро" })).toBeVisible();
 });
 
+test("из карточки сотрудника и ИПР должность открывается сразу профилем", async ({ page }) => {
+  const person = { login: "e2e.links", name: "Сотрудник ссылок E2E", password: "e2e-links-password" };
+  await loginAsAdmin(page);
+
+  await page.goto("/people");
+  const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
+  await form.locator('input[name="login"]').fill(person.login);
+  await form.locator('input[name="name"]').fill(person.name);
+  await form.locator('input[name="password"]').fill(person.password);
+  await form.locator('select[name="jobId"]').selectOption("junior");
+  await form.locator('select[name="managerId"]').selectOption({ label: ADMIN.name });
+  await form.getByRole("button", { name: "Создать" }).click();
+
+  await page.getByRole("link", { name: person.name, exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: person.name })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Младший программист", exact: true })).toHaveAttribute(
+    "href",
+    "/jobs/junior/profile",
+  );
+
+  await page.goto("/idps");
+  await page.locator('select[name="employeeId"]').selectOption({ label: person.name });
+  await page.locator('select[name="targetJobId"]').selectOption("programmer");
+  await page.locator('input[name="periodStart"]').fill("2026-01-01");
+  await page.locator('input[name="periodEnd"]').fill("2026-12-31");
+  await page.getByRole("button", { name: "Создать" }).click();
+  await page.locator("li", { hasText: person.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "ИПР: Программист" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Младший программист", exact: true })).toHaveAttribute(
+    "href",
+    "/jobs/junior/profile",
+  );
+  await expect(page.getByRole("link", { name: "Программист", exact: true })).toHaveAttribute(
+    "href",
+    "/jobs/programmer/profile",
+  );
+});
+
 test("админ на должности без профиля видит создание пустого профиля", async ({ page }) => {
   await loginAsAdmin(page);
   await page.goto("/jobs/consultant");
