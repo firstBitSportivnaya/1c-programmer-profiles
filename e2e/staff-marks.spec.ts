@@ -34,16 +34,17 @@ test("админ заводит сотрудника на младшего пр�
   await form.getByLabel("Логин").fill(JUNIOR.login);
   await form.getByLabel("Имя").fill(JUNIOR.name);
   await form.getByLabel("Пароль").fill(JUNIOR.password);
-  await form.locator('select[name="jobId"]').selectOption("junior");
-  await form.locator('select[name="managerId"]').selectOption({ label: E2E_ADMIN.name });
+  // В подпись <select> внутри <label> попадает текст вариантов, поэтому подпись сверяется с началом строки.
+  await form.getByLabel(/^Должность/).selectOption("junior");
+  await form.getByLabel(/^Руководитель/).selectOption({ label: E2E_ADMIN.name });
   await form.getByRole("button", { name: "Создать" }).click();
   await expect(page.getByRole("link", { name: JUNIOR.name, exact: true })).toBeVisible();
 
   await page.goto("/idps");
-  await page.locator('select[name="employeeId"]').selectOption({ label: JUNIOR.name });
-  await page.locator('select[name="targetJobId"]').selectOption("programmer");
-  await page.locator('input[name="periodStart"]').fill("2026-01-01");
-  await page.locator('input[name="periodEnd"]').fill("2026-12-31");
+  await page.getByLabel(/^Сотрудник/).selectOption({ label: JUNIOR.name });
+  await page.getByLabel(/^Цель/).selectOption("programmer");
+  await page.getByLabel("Начало").fill("2026-01-01");
+  await page.getByLabel("Конец").fill("2026-12-31");
   await page.getByRole("button", { name: "Создать" }).click();
   await expect(page.getByText(`${JUNIOR.name} · создал ${E2E_ADMIN.name}`)).toBeVisible();
 });
