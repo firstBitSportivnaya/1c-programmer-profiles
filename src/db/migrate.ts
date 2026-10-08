@@ -100,6 +100,15 @@ CREATE TABLE IF NOT EXISTS employee_competency_marks (
   updated_at INTEGER NOT NULL,
   UNIQUE (employee_id, competency_id)
 );
+CREATE TABLE IF NOT EXISTS competency_links (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  competency_id TEXT NOT NULL REFERENCES competencies(id),
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 function ensureCompetenciesParentFk() {

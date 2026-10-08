@@ -1,5 +1,6 @@
 import { ActionForm } from "@/components/ActionForm";
 import { AddIdpItemForm } from "@/components/AddIdpItemForm";
+import { CompetencyLinks } from "@/components/CompetencyLinks";
 import {
   acceptIdpItemAction,
   cancelIdpAction,
@@ -11,7 +12,14 @@ import {
 } from "@/app/idp-actions";
 import type { SessionEmployee } from "@/lib/auth";
 import { canManageEmployee, canTickIdpItem } from "@/lib/invariants";
-import { getActiveIdp, getJob, listActiveIdpAssignmentsFor, listIdpItems, listIdps } from "@/lib/queries";
+import {
+  getActiveIdp,
+  getJob,
+  listActiveIdpAssignmentsFor,
+  listCompetencyLinks,
+  listIdpItems,
+  listIdps,
+} from "@/lib/queries";
 import type { idpItems, idpPool, idps } from "@/db/schema";
 
 const ITEM_STATUS: Record<string, string> = {
@@ -103,6 +111,7 @@ export function IdpBlock({
   const tick = open && canTickIdpItem(actor, idp.employeeId);
   const accepted = items.filter((item) => item.acceptedAt != null).length;
   const groups = groupItems(items);
+  const links = listCompetencyLinks();
   const competencyName = new Map(pool.map((row) => [row.competencyId, row.competencyName]));
   const catalog = listActiveIdpAssignmentsFor(pool.map((row) => row.competencyId)).map((assignment) => ({
     ...assignment,
@@ -143,6 +152,7 @@ export function IdpBlock({
               ) : null}
               <span className="chip ml-2">{group.confirmed ? "компетенция подтверждена" : "не подтверждена"}</span>
             </h3>
+            <CompetencyLinks links={links.get(group.competencyId) ?? []} />
             <ul className="space-y-3">
               {group.rows.map((item) => {
                 const acceptedRow = item.acceptedAt != null;

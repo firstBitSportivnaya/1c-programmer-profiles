@@ -1,8 +1,14 @@
 import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
-import { deleteCompetencyAction, saveCompetencyAction } from "@/app/actions";
+import { CompetencyLinks, LINK_KINDS } from "@/components/CompetencyLinks";
+import {
+  addCompetencyLinkAction,
+  deleteCompetencyAction,
+  deleteCompetencyLinkAction,
+  saveCompetencyAction,
+} from "@/app/actions";
 import { isAdmin } from "@/lib/auth";
-import { listCompetencies } from "@/lib/queries";
+import { listCompetencies, listCompetencyLinks } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +29,7 @@ export default async function CompetenciesPage() {
   if (!(await isAdmin())) redirect("/admin/login");
   const items = listCompetencies();
   const roots = items.filter((c) => !c.parentId);
+  const links = listCompetencyLinks();
   return (
     <div className="space-y-6">
       <div className="page-kicker">
@@ -83,6 +90,43 @@ export default async function CompetenciesPage() {
                 Ок
               </button>
             </ActionForm>
+            <div role="group" aria-label={`Материалы: ${c.name}`} className="mt-3">
+              <CompetencyLinks
+                links={links.get(c.id) ?? []}
+                action={(link) => (
+                  <ActionForm action={deleteCompetencyLinkAction}>
+                    <input type="hidden" name="linkId" value={link.id} />
+                    <button className="btn-quiet" type="submit">
+                      Удалить ссылку
+                    </button>
+                  </ActionForm>
+                )}
+              />
+              <ActionForm action={addCompetencyLinkAction} className="mt-2 grid gap-2 md:grid-cols-4">
+                <input type="hidden" name="competencyId" value={c.id} />
+                <label className="lbl">
+                  Вид
+                  <select name="kind" className="field">
+                    {LINK_KINDS.map((k) => (
+                      <option key={k.value} value={k.value}>
+                        {k.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="lbl">
+                  Название ссылки
+                  <input name="title" className="field" />
+                </label>
+                <label className="lbl">
+                  Адрес
+                  <input name="url" className="field" placeholder="https://" />
+                </label>
+                <button className="btn w-fit self-end" type="submit">
+                  Добавить ссылку
+                </button>
+              </ActionForm>
+            </div>
             <ActionForm action={deleteCompetencyAction} className="mt-2">
               <input type="hidden" name="id" value={c.id} />
               <button className="btn-danger" type="submit">

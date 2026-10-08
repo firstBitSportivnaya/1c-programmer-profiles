@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { migrate } from "@/db/migrate";
 import {
   competencies,
+  competencyLinks,
   employeeCompetencyMarks,
   employees,
   idpAssignments,
@@ -18,7 +19,7 @@ import {
 } from "@/db/schema";
 import { sectionForType } from "@/lib/invariants";
 
-const SCHEMA_TICK = 4;
+const SCHEMA_TICK = 5;
 let appliedTick = 0;
 export function ensureSchema() {
   if (appliedTick !== SCHEMA_TICK) {
@@ -251,6 +252,23 @@ export function listCompetencyMarks(employeeId: string) {
     .where(eq(employeeCompetencyMarks.employeeId, employeeId))
     .all();
   return new Map<string, CompetencyMarkStatus>(rows.map((row) => [row.competencyId, row.status]));
+}
+
+export type CompetencyLink = typeof competencyLinks.$inferSelect;
+
+/** Ссылки на материалы: компетенция → ссылки в порядке `sort_order`. */
+export function listCompetencyLinks() {
+  ensureSchema();
+  const rows = getDb()
+    .select()
+    .from(competencyLinks)
+    .orderBy(asc(competencyLinks.sortOrder), asc(competencyLinks.id))
+    .all();
+  const byCompetency = new Map<string, CompetencyLink[]>();
+  for (const row of rows) {
+    byCompetency.set(row.competencyId, [...(byCompetency.get(row.competencyId) ?? []), row]);
+  }
+  return byCompetency;
 }
 
 export function listIdps(employeeId: string) {

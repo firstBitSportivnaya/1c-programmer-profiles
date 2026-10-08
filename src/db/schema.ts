@@ -158,9 +158,22 @@ export const employeeCompetencyMarks = sqliteTable(
   (t) => [uniqueIndex("employee_competency_marks_unique").on(t.employeeId, t.competencyId)],
 );
 
+export const competencyLinks = sqliteTable("competency_links", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  competencyId: text("competency_id")
+    .notNull()
+    .references(() => competencies.id),
+  kind: text("kind", { enum: ["its", "training", "video"] }).notNull(),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export type JobLane = "executor" | "manager" | "other";
 export type TransitionKind = "linear" | "level_change";
 export type CompetencyType = "professional" | "universal" | "duty";
 export type IdpStatus = "active" | "completed" | "cancelled";
 export type IdpItemStatus = "not_started" | "in_progress" | "done";
 export type CompetencyMarkStatus = "has" | "lacks" | "in_progress";
+export type CompetencyLinkKind = "its" | "training" | "video";

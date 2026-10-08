@@ -8,7 +8,15 @@
  */
 import { getDb, getSqlite, now } from "../src/db";
 import { migrate } from "../src/db/migrate";
-import { employeeCompetencyMarks, employees, idpAssignments, idpItems, idpPool, idps } from "../src/db/schema";
+import {
+  competencyLinks,
+  employeeCompetencyMarks,
+  employees,
+  idpAssignments,
+  idpItems,
+  idpPool,
+  idps,
+} from "../src/db/schema";
 import { hashPassword } from "../src/lib/password";
 
 type TargetSkill = { competencyId: string; competencyName: string; level: number | null };
@@ -114,12 +122,19 @@ function main() {
           { employeeId: "emp-junior", competencyId: skills[1].competencyId, status: "in_progress", updatedAt: t },
         ])
         .run();
+
+      db.insert(competencyLinks)
+        .values([
+          { competencyId: skills[0].competencyId, kind: "its", title: "Стандарты разработки", url: "https://its.1c.ru/db/v8std", sortOrder: 0, updatedAt: t },
+          { competencyId: skills[0].competencyId, kind: "video", title: "Разбор", url: "https://example.org/video", sortOrder: 1, updatedAt: t },
+        ])
+        .run();
       return true;
     })
     .deferred(null);
 
   console.log(
-    "upgrade base: employees=4 idps=2 idp_assignments=2 idp_pool=3 idp_items=2 employee_competency_marks=2",
+    "upgrade base: employees=4 idps=2 idp_assignments=2 idp_pool=3 idp_items=2 employee_competency_marks=2 competency_links=2",
   );
 }
 
