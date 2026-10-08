@@ -34,13 +34,18 @@
   --toolbar-text: #e2e8f0;
   --toolbar-hover: rgba(15, 23, 42, 0.95);
   --field-bg: rgba(2, 6, 23, 0.65);
+  --row-alt: #1e293b;
+  --change-added: #34d399;
+  --change-removed: #fb7185;
+  --change-level: #a78bfa;
+  --change-criteria: #fbbf24;
 }
 
 [data-theme="light"] {
   --bg: #f8fafc;
   --grid: #e2e8f0;
   --text: #0f172a;
-  --text-muted: #64748b;
+  --text-muted: #475569;
   --text-dim: #94a3b8;
   --text-faint: #64748b;
   --panel: #ffffff;
@@ -68,6 +73,11 @@
   --toolbar-text: #334155;
   --toolbar-hover: #ffffff;
   --field-bg: #ffffff;
+  --row-alt: #f1f5f9;
+  --change-added: #047857;
+  --change-removed: #be123c;
+  --change-level: #6d28d9;
+  --change-criteria: #b45309;
 }
 
 html,
@@ -602,6 +612,7 @@ details[open] > .skill-summary::before {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8125rem;
+  background: var(--panel-solid);
 }
 
 .compare-table th {
@@ -633,27 +644,31 @@ details[open] > .skill-summary::before {
 }
 
 .compare-table td {
-  border-bottom: 1px solid var(--panel-border);
+  border-bottom: 1px solid var(--text-faint);
   padding: 0.7rem 0.5rem;
   vertical-align: top;
 }
 
+.compare-table tbody tr[data-change]:nth-child(odd) td {
+  background: var(--row-alt);
+}
+
 .compare-table tr[data-change="added"] td:last-child {
-  color: var(--backend-stroke);
+  color: var(--change-added);
 }
 
 .compare-table tr[data-change="removed"] td:last-child {
-  color: var(--security-stroke);
+  color: var(--change-removed);
 }
 
 .compare-table tr[data-change="level"] td:last-child {
-  color: var(--database-stroke);
+  color: var(--change-level);
 }
 
 .compare-table tr[data-change="criteria"] td:last-child {
-  color: var(--cloud-stroke);
+  color: var(--change-criteria);
 }
 
 .compare-table tr[data-change="same"] td:last-child {
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
