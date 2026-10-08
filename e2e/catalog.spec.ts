@@ -70,6 +70,58 @@ test("гость не видит правку должности на стран
   await expect(page.getByRole("button", { name: "Добавить ребро" })).toHaveCount(0);
 });
 
+const SECTIONS = ["Технические навыки", "Личные навыки", "Функциональные обязанности"];
+
+/** Раскрываемые группы и карточки навыков в блоке профиля. */
+function sectionDetails(page: Page, section: string) {
+  return page.locator("section", { has: page.getByRole("heading", { level: 2, name: section }) }).locator("details");
+}
+
+async function expectAllDetails(page: Page, open: boolean) {
+  for (const section of SECTIONS) {
+    const details = sectionDetails(page, section);
+    expect(await details.count()).toBeGreaterThan(0);
+    await expect(details.and(page.locator(open ? "details:not([open])" : "details[open]"))).toHaveCount(0);
+  }
+}
+
+test("профиль открывается со свёрнутыми группами и карточками", async ({ page }) => {
+  await page.goto("/jobs/junior/profile");
+  await expect(page.getByRole("button", { name: "Развернуть все" })).toHaveCount(1);
+  await expectAllDetails(page, false);
+});
+
+test("«Развернуть все» раскрывает все три блока, «Свернуть все» сворачивает", async ({ page }) => {
+  await page.goto("/jobs/junior/profile");
+  await page.getByRole("button", { name: "Развернуть все" }).click();
+  await expectAllDetails(page, true);
+  await expect(page.getByRole("button", { name: "Развернуть все" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Свернуть все" }).click();
+  await expectAllDetails(page, false);
+  await expect(page.getByRole("button", { name: "Развернуть все" })).toHaveCount(1);
+});
+
+test("раскрытие не запоминается: после перезагрузки всё снова свёрнуто", async ({ page }) => {
+  await page.goto("/jobs/junior/profile");
+  await page.getByRole("button", { name: "Развернуть все" }).click();
+  await expectAllDetails(page, true);
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Развернуть все" })).toHaveCount(1);
+  await expectAllDetails(page, false);
+});
+
+test("ручное раскрытие одной карточки не раскрывает остальные", async ({ page }) => {
+  await page.goto("/jobs/junior/profile");
+  await page.getByText("Обучаемость", { exact: true }).click();
+
+  const opened = page.locator("details[open]");
+  await expect(opened).toHaveCount(1);
+  await expect(opened).toContainText("Обучаемость");
+  await expect(page.getByRole("button", { name: "Развернуть все" })).toHaveCount(1);
+});
+
 test("несуществующая должность — 404", async ({ page }) => {
   const response = await page.goto("/jobs/no-such-job");
   expect(response?.status()).toBe(404);
