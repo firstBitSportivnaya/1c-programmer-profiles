@@ -64,13 +64,74 @@ test("неверный пароль учётки — ошибка на стра�
   await expect(page.getByRole("alert")).toHaveText("Неверный логин или пароль");
 });
 
-test("админ входит учёткой и видит раздел компетенций", async ({ page }) => {
+async function loginAsAdmin(page: Page) {
   await page.goto("/login");
   const form = loginForm(page);
   await form.getByLabel("Логин").fill(ADMIN.login);
   await form.getByLabel("Пароль", { exact: true }).fill(ADMIN.password);
   await form.getByRole("button", { name: "Войти" }).click();
-
   await expect(page).toHaveURL(/\/me$/);
+}
+
+test("админ входит учёткой и видит раздел компетенций", async ({ page }) => {
+  await loginAsAdmin(page);
   await expect(page.getByRole("link", { name: "Компетенции" })).toBeVisible();
+});
+
+test("из кабинета должность открывается сразу профилем, админ правит её там же", async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.getByRole("link", { name: "Руководитель команды разработки" }).click();
+
+  await expect(page).toHaveURL(/\/jobs\/team-lead\/profile$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Руководитель команды разработки" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Технические навыки" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Правка должности" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Добавить ребро" })).toBeVisible();
+});
+
+test("из карточки сотрудника и ИПР должность открывается сразу профилем", async ({ page }) => {
+  const person = { login: "e2e.links", name: "Сотрудник ссылок E2E", password: "e2e-links-password" };
+  await loginAsAdmin(page);
+
+  await page.goto("/people");
+  const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
+  await form.getByLabel("Логин").fill(person.login);
+  await form.getByLabel("Имя").fill(person.name);
+  await form.getByLabel("Пароль").fill(person.password);
+  // В подпись <select> внутри <label> попадает текст вариантов, поэтому подпись сверяется с началом строки.
+  await form.getByLabel(/^Должность/).selectOption("junior");
+  await form.getByLabel(/^Руководитель/).selectOption({ label: ADMIN.name });
+  await form.getByRole("button", { name: "Создать" }).click();
+
+  await page.getByRole("link", { name: person.name, exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: person.name })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Младший программист", exact: true })).toHaveAttribute(
+    "href",
+    "/jobs/junior/profile",
+  );
+
+  await page.goto("/idps");
+  await page.getByLabel(/^Сотрудник/).selectOption({ label: person.name });
+  await page.getByLabel(/^Цель/).selectOption("programmer");
+  await page.getByLabel("Начало").fill("2026-01-01");
+  await page.getByLabel("Конец").fill("2026-12-31");
+  await page.getByRole("button", { name: "Создать" }).click();
+  await page.locator("li", { hasText: person.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "ИПР: Программист" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Младший программист", exact: true })).toHaveAttribute(
+    "href",
+    "/jobs/junior/profile",
+  );
+  await expect(page.getByRole("link", { name: "Программист", exact: true })).toHaveAttribute(
+    "href",
+    "/jobs/programmer/profile",
+  );
+});
+
+test("админ на должности без профиля видит создание пустого профиля", async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.goto("/jobs/consultant");
+  await expect(page.getByRole("button", { name: "Создать пустой профиль" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Правка должности" })).toBeVisible();
 });

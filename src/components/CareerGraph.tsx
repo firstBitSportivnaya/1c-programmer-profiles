@@ -83,7 +83,7 @@ function JobNode({ id, data }: NodeProps) {
   const label = String((data as { label?: string }).label ?? "");
   return (
     <a
-      href={`/jobs/${id}`}
+      href={filled ? `/jobs/${id}/profile` : `/jobs/${id}`}
       className={filled ? "job-card job-card--filled nopan" : "job-card nopan"}
       onClick={(event) => event.stopPropagation()}
     >

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { EmployeeIdpSummary } from "@/components/IdpBlock";
 import { getSessionEmployee } from "@/lib/auth";
-import { getJob } from "@/lib/queries";
+import { getJob, jobHref } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export default async function MePage() {
         <dt className="muted">Текущая должность</dt>
         <dd>
           {job ? (
-            <a className="link-accent" href={`/jobs/${job.id}`}>
+            <a className="link-accent" href={jobHref(job.id)}>
               {job.name}
             </a>
           ) : (

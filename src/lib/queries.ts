@@ -39,6 +39,11 @@ export function getProfileByJob(jobId: string) {
   return getDb().select().from(profiles).where(eq(profiles.jobId, jobId)).get();
 }
 
+/** Адрес страницы должности: с профилем — сразу профиль, без профиля — карточка `/jobs/{id}`. */
+export function jobHref(jobId: string) {
+  return getProfileByJob(jobId) ? `/jobs/${jobId}/profile` : `/jobs/${jobId}`;
+}
+
 export const listCompetencies = cache(function listCompetencies() {
   ensureSchema();
   return getDb().select().from(competencies).orderBy(asc(competencies.name)).all();
