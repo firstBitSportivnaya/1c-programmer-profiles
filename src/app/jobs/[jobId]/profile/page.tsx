@@ -3,9 +3,18 @@ import { ActionForm } from "@/components/ActionForm";
 import { ExpandAll } from "@/components/ExpandAll";
 import { JobAdminPanel, JobFacts, NextJobs } from "@/components/JobOverview";
 import { deleteSkillAction, upsertSkillAction } from "@/app/actions";
-import { isAdmin } from "@/lib/auth";
+import { CompetencyLinks } from "@/components/CompetencyLinks";
+import { getSessionEmployee } from "@/lib/auth";
 import { Fragment } from "react";
-import { clusterSkillRows, getJob, groupedProfile, unusedCompetencies, type ProfileSkillRow } from "@/lib/queries";
+import {
+  clusterSkillRows,
+  getJob,
+  groupedProfile,
+  listCompetencyLinks,
+  unusedCompetencies,
+  type CompetencyLink,
+  type ProfileSkillRow,
+} from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,10 +44,12 @@ function SkillCard({
   row,
   admin,
   jobId,
+  links,
 }: {
   row: ProfileSkillRow;
   admin: boolean;
   jobId: string;
+  links: Map<string, CompetencyLink[]>;
 }) {
   return (
     <details className="skill-card">
@@ -76,6 +87,7 @@ function SkillCard({
       ) : row.skill.criteria ? (
         <p className="skill-criteria">{row.skill.criteria}</p>
       ) : null}
+      <CompetencyLinks links={links.get(row.competency.id) ?? []} />
       {admin ? (
         <ActionForm action={deleteSkillAction} className="mt-2">
           <input type="hidden" name="jobId" value={jobId} />
@@ -97,6 +109,7 @@ function Section({
   jobId,
   type,
   unused,
+  links,
 }: {
   title: string;
   className: string;
@@ -105,6 +118,7 @@ function Section({
   jobId: string;
   type: string;
   unused: ReturnType<typeof unusedCompetencies>;
+  links: Map<string, CompetencyLink[]>;
 }) {
   const clusters = clusterSkillRows(rows);
   return (
@@ -122,14 +136,14 @@ function Section({
               </summary>
               <div className="skill-group-body">
                 {cluster.rows.map((row) => (
-                  <SkillCard key={row.skill.id} row={row} admin={admin} jobId={jobId} />
+                  <SkillCard key={row.skill.id} row={row} admin={admin} jobId={jobId} links={links} />
                 ))}
               </div>
             </details>
           ) : (
             <Fragment key={cluster.key}>
               {cluster.rows.map((row) => (
-                <SkillCard key={row.skill.id} row={row} admin={admin} jobId={jobId} />
+                <SkillCard key={row.skill.id} row={row} admin={admin} jobId={jobId} links={links} />
               ))}
             </Fragment>
           ),
@@ -174,7 +188,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
   if (!grouped) {
     redirect(`/jobs/${jobId}`);
   }
-  const admin = await isAdmin();
+  const viewer = await getSessionEmployee();
+  const admin = Boolean(viewer?.isAdmin);
+  // Материалы внутренние: гостю каталога не показываются, пока это не согласовано с ИБ.
+  const links = viewer ? listCompetencyLinks() : new Map<string, CompetencyLink[]>();
   const unusedTech = unusedCompetencies(grouped.profile.id, "professional");
   const unusedSoft = unusedCompetencies(grouped.profile.id, "universal");
   const unusedDuty = unusedCompetencies(grouped.profile.id, "duty");
@@ -196,6 +213,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
           jobId={jobId}
           type="professional"
           unused={unusedTech}
+          links={links}
         />
         <Section
           title="Личные навыки"
@@ -205,6 +223,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
           jobId={jobId}
           type="universal"
           unused={unusedSoft}
+          links={links}
         />
         <Section
           title="Функциональные обязанности"
@@ -214,6 +233,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
           jobId={jobId}
           type="duty"
           unused={unusedDuty}
+          links={links}
         />
       </ExpandAll>
       {admin ? <JobAdminPanel job={job} /> : null}
