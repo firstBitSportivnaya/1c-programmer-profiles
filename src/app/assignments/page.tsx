@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AssignmentImportForm } from "@/components/AssignmentImportForm";
 import { getSessionEmployee } from "@/lib/auth";
 import { canEditAssignmentCatalog } from "@/lib/invariants";
 import { listCompetencies, listIdpAssignments } from "@/lib/queries";
@@ -41,6 +42,7 @@ export default async function AssignmentsPage({
           Новое задание
         </a>
       </div>
+      {actor.isAdmin ? <AssignmentImportForm /> : null}
       {items.length === 0 ? (
         <ul className="panel">
           <li className="list-row muted">Заданий ещё нет</li>

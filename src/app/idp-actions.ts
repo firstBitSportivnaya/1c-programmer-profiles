@@ -37,11 +37,15 @@ import {
   getIdp,
   getIdpAssignment,
   listAssignmentTest,
+  listCompetencies,
+  listIdpAssignments,
   getProfileByJob,
   listActiveIdpAssignments,
   listIdpPool,
 } from "@/lib/queries";
 import type { ActionResult } from "@/lib/action-result";
+import { parseAssignmentSheet, type ParsedAssignment } from "@/lib/assignment-workbook";
+import { readXlsxSheet } from "@/lib/xlsx-sheet";
 
 function isNextControlFlow(error: unknown) {
   return (
@@ -570,6 +574,39 @@ function readAssignmentTest(formData: FormData) {
   return questions;
 }
 
+function replaceAssignmentTest(
+  assignmentId: string,
+  questions: { prompt: string; options: { text: string; correct: boolean }[] }[],
+) {
+  const db = getDb();
+  const previous = db
+    .select({ id: idpAssignmentQuestions.id })
+    .from(idpAssignmentQuestions)
+    .where(eq(idpAssignmentQuestions.assignmentId, assignmentId))
+    .all();
+  for (const question of previous) {
+    db.delete(idpAssignmentOptions).where(eq(idpAssignmentOptions.questionId, question.id)).run();
+  }
+  db.delete(idpAssignmentQuestions).where(eq(idpAssignmentQuestions.assignmentId, assignmentId)).run();
+  questions.forEach((question, questionIndex) => {
+    const questionId = newId("q");
+    db.insert(idpAssignmentQuestions)
+      .values({ id: questionId, assignmentId, prompt: question.prompt, sortOrder: questionIndex })
+      .run();
+    question.options.forEach((option, optionIndex) => {
+      db.insert(idpAssignmentOptions)
+        .values({
+          id: newId("opt"),
+          questionId,
+          text: option.text,
+          isCorrect: option.correct ? 1 : 0,
+          sortOrder: optionIndex,
+        })
+        .run();
+    });
+  });
+}
+
 export async function saveAssignmentTestAction(
   _prev: ActionResult,
   formData: FormData,
@@ -584,36 +621,13 @@ export async function saveAssignmentTestAction(
     const existing = getIdpAssignment(id);
     if (!existing) throw new InvariantError("Задание не найдено");
     if (existing.archived !== 0) throw new InvariantError("Скрытое задание сначала верните в справочник");
-    const questions = readAssignmentTest(formData);
-    const db = getDb();
-    const previous = db
-      .select({ id: idpAssignmentQuestions.id })
-      .from(idpAssignmentQuestions)
-      .where(eq(idpAssignmentQuestions.assignmentId, id))
-      .all();
+    const questions = readAssignmentTest(formData).map((question) => ({
+      prompt: question.prompt,
+      options: question.options.map((text, index) => ({ text, correct: question.correct.has(index) })),
+    }));
     getSqlite()
       .transaction(() => {
-        for (const question of previous) {
-          db.delete(idpAssignmentOptions).where(eq(idpAssignmentOptions.questionId, question.id)).run();
-        }
-        db.delete(idpAssignmentQuestions).where(eq(idpAssignmentQuestions.assignmentId, id)).run();
-        questions.forEach((question, questionIndex) => {
-          const questionId = newId("q");
-          db.insert(idpAssignmentQuestions)
-            .values({ id: questionId, assignmentId: id, prompt: question.prompt, sortOrder: questionIndex })
-            .run();
-          question.options.forEach((text, optionIndex) => {
-            db.insert(idpAssignmentOptions)
-              .values({
-                id: newId("opt"),
-                questionId,
-                text,
-                isCorrect: question.correct.has(optionIndex) ? 1 : 0,
-                sortOrder: optionIndex,
-              })
-              .run();
-          });
-        });
+        replaceAssignmentTest(id, questions);
         return true;
       })
       .deferred(null);
@@ -621,6 +635,125 @@ export async function saveAssignmentTestAction(
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return saveAssignmentTestAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+export async function importAssignmentsAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireEmployee();
+    if (!actor.isAdmin) throw new InvariantError("Загрузку заданий выполняет админ");
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0 || !file.name.toLowerCase().endsWith(".xlsx")) {
+      throw new InvariantError("Нужен файл Excel .xlsx");
+    }
+    let grid: string[][];
+    try {
+      grid = readXlsxSheet(Buffer.from(await file.arrayBuffer()));
+    } catch {
+      return { error: "Это не файл Excel" };
+    }
+    const parsed = parseAssignmentSheet(grid);
+    const competencies = new Map(listCompetencies().map((item) => [item.id, item]));
+    const catalog = listIdpAssignments();
+    const errors = [...parsed.errors];
+    const plan: (
+      | { kind: "create"; item: ParsedAssignment }
+      | { kind: "update"; id: string; item: ParsedAssignment; hiddenNames: string[] }
+      | { kind: "skip"; names: string[] }
+    )[] = [];
+    for (const item of parsed.assignments) {
+      const competency = competencies.get(item.competencyId);
+      if (!competency) {
+        errors.push(`Неизвестная компетенция «${item.competencyId}»`);
+        continue;
+      }
+      if (competency.type === "duty") {
+        errors.push("Задание только к компетенции, не к обязанности");
+        continue;
+      }
+      if (item.levelProvided && item.level != null && (item.level < 1 || item.level > 3)) {
+        errors.push(`У задания «${item.name}» уровень — 1, 2 или 3`);
+        continue;
+      }
+      const same = catalog.filter(
+        (row) => row.competencyId === item.competencyId && row.name.toLowerCase() === item.name.toLowerCase(),
+      );
+      const active = same.filter((row) => row.archived === 0);
+      const hidden = same.filter((row) => row.archived !== 0);
+      if (active.length > 1) {
+        errors.push(`Несколько активных заданий «${item.name}»`);
+        continue;
+      }
+      if (active.length === 1) {
+        const current = active[0];
+        if (!current) continue;
+        plan.push({ kind: "update", id: current.id, item, hiddenNames: hidden.map((row) => row.name) });
+      } else if (hidden.length > 0) {
+        plan.push({ kind: "skip", names: hidden.map((row) => row.name) });
+      } else {
+        plan.push({ kind: "create", item });
+      }
+    }
+    if (errors.length > 0) return { error: errors.join("\n") };
+
+    const db = getDb();
+    const t = now();
+    const hiddenNames: string[] = [];
+    const touched: string[] = [];
+    getSqlite()
+      .transaction(() => {
+        for (const step of plan) {
+          if (step.kind === "skip") {
+            hiddenNames.push(...step.names);
+            continue;
+          }
+          if (step.kind === "create") {
+            const id = newId("asg");
+            db.insert(idpAssignments)
+              .values({
+                id,
+                competencyId: step.item.competencyId,
+                name: step.item.name,
+                learnText: step.item.learnText,
+                verifyText: step.item.verifyText,
+                level: step.item.levelProvided ? step.item.level : null,
+                archived: 0,
+                updatedAt: t,
+              })
+              .run();
+            replaceAssignmentTest(id, step.item.questions);
+            touched.push(id);
+            continue;
+          }
+          db.update(idpAssignments)
+            .set({
+              learnText: step.item.learnText,
+              verifyText: step.item.verifyText,
+              ...(step.item.levelProvided && step.item.level != null ? { level: step.item.level } : {}),
+              updatedAt: t,
+            })
+            .where(eq(idpAssignments.id, step.id))
+            .run();
+          replaceAssignmentTest(step.id, step.item.questions);
+          hiddenNames.push(...step.hiddenNames);
+          touched.push(step.id);
+        }
+        return true;
+      })
+      .deferred(null);
+    revalidatePath("/assignments");
+    for (const id of touched) revalidatePath(`/assignments/${id}`);
+    const lines = [`Загружено заданий: ${touched.length}.`];
+    if (hiddenNames.length > 0) lines.push(`Скрытые без изменений: ${hiddenNames.join(", ")}`);
+    return { notice: lines.join("\n") };
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return importAssignmentsAction(_prev, formData, true);
+    if (isUniqueConstraint(error)) return { error: "Такое задание уже есть в справочнике этой компетенции" };
     return asActionError(error);
   }
 }

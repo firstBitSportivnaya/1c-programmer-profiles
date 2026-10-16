@@ -14,7 +14,8 @@
     "db:upgrade-base": "tsx scripts/upgrade-base.ts",
     "check:upgrade": "tsx scripts/check-upgrade.ts",
     "test:e2e": "playwright test",
-    "db:spike": "tsx scripts/sqlite-spike.ts"
+    "db:spike": "tsx scripts/sqlite-spike.ts",
+    "assignments:xlsx": "tsx scripts/write-assignment-workbook.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.6",
