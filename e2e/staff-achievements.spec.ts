@@ -13,11 +13,14 @@ const A = ACCOUNT("a", "Ачивки A");
 const B = ACCOUNT("b", "Ачивки B");
 const C = ACCOUNT("c", "Ачивки C");
 const D = ACCOUNT("d", "Ачивки D");
+const E = ACCOUNT("e", "Ачивки E");
+const F = ACCOUNT("f", "Ачивки F");
 const A_GOAL = `Цель A ${STAMP}`;
 const A_SECOND = `Цель A2 ${STAMP}`;
 const C_GOAL = `Цель C ${STAMP}`;
 const D_FIRST = `Цель D1 ${STAMP}`;
 const D_SECOND = `Цель D2 ${STAMP}`;
+const F_GOAL = `Цель F ${STAMP}`;
 let aPlanPath = "";
 let cPlanPath = "";
 let dPlanPath = "";
@@ -62,7 +65,12 @@ async function createStaff(page: Page, staff: { login: string; name: string; pas
   await expect(page.getByRole("link", { name: staff.name, exact: true })).toBeVisible();
 }
 
-async function createPlan(page: Page, staff: { name: string }, targetJobId: string) {
+async function createPlan(
+  page: Page,
+  staff: { name: string },
+  targetJobId: string,
+  options: { emptyPool?: boolean; rowText?: string } = {},
+) {
   await page.goto("/idps");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый ИПР" }) });
   await form.getByLabel(/^Сотрудник/).selectOption({ label: staff.name });
@@ -70,11 +78,15 @@ async function createPlan(page: Page, staff: { name: string }, targetJobId: stri
   await form.getByLabel("Начало").fill("2026-03-01");
   await form.getByLabel("Конец").fill("2026-09-30");
   await form.getByRole("button", { name: "Создать" }).click();
-  const row = page.locator("li", { hasText: staff.name });
+  const rows = page.locator("li", { hasText: staff.name });
+  const row = options.rowText ? rows.filter({ hasText: options.rowText }) : rows;
   await expect(row.getByRole("link").first()).toBeVisible();
   await row.getByRole("link").first().click();
-  const add = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
-  await expect(add).toBeVisible();
+  if (options.emptyPool) {
+    await expect(page.getByText("В пуле нет компетенций")).toBeVisible();
+  } else {
+    await expect(addItemForm(page)).toBeVisible();
+  }
   return new URL(page.url()).pathname;
 }
 
@@ -197,4 +209,31 @@ test("чужой кабинет чужих ачивок не показывае�
   await page.goto("/me");
   await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
   await expect(page.getByText("Все компетенции пула подтверждены")).toHaveCount(0);
+});
+
+test("план без компетенций в пуле ачивку пула не даёт", async ({ page }) => {
+  await login(page);
+  await createStaff(page, E, "senior");
+  // Профиль senior полностью покрывает профиль programmer: разрыв пуст, строк пула не появляется.
+  await createPlan(page, E, "programmer", { emptyPool: true });
+
+  await login(page, E);
+  await page.goto("/me");
+  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await expect(page.getByText("Все компетенции пула подтверждены")).toHaveCount(0);
+});
+
+test("приёмка в первом плане видна, когда появился второй план", async ({ page }) => {
+  await login(page);
+  await createStaff(page, F, "junior");
+  await createPlan(page, F, "programmer");
+  await addItem(page, F_GOAL);
+  await acceptItem(page, F_GOAL);
+  await expect(page.getByText("выполнен", { exact: true })).toBeVisible();
+
+  await createPlan(page, F, "programmer", { rowText: "активен" });
+
+  await login(page, F);
+  await page.goto("/me");
+  await expect(achievements(page).getByText("Первая принятая строка", { exact: true })).toBeVisible();
 });
