@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 const MONTHS = [
   "январь",
@@ -71,16 +71,10 @@ export function DateField({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
-  // До гидратации клик по кнопке не открывает календарь: до монтирования она недоступна.
-  const [ready, setReady] = useState(false);
   const [cursor, setCursor] = useState(() => cursorFromValue(defaultValue));
   const [place, setPlace] = useState({ top: 0, left: 0 });
   const blanks = leadingBlanks(cursor);
   const days = daysInMonth(cursor);
-
-  useEffect(() => {
-    setReady(true);
-  }, []);
 
   function toggle() {
     const rect = buttonRef.current?.getBoundingClientRect();
@@ -125,7 +119,6 @@ export function DateField({
         type="button"
         aria-expanded={open}
         aria-label="Показать календарь"
-        disabled={!ready}
         onClick={toggle}
       >
         Календарь

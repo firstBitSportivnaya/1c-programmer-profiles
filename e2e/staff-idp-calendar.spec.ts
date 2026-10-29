@@ -138,25 +138,6 @@ test("день вне периода не записывается, пустой
   await expect(again.getByLabel("Срок")).toHaveCount(0);
 });
 
-test("кнопка календаря неактивна до гидратации и доступна после", async ({ page }) => {
-  await login(page);
-  await page.goto("/idps");
-  await page.locator("li", { hasText: STAFF.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
-  const due = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
-
-  // Разметка с сервера: до монтирования кнопка выключена, иначе первый клик теряется.
-  const raw = await page.request.get(new URL(page.url()).pathname);
-  expect(raw.ok()).toBeTruthy();
-  const tags = (await raw.text()).match(/<button[^>]*aria-label="Показать календарь"[^>]*>/g) ?? [];
-  expect(tags.length).toBeGreaterThan(0);
-  for (const tag of tags) expect(tag).toContain("disabled");
-
-  const open = due.getByRole("button", { name: "Показать календарь" });
-  await expect(open).toBeEnabled();
-  await open.click();
-  await expect(due.getByRole("dialog", { name: "Календарь" })).toBeVisible();
-});
-
 test("гость со списка ИПР не видит поля даты", async ({ page }) => {
   await page.goto("/idps");
   await expect(page).toHaveURL(/\/login$/);

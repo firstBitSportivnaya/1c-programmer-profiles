@@ -26,6 +26,7 @@ let cPlanPath = "";
 let dPlanPath = "";
 let aOtherCompetency = "";
 
+/** Вход учёткой; на первом прогоне сначала создаёт админа и переключается на нужного сотрудника. */
 async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
   await page.goto("/login");
   if (/\/me$/.test(page.url())) {
@@ -65,6 +66,7 @@ async function createStaff(page: Page, staff: { login: string; name: string; pas
   await expect(page.getByRole("link", { name: staff.name, exact: true })).toBeVisible();
 }
 
+/** Создаёт ИПР сотруднику и возвращает путь к карточке плана. */
 async function createPlan(
   page: Page,
   staff: { name: string },
@@ -94,6 +96,7 @@ function addItemForm(page: Page) {
   return page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
 }
 
+/** Добавляет задание в открытый ИПР и ждёт его строку в таблице. */
 async function addItem(page: Page, name: string, competencyIndex = 0) {
   const form = addItemForm(page);
   if (competencyIndex > 0) {

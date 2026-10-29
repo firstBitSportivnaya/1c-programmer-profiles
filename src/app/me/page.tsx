@@ -8,6 +8,7 @@ import { getJob, jobHref } from "@/lib/queries";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Кабинет сотрудника: реквизиты, достижения, сводка компетенций и ИПР. */
 export default async function MePage() {
   const employee = await getSessionEmployee();
   if (!employee) redirect("/login");
