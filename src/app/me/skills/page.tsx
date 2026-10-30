@@ -3,7 +3,6 @@ import { Achievements } from "@/components/Achievements";
 import { SkillTree } from "@/components/SkillTree";
 import { employeeAchievements } from "@/lib/achievements";
 import { getSessionEmployee } from "@/lib/auth";
-import { sectionForType } from "@/lib/invariants";
 import {
   competencyMarkViews,
   getActiveIdp,
@@ -13,57 +12,80 @@ import {
   listCompetencies,
   listCompetencyLinks,
   listIdpItems,
-  listIdpPool,
 } from "@/lib/queries";
 import {
   buildSkillTree,
   type TreeLink,
   type TreeMarkRow,
-  type TreeOutsideRow,
-  type TreeProfileSkill,
+  type TreeSkillRow,
 } from "@/lib/skill-tree";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type GroupedProfile = NonNullable<ReturnType<typeof groupedProfile>>;
+type ProfileRow = { level: number | null; criteria: string | null };
 
-/** Строки профиля должности без обязанностей: только навыки, как в разрыве. */
-function profileSkills(grouped: GroupedProfile, parentNames: Map<string, string>): TreeProfileSkill[] {
-  return [...grouped.technical, ...grouped.personal].map((row) => ({
-    id: row.competency.id,
-    name: row.competency.name,
-    section: sectionForType(row.competency.type) === "personal" ? "personal" : "technical",
-    groupId: row.competency.parentId ?? null,
-    groupName: row.competency.parentId ? (parentNames.get(row.competency.parentId) ?? null) : null,
-    level: row.skill.level,
-    criteria: row.skill.criteria?.trim() ? row.skill.criteria : null,
-  }));
+/** Строки профиля по компетенциям: планка и критерий. У обязанностей уровня нет. */
+function profileRows(jobId: string | null): Map<string, ProfileRow> {
+  const map = new Map<string, ProfileRow>();
+  if (!jobId) return map;
+  const grouped = groupedProfile(jobId);
+  if (!grouped) return map;
+  for (const row of grouped.technical.concat(grouped.personal)) {
+    map.set(row.competency.id, {
+      level: row.skill.level,
+      criteria: row.skill.criteria?.trim() ? row.skill.criteria : null,
+    });
+  }
+  return map;
 }
 
-/** Страница дерева: собирает пометки, профили и активный план в один снимок. */
+/** Уровни навыков профиля. */
+function levelMap(rows: Map<string, ProfileRow>): Map<string, number | null> {
+  return new Map([...rows].map(([id, row]) => [id, row.level]));
+}
+
+/**
+ * Критерий читается по той планке, которую требует план: если цель выше текущей,
+ * показываем критерий цели, иначе критерий текущей должности.
+ */
+function criteriaMap(current: Map<string, ProfileRow>, target: Map<string, ProfileRow>) {
+  const map = new Map<string, string | null>();
+  for (const id of new Set([...current.keys(), ...target.keys()])) {
+    const now = current.get(id);
+    const goal = target.get(id);
+    const fromTarget = goal !== undefined && (now === undefined || (goal.level ?? 0) > (now.level ?? 0));
+    map.set(id, (fromTarget ? goal.criteria : now?.criteria) ?? goal?.criteria ?? null);
+  }
+  return map;
+}
+
+/** Все навыки справочника: группы без родителя и обязанности в дерево не входят. */
+function treeSkills(): TreeSkillRow[] {
+  const all = listCompetencies();
+  const names = new Map(all.map((row) => [row.id, row.name]));
+  return all
+    .filter((row) => row.parentId !== null && row.type !== "duty")
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      groupName: row.parentId ? (names.get(row.parentId) ?? null) : null,
+    }));
+}
+
+/** Страница дерева: собирает пометки, оба профиля и активный план в один снимок. */
 export default async function SkillTreePage() {
   const employee = await getSessionEmployee();
   if (!employee) redirect("/login");
 
-  const parentNames = new Map(listCompetencies().map((row) => [row.id, row.name]));
   const currentJob = getJob(employee.jobId);
-  const currentProfile = groupedProfile(employee.jobId);
   const active = getActiveIdp(employee.id);
   const targetJob = active ? getJob(active.targetJobId) : null;
-  const targetProfile = active ? groupedProfile(active.targetJobId) : null;
 
   const { current, outside } = competencyMarkViews(employee.id, employee.jobId);
   const marks: TreeMarkRow[] = [];
-  for (const row of current) {
+  for (const row of [...current, ...outside]) {
     if (row.status === "has" || row.status === "lacks" || row.status === "in_progress") {
-      marks.push({ competencyId: row.id, status: row.status, note: row.note });
-    }
-  }
-  const outsideRows: TreeOutsideRow[] = [];
-  for (const row of outside) {
-    if (row.status === "has" || row.status === "lacks" || row.status === "in_progress") {
-      outsideRows.push({ id: row.id, name: row.name, section: row.section, status: row.status, note: row.note });
       marks.push({ competencyId: row.id, status: row.status, note: row.note });
     }
   }
@@ -76,6 +98,11 @@ export default async function SkillTreePage() {
     );
   }
 
+  const currentRows = profileRows(employee.jobId);
+  const targetRows = profileRows(active?.targetJobId ?? null);
+
+  const criteria = criteriaMap(currentRows, targetRows);
+
   const confirmed = new Set(
     employeeAchievements(employee.id)
       .filter((row) => row.key.startsWith("competency:"))
@@ -86,9 +113,10 @@ export default async function SkillTreePage() {
     currentJob: currentJob ? { id: currentJob.id, name: currentJob.name, href: jobHref(currentJob.id) } : null,
     targetJob: targetJob ? { id: targetJob.id, name: targetJob.name, href: jobHref(targetJob.id) } : null,
     planId: active?.id ?? null,
-    currentSkills: currentProfile ? profileSkills(currentProfile, parentNames) : [],
-    targetSkills: targetProfile ? profileSkills(targetProfile, parentNames) : [],
-    pool: active ? listIdpPool(active.id) : [],
+    skills: treeSkills(),
+    currentLevels: levelMap(currentRows),
+    targetLevels: levelMap(targetRows),
+    criteria,
     items: active
       ? listIdpItems(active.id).map((item) => ({
           id: item.id,
@@ -100,10 +128,12 @@ export default async function SkillTreePage() {
         }))
       : [],
     marks,
-    outside: outsideRows,
     materials,
     confirmed,
   });
+
+  const hasProfile = data.nodes.some((node) => node.relation !== "none");
+  const hasMarks = data.nodes.some((node) => node.mark !== "");
 
   return (
     <article className="space-y-6">
@@ -114,8 +144,8 @@ export default async function SkillTreePage() {
         <h1 className="page-title">Дерево навыков</h1>
       </div>
       <p className="muted text-sm">
-        Заливка узла — ваша пометка, свечение — подтверждение руководителем. Планка уровня — требование должности, а не
-        оценка. Видите только вы.
+        Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Заливка узла — ваша пометка, значок —
+        шаг активного ИПР, свечение — подтверждение приёмкой. Видите только вы.
       </p>
       <Achievements employeeId={employee.id} />
       {!data.planId ? (
@@ -127,7 +157,7 @@ export default async function SkillTreePage() {
           .
         </p>
       ) : null}
-      {data.current || data.target || data.outside.length > 0 ? (
+      {hasProfile || hasMarks ? (
         <SkillTree data={data} />
       ) : (
         <p className="muted text-sm" data-testid="skill-tree-no-profile">

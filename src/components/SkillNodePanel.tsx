@@ -1,8 +1,6 @@
 "use client";
 
-import type { SkillNode } from "@/lib/skill-tree";
-
-export type SkillNodeTier = "current" | "target" | "outside";
+import type { SkillTreeNode } from "@/lib/skill-tree";
 
 const MARK_LABEL: Record<string, string> = {
   has: "есть",
@@ -17,34 +15,30 @@ const ITEM_STATUS: Record<string, string> = {
   done: "сделал",
 };
 
-const TIER_LABEL: Record<SkillNodeTier, string> = {
-  current: "Сейчас",
-  target: "Цель активного ИПР",
-  outside: "Вне профиля",
-};
-
 const LINK_KIND: Record<string, string> = {
   its: "ИТС",
   training: "Обучение",
   video: "Видео",
 };
 
-/** Планка уровня: у цели ниже текущей планки стрелка «было → стало», личного уровня нет. */
-export function levelLabel(node: Pick<SkillNode, "level" | "wasLevel">): string {
-  if (node.level == null) return "планка не задана";
-  if (node.wasLevel != null) return `планка ${node.wasLevel} → ${node.level}`;
-  return `планка ${node.level}`;
+/** Планка уровня: требование должности и цель активного ИПР, личного уровня нет (ADR 0001, 0007). */
+export function levelLabel(node: Pick<SkillTreeNode, "currentLevel" | "targetLevel">): string {
+  const { currentLevel, targetLevel } = node;
+  if (currentLevel == null && targetLevel == null) return "планка не задана";
+  if (currentLevel == null) return `планка цели ${targetLevel}`;
+  if (targetLevel == null || targetLevel === currentLevel) return `планка ${currentLevel}`;
+  return `планка ${currentLevel} → ${targetLevel}`;
 }
 
 /** Панель узла: критерий профиля, материалы, личная пометка и строки активного плана. */
 export function SkillNodePanel({
   node,
-  tier,
+  context,
   planId,
   onClose,
 }: {
-  node: SkillNode;
-  tier: SkillNodeTier;
+  node: SkillTreeNode;
+  context: string;
   planId: string | null;
   onClose: () => void;
 }) {
@@ -52,7 +46,7 @@ export function SkillNodePanel({
     <aside className="skill-panel panel panel-pad space-y-4" data-testid="skill-node-panel" aria-label={`Узел: ${node.name}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="muted text-xs uppercase tracking-widest">{TIER_LABEL[tier]}</p>
+          <p className="muted text-xs uppercase tracking-widest">{context}</p>
           <h2 className="text-base font-semibold leading-snug">{node.name}</h2>
         </div>
         <button type="button" className="btn-quiet" onClick={onClose}>

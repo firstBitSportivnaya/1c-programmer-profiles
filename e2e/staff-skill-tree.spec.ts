@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
 
@@ -180,9 +181,63 @@ function skillNode(page: Page, competencyId: string) {
   return page.getByTestId(`skill-node-${competencyId}`);
 }
 
-function planEdge(page: Page, competencyId: string) {
-  return page.getByTestId(`rf__edge-target:edge:${competencyId}`);
+/** Все рёбра холста — только предпосылки: от родителя на слой выше к навыку на слой ниже. */
+async function expectPrerequisiteLayers(page: Page) {
+  const graph = await page.evaluate(() => {
+    const depth = new Map<string, number>();
+    for (const element of document.querySelectorAll<HTMLElement>('[data-testid^="skill-node-"]')) {
+      const id = element.dataset.testid?.slice("skill-node-".length) ?? "";
+      depth.set(id, Number(element.dataset.depth));
+    }
+    const edges = [...document.querySelectorAll(".react-flow__edge")].map((element) => element.getAttribute("data-id") ?? "");
+    return { edges, depths: [...depth.entries()] as [string, number][] };
+  });
+  const depths = new Map(graph.depths);
+  expect(graph.edges.length).toBeGreaterThan(0);
+  for (const id of graph.edges) {
+    const [kind, parent, child] = id.split(":");
+    expect(kind, id).toBe("prereq");
+    expect(depths.get(parent), id).toBe((depths.get(child) ?? Number.NaN) - 1);
+  }
 }
+
+/** Линия ребра не идёт по чужой карточке: между слоями есть пустая полоса. */
+async function expectEdgesClearOfNodes(page: Page) {
+  const hits = await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll<HTMLElement>(".react-flow__node-skill")].map((element) => ({
+      id: element.getAttribute("data-id") ?? "",
+      box: element.getBoundingClientRect(),
+    }));
+    const found = new Set<string>();
+    for (const edge of document.querySelectorAll<SVGGElement>(".react-flow__edge")) {
+      const id = edge.getAttribute("data-id") ?? "";
+      const [, parent, child] = id.split(":");
+      const path = edge.querySelector("path");
+      if (!path) continue;
+      const line = path.getBoundingClientRect();
+      if (line.width < 1 && line.height < 1) continue;
+      for (const node of boxes) {
+        if (node.id === `skill:${parent}` || node.id === `skill:${child}`) continue;
+        const pad = 2;
+        const hit =
+          line.left < node.box.right - pad &&
+          line.right > node.box.left + pad &&
+          line.top < node.box.bottom - pad &&
+          line.bottom > node.box.top + pad;
+        if (hit) found.add(`${id} через ${node.id}`);
+      }
+    }
+    return [...found];
+  });
+  expect(hits).toEqual([]);
+}
+
+/** Навыки справочника без обязанностей и групп разделов: столько узлов в полном дереве. */
+const SKILL_COUNT = (
+  JSON.parse(readFileSync("seed/data.json", "utf8")) as {
+    competencies: { parentId: string | null; type: string }[];
+  }
+).competencies.filter((row) => row.parentId !== null && row.type !== "duty").length;
 
 test("админ заводит сотрудников, ИПР, строки плана и материал", async ({ page }) => {
   await login(page);
@@ -212,27 +267,33 @@ test("админ заводит сотрудников, ИПР, строки п�
   await expect(materials.getByRole("link", { name: MATERIAL })).toHaveAttribute("href", MATERIAL_URL);
 });
 
-test("два яруса, планки и один узел на компетенцию, обязанностей нет", async ({ page }) => {
+test("дерево слоями: предпосылки, планки и один узел на компетенцию, обязанностей нет", async ({ page }) => {
   await login(page, STUDENT);
   await page.goto("/me");
   await page.getByRole("link", { name: "Дерево навыков" }).click();
   await expect(page).toHaveURL(/\/me\/skills$/);
   await expect(page.getByRole("heading", { level: 1, name: "Дерево навыков" })).toBeVisible();
 
-  const target = page.getByTestId("skill-tier-target");
-  const current = page.getByTestId("skill-tier-current");
-  await expect(target).toContainText("Цель активного ИПР");
-  await expect(target).toContainText("Программист");
-  await expect(current).toContainText("Сейчас");
-  await expect(current).toContainText("Младший программист");
+  const jobs = page.locator(".skill-tree-jobs");
+  await expect(jobs).toContainText("Сейчас:");
+  await expect(jobs.getByRole("link", { name: "Младший программист", exact: true })).toBeVisible();
+  await expect(jobs).toContainText("Цель ИПР:");
+  await expect(jobs.getByRole("link", { name: "Программист", exact: true })).toBeVisible();
 
   const programming = skillNode(page, PROGRAMMING.id);
-  await expect(programming).toHaveAttribute("data-tier", "target");
+  await expect(programming).toHaveAttribute("data-relation", "both");
   await expect(programming).toContainText("планка 1 → 2");
-  await expect(skillNode(page, TESTING.id)).toContainText("планка 1");
-  await expect(skillNode(page, OBUCHAEMOST)).toHaveAttribute("data-tier", "current");
+  await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-relation", "target");
+  await expect(skillNode(page, TESTING.id)).toContainText("планка цели 1");
+  await expect(skillNode(page, OBUCHAEMOST)).toHaveAttribute("data-relation", "both");
   await expect(skillNode(page, OBUCHAEMOST)).toContainText("планка 2");
   await expect(skillNode(page, OBUCHAEMOST)).toHaveCount(1);
+
+  // Предпосылка «высокоуровневый язык → программирование на 1С»: ребро между соседними слоями.
+  await expect(page.locator('[data-id="prereq:comp-vysokourovnevyi-yazyk-programmirovaniya:comp-navyki-programmirovaniya-na-yazyke-1s"]')).toHaveCount(1);
+  await expectPrerequisiteLayers(page);
+  await expectEdgesClearOfNodes(page);
+  await expect(page.locator(".skill-job-card")).toHaveCount(0);
 
   await expect(page.getByText("Алгоритмизация поставленных задач (A/01.3)")).toHaveCount(0);
   await expect(page.getByText("Написание программного кода на языке 1С по техническому заданию (A/02.3)")).toHaveCount(0);
@@ -277,11 +338,13 @@ test("заливка узла — пометка, панель показыва�
   await expect(panel.getByRole("link", { name: MATERIAL })).toHaveAttribute("href", MATERIAL_URL);
   await expect(panel.getByTestId("skill-panel-rows")).toContainText(GOAL_ITEM);
 
-  await expect(planEdge(page, REST).locator("path.skill-edge--not_started")).toBeVisible();
-  await expect(planEdge(page, TESTING.id).locator("path.skill-edge--in_progress")).toBeVisible();
+  await expect(page.getByTestId(`skill-plan-${TESTING.id}`)).toContainText("в работе");
+  await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-plan-state", "in_progress");
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-plan-state", "not_started");
+  await expect(skillNode(page, REST)).toHaveAttribute("data-plan-state", "none");
 });
 
-test("приёмка подтверждает узел и ребро, снятие убирает значок и ачивку", async ({ page }) => {
+test("приёмка подтверждает узел и его шаг плана, снятие убирает значок и ачивку", async ({ page }) => {
   await login(page);
   await page.goto(studentPlanPath);
   await acceptItem(page, GOAL_ITEM);
@@ -290,11 +353,12 @@ test("приёмка подтверждает узел и ребро, сняти
   await page.goto("/me/skills");
   await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-confirmed", "true");
   await expect(page.getByTestId(`skill-badge-${PROGRAMMING.id}`)).toBeVisible();
-  await expect(planEdge(page, PROGRAMMING.id).locator("path.skill-edge--done")).toBeVisible();
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-plan-state", "done");
+  await expect(page.getByTestId(`skill-plan-${PROGRAMMING.id}`)).toContainText("принято");
   await expect(page.getByRole("heading", { name: "Достижения" })).toBeVisible();
   await expect(page.getByText("Компетенция подтверждена")).toBeVisible();
   await expect(page.getByTestId(`skill-badge-${TESTING.id}`)).toHaveCount(0);
-  await expect(planEdge(page, TESTING.id).locator("path.skill-edge--in_progress")).toBeVisible();
+  await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-plan-state", "in_progress");
 
   await login(page);
   await page.goto(studentPlanPath);
@@ -306,32 +370,35 @@ test("приёмка подтверждает узел и ребро, сняти
   await page.goto("/me/skills");
   await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-confirmed", "false");
   await expect(page.getByTestId(`skill-badge-${PROGRAMMING.id}`)).toHaveCount(0);
-  await expect(planEdge(page, PROGRAMMING.id).locator("path.skill-edge--done")).toHaveCount(0);
+  await expect(skillNode(page, PROGRAMMING.id)).not.toHaveAttribute("data-plan-state", "done");
+  await expect(page.getByTestId(`skill-plan-${PROGRAMMING.id}`)).not.toContainText("принято");
   await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
 });
 
-test("без профиля — пустое состояние, без плана — только текущий ярус и приглашение", async ({ page }) => {
+test("без профиля — пустое состояние, без плана — только текущая должность и приглашение", async ({ page }) => {
   await login(page, EMPTY);
   await page.goto("/me/skills");
   const noProfile = page.getByTestId("skill-tree-no-profile");
   await expect(noProfile).toContainText("У должности нет профиля с навыками");
   await expect(noProfile.getByRole("link", { name: "Мои компетенции" })).toHaveAttribute("href", "/me/marks");
-  await expect(page.getByTestId("skill-tier-current")).toHaveCount(0);
-  await expect(page.getByTestId("skill-tier-target")).toHaveCount(0);
+  await expect(page.locator(".skill-tree-shell")).toHaveCount(0);
 
   await login(page, ALONE);
   await page.goto("/me/skills");
-  await expect(page.getByTestId("skill-tier-current")).toBeVisible();
-  await expect(page.getByTestId("skill-tier-target")).toHaveCount(0);
+  await expect(page.locator(".skill-tree-jobs")).toContainText("Сейчас:");
+  await expect(page.locator(".skill-tree-jobs")).toContainText("активного ИПР нет");
   await expect(page.getByTestId("skill-tree-no-plan")).toContainText("Активного ИПР нет");
   await expect(page.getByTestId("skill-tree-no-plan").getByRole("link", { name: "ИПР" })).toHaveAttribute(
     "href",
     "/idps",
   );
-  await expect(page.locator('[data-testid^="rf__edge-"]')).toHaveCount(0);
+  await expect(skillNode(page, PROGRAMMING.id)).toBeVisible();
+  await expectPrerequisiteLayers(page);
+  // Дерево есть всегда: без плана на узлах нет шагов, но предпосылки остаются.
+  await expect(page.locator('[data-plan-state]:not([data-plan-state="none"])')).toHaveCount(0);
 });
 
-test("пометка вне профиля — отдельная группа, отменённый план не считается", async ({ page }) => {
+test("пометка вне профиля остаётся в дереве, отменённый план не считается", async ({ page }) => {
   await login(page, OUTSIDE);
   await page.goto("/me/marks");
   const outsideStatus = page.getByLabel(`Статус: ${TESTING.name}`);
@@ -345,15 +412,30 @@ test("пометка вне профиля — отдельная группа, 
 
   await login(page, OUTSIDE);
   await page.goto("/me/skills");
-  await expect(page.getByTestId("skill-tier-target")).toHaveCount(0);
   await expect(page.getByTestId("skill-tree-no-plan")).toBeVisible();
-  await expect(page.getByTestId("skill-tier-outside")).toContainText("Вне профиля");
+  await expect(page.locator(".skill-tree-jobs")).toContainText("активного ИПР нет");
   const outsideNode = skillNode(page, TESTING.id);
-  await expect(outsideNode).toHaveAttribute("data-tier", "outside");
+  await expect(outsideNode).toHaveAttribute("data-relation", "none");
   await expect(outsideNode).toHaveAttribute("data-mark", "in_progress");
   await expect(page.getByTestId(`skill-badge-${TESTING.id}`)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
-  await expect(page.locator('[data-testid^="rf__edge-"]')).toHaveCount(0);
+  await expect(page.locator('[data-plan-state]:not([data-plan-state="none"])')).toHaveCount(0);
+});
+
+test("отбор «Мои» убирает чужие ветви, переключатель открывает всё дерево", async ({ page }) => {
+  await login(page, STUDENT);
+  await page.goto("/me/skills");
+  const nodes = page.locator('[data-testid^="skill-node-"]');
+  await expect(nodes.first()).toBeVisible();
+  const filtered = await nodes.count();
+  expect(filtered).toBeLessThan(SKILL_COUNT);
+
+  await page.getByLabel("Показывать всё дерево").check();
+  await expect(nodes).toHaveCount(SKILL_COUNT);
+  await expectPrerequisiteLayers(page);
+
+  const ids = await nodes.evaluateAll((list) => list.map((element) => element.getAttribute("data-testid")));
+  expect(new Set(ids).size).toBe(ids.length);
 });
 
 test("гость уходит на вход, чужой сотрудник дерево и пометки не видит", async ({ page }) => {
@@ -367,7 +449,7 @@ test("гость уходит на вход, чужой сотрудник де�
   await expect(page.getByText("Мои компетенции")).toHaveCount(0);
 
   await page.goto("/me/skills");
-  await expect(page.getByTestId("skill-tier-current")).toBeVisible();
+  await expect(page.locator(".skill-tree-jobs")).toContainText("Сейчас:");
   await expect(page.getByText(NOTE)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Выйти" }).click();

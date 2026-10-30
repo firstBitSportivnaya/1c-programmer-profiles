@@ -1,30 +1,21 @@
 import type { CompetencyLinkKind, IdpItemStatus } from "@/db/schema";
 
 /**
- * Дерево навыков: личные пометки и путь активного ИПР на одной карте.
+ * Дерево навыков: карта предпосылок с личным слоем (ADR 0009).
  * Чистая сборка без запросов к базе: страница отдаёт уже прочитанные строки.
- * Личного уровня нет (ADR 0001, 0007): планка уровня — требование должности,
- * подтверждение — приёмка строки (ADR 0006).
+ * Личного уровня нет (ADR 0001, 0007): планка — требование должности,
+ * подтверждение — приёмка всех строк компетенции (ADR 0006).
  */
 
 export type SkillMarkStatus = "has" | "lacks" | "in_progress";
 
-export type TreeSectionKey = "technical" | "personal";
+/** Отношение навыка к сотруднику: текущая должность, цель активного ИПР или оба. */
+export type SkillRelation = "current" | "target" | "both" | "none";
 
-export type TreeProfileSkill = {
+export type TreeSkillRow = {
   id: string;
   name: string;
-  section: TreeSectionKey;
-  groupId: string | null;
   groupName: string | null;
-  level: number | null;
-  criteria: string | null;
-};
-
-export type TreePoolRow = {
-  competencyId: string;
-  competencyName: string;
-  requiredLevel: number | null;
 };
 
 export type TreeItemRow = {
@@ -38,14 +29,6 @@ export type TreeItemRow = {
 
 export type TreeMarkRow = {
   competencyId: string;
-  status: SkillMarkStatus;
-  note: string;
-};
-
-export type TreeOutsideRow = {
-  id: string;
-  name: string;
-  section: TreeSectionKey;
   status: SkillMarkStatus;
   note: string;
 };
@@ -64,46 +47,35 @@ export type TreeJob = {
 
 export type PlanState = "done" | "in_progress" | "not_started";
 
-export type SkillNode = {
+export type SkillPlan = { state: PlanState; total: number; accepted: number };
+
+export type SkillTreeNode = {
   id: string;
   name: string;
-  section: TreeSectionKey;
-  groupId: string | null;
   groupName: string | null;
-  level: number | null;
-  wasLevel: number | null;
+  /** Планка текущей должности: требование, не оценка сотрудника. */
+  currentLevel: number | null;
+  /** Планка цели активного ИПР. */
+  targetLevel: number | null;
+  relation: SkillRelation;
   mark: SkillMarkStatus | "";
   note: string;
   confirmed: boolean;
-  plan: { state: PlanState; total: number; accepted: number };
   criteria: string | null;
   materials: TreeLink[];
+  plan: SkillPlan;
   rows: { id: number; name: string; status: IdpItemStatus; dueOn: string | null; accepted: boolean }[];
 };
 
-export type SkillTier = {
-  job: TreeJob;
-  sections: { key: TreeSectionKey; title: string; skills: SkillNode[] }[];
-};
-
 export type SkillTreeData = {
-  current: SkillTier | null;
-  target: SkillTier | null;
-  outside: SkillNode[];
+  nodes: SkillTreeNode[];
+  currentJob: TreeJob | null;
+  targetJob: TreeJob | null;
   planId: string | null;
 };
 
-const SECTION_TITLES: Record<TreeSectionKey, string> = {
-  technical: "Профессиональные",
-  personal: "Личные",
-};
-
 /** Состояние шага плана по строкам одной компетенции: принято всё, начато или не начато. */
-export function planState(rows: { status: IdpItemStatus; accepted: boolean }[]): {
-  state: PlanState;
-  total: number;
-  accepted: number;
-} {
+export function planState(rows: { status: IdpItemStatus; accepted: boolean }[]): SkillPlan {
   const accepted = rows.filter((row) => row.accepted).length;
   if (rows.length > 0 && accepted === rows.length) return { state: "done", total: rows.length, accepted };
   if (accepted > 0 || rows.some((row) => row.status !== "not_started")) {
@@ -112,68 +84,57 @@ export function planState(rows: { status: IdpItemStatus; accepted: boolean }[]):
   return { state: "not_started", total: rows.length, accepted };
 }
 
-function sections(skills: SkillNode[]): SkillTier["sections"] {
-  return (["technical", "personal"] as const)
-    .map((key) => ({ key, title: SECTION_TITLES[key], skills: skills.filter((skill) => skill.section === key) }))
-    .filter((section) => section.skills.length > 0);
-}
-
 export type BuildSkillTreeInput = {
+  skills: TreeSkillRow[];
+  /** Планки навыков текущей должности. */
+  currentLevels: Map<string, number | null>;
+  /** Планки навыков пула активного ИПР. */
+  targetLevels: Map<string, number | null>;
+  /** Критерий: из текущей должности, иначе из цели. */
+  criteria: Map<string, string | null>;
+  marks: TreeMarkRow[];
+  items: TreeItemRow[];
+  materials: Map<string, TreeLink[]>;
+  confirmed: Set<string>;
   currentJob: TreeJob | null;
   targetJob: TreeJob | null;
   planId: string | null;
-  currentSkills: TreeProfileSkill[];
-  targetSkills: TreeProfileSkill[];
-  pool: TreePoolRow[];
-  items: TreeItemRow[];
-  marks: TreeMarkRow[];
-  outside: TreeOutsideRow[];
-  materials: Map<string, TreeLink[]>;
-  confirmed: Set<string>;
 };
 
-/**
- * Собирает два яруса и группу «Вне профиля». Пул активного плана — верхний ярус:
- * компетенция попадает туда один раз, даже если она уже есть в текущем профиле
- * (тогда узел помнит прежнюю планку). Обязанности сюда не передаются.
- */
+function relationOf(inCurrent: boolean, inTarget: boolean): SkillRelation {
+  if (inCurrent && inTarget) return "both";
+  if (inCurrent) return "current";
+  if (inTarget) return "target";
+  return "none";
+}
+
+/** Собирает все навыки справочника с личным слоем: пометка, подтверждение, строки плана. */
 export function buildSkillTree(input: BuildSkillTreeInput): SkillTreeData {
   const marks = new Map(input.marks.map((row) => [row.competencyId, row]));
   const items = new Map<string, TreeItemRow[]>();
   for (const row of input.items) {
     items.set(row.competencyId, [...(items.get(row.competencyId) ?? []), row]);
   }
-  const currentById = new Map(input.currentSkills.map((row) => [row.id, row]));
-  const targetById = new Map(input.targetSkills.map((row) => [row.id, row]));
 
-  const makeNode = (
-    id: string,
-    name: string,
-    section: TreeSectionKey,
-    groupId: string | null,
-    groupName: string | null,
-    level: number | null,
-    wasLevel: number | null,
-    criteria: string | null,
-    rowsFromPlan: TreeItemRow[],
-  ): SkillNode => {
-    const mark = marks.get(id);
-    const plan = planState(rowsFromPlan);
+  const nodes: SkillTreeNode[] = input.skills.map((skill) => {
+    const mark = marks.get(skill.id);
+    const inCurrent = input.currentLevels.has(skill.id);
+    const inTarget = input.targetLevels.has(skill.id);
+    const rows = items.get(skill.id) ?? [];
     return {
-      id,
-      name,
-      section,
-      groupId,
-      groupName,
-      level,
-      wasLevel,
+      id: skill.id,
+      name: skill.name,
+      groupName: skill.groupName,
+      currentLevel: input.currentLevels.get(skill.id) ?? null,
+      targetLevel: input.targetLevels.get(skill.id) ?? null,
+      relation: relationOf(inCurrent, inTarget),
       mark: mark?.status ?? "",
       note: mark?.note ?? "",
-      confirmed: input.confirmed.has(id),
-      plan,
-      criteria,
-      materials: input.materials.get(id) ?? [],
-      rows: rowsFromPlan.map((row) => ({
+      confirmed: input.confirmed.has(skill.id),
+      criteria: input.criteria.get(skill.id) ?? null,
+      materials: input.materials.get(skill.id) ?? [],
+      plan: planState(rows),
+      rows: rows.map((row) => ({
         id: row.id,
         name: row.name,
         status: row.status,
@@ -181,53 +142,7 @@ export function buildSkillTree(input: BuildSkillTreeInput): SkillTreeData {
         accepted: row.accepted,
       })),
     };
-  };
-
-  const poolIds = new Set(input.pool.map((row) => row.competencyId));
-
-  const currentSkills = input.currentSkills
-    .filter((row) => !poolIds.has(row.id))
-    .map((row) =>
-      makeNode(
-        row.id,
-        row.name,
-        row.section,
-        row.groupId,
-        row.groupName,
-        row.level,
-        null,
-        row.criteria,
-        items.get(row.id) ?? [],
-      ),
-    );
-
-  const targetSkills = input.pool.map((row) => {
-    const target = targetById.get(row.competencyId);
-    const previous = currentById.get(row.competencyId);
-    return makeNode(
-      row.competencyId,
-      target?.name ?? row.competencyName,
-      target?.section ?? "technical",
-      target?.groupId ?? null,
-      target?.groupName ?? null,
-      row.requiredLevel ?? target?.level ?? null,
-      previous?.level ?? null,
-      target?.criteria ?? null,
-      items.get(row.competencyId) ?? [],
-    );
   });
 
-  const outside = input.outside.map((row) =>
-    makeNode(row.id, row.name, row.section, null, null, null, null, null, items.get(row.id) ?? []),
-  );
-
-  return {
-    current:
-      input.currentJob && currentSkills.length > 0
-        ? { job: input.currentJob, sections: sections(currentSkills) }
-        : null,
-    target: input.targetJob ? { job: input.targetJob, sections: sections(targetSkills) } : null,
-    outside,
-    planId: input.planId,
-  };
+  return { nodes, currentJob: input.currentJob, targetJob: input.targetJob, planId: input.planId };
 }

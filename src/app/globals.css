@@ -904,29 +904,29 @@ details[open] > .skill-summary::before {
   color: var(--arrow-emphasis);
 }
 
-.skill-legend__line {
-  width: 1.2rem;
-  height: 0;
-  border-top: 2px solid var(--arrow);
+.skill-legend__arrow {
+  color: var(--arrow);
 }
 
-.skill-legend__line--done {
-  border-color: var(--arrow-emphasis);
+.skill-legend__plan {
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
 }
 
-.skill-legend__line--progress {
-  border-color: var(--cloud-stroke);
-  border-top-style: dashed;
+.skill-tree-jobs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  font-size: 0.8rem;
 }
 
-.graph-shell .react-flow__node-tier,
-.graph-shell .react-flow__node-group,
-.graph-shell .react-flow__node-caption {
-  pointer-events: none !important;
-}
-
-.graph-shell .react-flow__node-skill-job {
-  pointer-events: all;
+.skill-tree-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .graph-shell .react-flow__node-skill {
@@ -938,130 +938,14 @@ details[open] > .skill-summary::before {
   outline-offset: 2px;
 }
 
-.skill-tier {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 16px;
-  border: 1px solid var(--tier-stroke, var(--toolbar-border));
-  background:
-    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--tier-fill) 65%, transparent), transparent 55%),
-    var(--lane-fill);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--tier-stroke) 22%, transparent),
-    0 0 26px color-mix(in srgb, var(--tier-stroke) 12%, transparent);
+/* Выбран узел: его ветвь остаётся яркой, остальное дерево приглушается. */
+.graph-shell .react-flow__node.skill-dim .skill-node {
+  opacity: 0.28;
 }
 
-.skill-tier::before,
-.skill-tier::after {
-  content: "";
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  border: 1px solid color-mix(in srgb, var(--tier-stroke) 75%, transparent);
+/* Ребро предпосылки: линия идёт по пустой полосе между слоями, клик не перехватывает. */
+.skill-edge {
   pointer-events: none;
-}
-
-.skill-tier::before {
-  top: 6px;
-  left: 6px;
-  border-right: 0;
-  border-bottom: 0;
-  border-radius: 7px 0 0 0;
-}
-
-.skill-tier::after {
-  right: 6px;
-  bottom: 6px;
-  border-top: 0;
-  border-left: 0;
-  border-radius: 0 0 7px 0;
-}
-
-.skill-tier--target {
-  --tier-stroke: var(--arrow-emphasis);
-  --tier-fill: var(--backend-fill);
-}
-
-.skill-tier--current {
-  --tier-stroke: var(--frontend-stroke);
-  --tier-fill: var(--frontend-fill);
-}
-
-.skill-tier--outside {
-  --tier-stroke: var(--external-stroke);
-  --tier-fill: var(--external-fill);
-}
-
-.skill-tier__label {
-  position: absolute;
-  top: 9px;
-  left: 16px;
-  max-width: calc(100% - 32px);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--tier-stroke);
-}
-
-.skill-job-card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border: 1px solid var(--tier-stroke, var(--toolbar-border));
-  border-radius: 10px;
-  background: var(--panel-solid);
-  color: var(--text);
-  text-decoration: none;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier-stroke) 18%, transparent);
-}
-
-.skill-job-card__subtitle {
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.skill-job-card__name {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.skill-group-frame {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border: 1px dashed color-mix(in srgb, var(--tier-stroke, var(--panel-border)) 50%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--panel-solid) 18%, transparent);
-}
-
-.skill-group-label {
-  position: absolute;
-  top: 5px;
-  left: 9px;
-  max-width: calc(100% - 18px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.skill-section-label {
-  padding-bottom: 4px;
-  border-bottom: 1px solid color-mix(in srgb, var(--tier-stroke, var(--panel-border)) 38%, transparent);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-muted);
 }
 
 .skill-node {
@@ -1111,33 +995,63 @@ details[open] > .skill-summary::before {
   --skill-fill: var(--external-fill);
 }
 
+/* Навык вне текущей должности и цели ИПР: виден, но подчёркнуто необязательный. */
+.skill-node[data-relation="none"] {
+  border-style: dashed;
+  background: var(--panel-solid);
+}
+
 .skill-node--confirmed {
   box-shadow:
     0 0 0 1px var(--arrow-emphasis),
     0 0 16px color-mix(in srgb, var(--arrow-emphasis) 45%, transparent);
 }
 
-.skill-node__level {
-  font-size: 9px;
-  letter-spacing: 0.08em;
+.skill-node__group {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8.5px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 
 .skill-node__name {
   display: -webkit-box;
   overflow: hidden;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.25;
 }
 
-.skill-node__plan {
+.skill-node__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   margin-top: auto;
   font-size: 9px;
   color: var(--text-faint);
+}
+
+.skill-node__level {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.skill-node__plan {
+  white-space: nowrap;
+}
+
+.skill-node__plan--done {
+  color: var(--arrow-emphasis);
+}
+
+.skill-node__plan--in_progress {
+  color: var(--cloud-stroke);
 }
 
 .skill-node__badge {
@@ -1156,8 +1070,4 @@ details[open] > .skill-summary::before {
   font-size: 11px;
   line-height: 1;
   box-shadow: 0 0 10px color-mix(in srgb, var(--arrow-emphasis) 65%, transparent);
-}
-
-.skill-edge--in_progress {
-  stroke-dasharray: 6 4;
 }

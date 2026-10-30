@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { PREREQUISITES, prerequisiteProblems } from "../src/lib/skill-tree-graph";
 
 type Job = {
   id: string;
@@ -23,6 +24,15 @@ const FILLED_PROFILES = ["intern", "junior", "programmer", "senior", "lead", "ar
 const LANES = new Set(["executor", "manager", "other"]);
 const KINDS = new Set(["linear", "level_change"]);
 const TYPES = new Set(["professional", "universal", "duty"]);
+/** Корни дерева предпосылок: базовые навыки, с которых начинаются ветви (ADR 0009). */
+const EXPECTED_ROOTS = [
+  "comp-gramotnaya-pismennaya-rech",
+  "comp-kommunikabelnost",
+  "comp-oop-i-algoritmy",
+  "comp-samostoyatelnost",
+  "comp-vladenie-sredstvami-razrabotki-i-administrirovaniya-platformy-1s-8-3",
+  "comp-yazyk-sql",
+];
 
 /** Читает JSON seed и проверяет, что файл кончается переводом строки. */
 function readSeed(rel: string, errors: string[]): Seed {
@@ -83,8 +93,7 @@ function checkCompetencies(data: Seed, errors: string[]) {
 }
 
 /** Инварианты профилей: состав заполненных должностей и уровни строк. */
-function checkProfiles(data: Seed, errors: string[]) {
-  const jobIds = new Set(data.jobs.map((j) => j.id));
+function checkProfiles(data: Seed, errors: string[]) {  const jobIds = new Set(data.jobs.map((j) => j.id));
   const competencyById = new Map(data.competencies.map((c) => [c.id, c]));
   const profileJobIds = data.profiles.map((p) => p.jobId);
 
@@ -110,6 +119,31 @@ function checkProfiles(data: Seed, errors: string[]) {
         errors.push(`${where}: level ${skill.level}, ожидается 1, 2 или 3`);
       }
     }
+  }
+}
+
+/**
+ * Дерево навыков (ADR 0009): предпосылки покрывают все навыки справочника, у навыка один
+ * родитель, циклов нет, рёбра не ведут на обязанности и группы разделов.
+ */
+function checkPrerequisites(data: Seed, errors: string[]) {
+  const skills = data.competencies.filter((row) => row.parentId !== null && row.type !== "duty");
+  const ids = skills.map((row) => row.id);
+  for (const problem of prerequisiteProblems(ids)) errors.push(`prerequisites: ${problem}`);
+
+  const covered = new Set<string>();
+  for (const [parent, child] of PREREQUISITES) {
+    covered.add(parent);
+    covered.add(child);
+  }
+  for (const id of ids) {
+    if (!covered.has(id)) errors.push(`prerequisites.${id}: навык не стоит в дереве предпосылок`);
+  }
+
+  const roots = [...new Set(ids)].filter((id) => !PREREQUISITES.some(([, child]) => child === id)).sort();
+  const expected = [...EXPECTED_ROOTS].sort();
+  if (roots.join(",") !== expected.join(",")) {
+    errors.push(`prerequisites: корни ${roots.join(", ") || "нет"}, ожидаются ${expected.join(", ")}`);
   }
 }
 
@@ -160,6 +194,7 @@ function main() {
   checkJobs(data, errors);
   checkCompetencies(data, errors);
   checkProfiles(data, errors);
+  checkPrerequisites(data, errors);
   checkFixture(data, fixture, errors);
 
   if (errors.length > 0) {
