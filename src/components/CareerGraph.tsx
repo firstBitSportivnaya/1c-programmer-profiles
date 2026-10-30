@@ -166,7 +166,6 @@ export function CareerGraph({
   profileJobIds: string[];
 }) {
   const theme = useArchifyTheme();
-  const hasProfile = new Set(profileJobIds);
   const positions = useMemo(() => ({ ...LAYOUT, ...extraJobPositions(jobs) }), [jobs]);
 
   const nodes: Node[] = useMemo(() => {
@@ -220,7 +219,7 @@ export function CareerGraph({
       id: job.id,
       type: "job",
       position: positions[job.id] ?? { x: LANE_X[job.lane], y: 108 },
-      data: { label: job.name, filled: hasProfile.has(job.id) },
+      data: { label: job.name, filled: profileJobIds.includes(job.id) },
       style: { width: JOB_W },
       draggable: false,
       zIndex: 3,
