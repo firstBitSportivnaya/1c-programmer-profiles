@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "verify": "tsx scripts/verify.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:sync-catalog": "tsx scripts/sync-catalog.ts",
