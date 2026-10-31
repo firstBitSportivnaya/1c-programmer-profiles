@@ -83,14 +83,15 @@ test("админ заводит сотрудника на младшего пр�
 test("в кабинете сводка текущего набора, списки на отдельной странице", async ({ page }) => {
   await login(page, JUNIOR);
 
-  await expect(page.getByRole("heading", { level: 2, name: "Мои компетенции" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Мои пометки по компетенциям" })).toBeVisible();
   await expect(page.getByTestId("marks-has")).toHaveText("0");
   await expect(page.getByTestId("marks-lacks")).toHaveText("0");
   await expect(page.getByTestId("marks-progress")).toHaveText("0");
   await expect(page.getByLabel(/^Статус:/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ок" })).toHaveCount(0);
-  await page.getByRole("link", { name: "Открыть компетенции" }).click();
+  await page.getByRole("link", { name: "Открыть пометки" }).click();
   await expect(page).toHaveURL(/\/me\/marks$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Мои пометки по компетенциям" })).toBeVisible();
 
   const learn = markRow(page, "Обучаемость");
   await expect(learn.getByText("цель ИПР")).toHaveCount(0);
@@ -244,7 +245,7 @@ test("руководитель-админ и гость пометок сотр�
   await page.goto("/people");
   await page.getByRole("link", { name: JUNIOR.name, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: JUNIOR.name })).toBeVisible();
-  await expect(page.getByText("Мои компетенции")).toHaveCount(0);
+  await expect(page.getByText("Мои пометки по компетенциям")).toHaveCount(0);
   await expect(page.getByLabel(/^Статус:/)).toHaveCount(0);
   await expect(page.getByText("смотрю ИТС")).toHaveCount(0);
 

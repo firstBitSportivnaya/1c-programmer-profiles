@@ -820,3 +820,535 @@ details[open] > .skill-summary::before {
 .compare-table tr[data-change="same"] td:last-child {
   color: var(--text-muted);
 }
+
+/* Дерево навыков: RPG-холст в кабинете, обе темы через переменные темы.
+   Размеров шрифта три: --sst-lg заголовок, --sst-md текст, --sst-sm подпись. */
+.skill-tree-layout {
+  --sst-lg: 0.9375rem;
+  --sst-md: 0.8125rem;
+  --sst-sm: 0.6875rem;
+  display: grid;
+  gap: 0.6rem;
+  font-size: var(--sst-md);
+  line-height: 1.45;
+}
+
+.skill-tree-shell {
+  position: relative;
+  height: clamp(560px, 78vh, 900px);
+}
+
+/* Карточка узла — всплывающее окно поверх холста, как деталь в archify. */
+.skill-popup {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 6;
+  width: min(22rem, calc(100% - 1.5rem));
+  max-height: calc(100% - 1.5rem);
+  overflow: auto;
+  animation: skill-popup-in 0.18s ease-out;
+}
+
+@keyframes skill-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.skill-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-solid) 94%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgb(0 0 0 / 32%);
+  font-size: var(--sst-md);
+}
+
+.skill-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.skill-card__title {
+  margin: 0.1rem 0 0;
+  font-size: var(--sst-lg);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.skill-card__label {
+  margin: 0 0 0.15rem;
+  font-size: var(--sst-sm);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.skill-card__text,
+.skill-card__link {
+  font-size: var(--sst-md);
+}
+
+.skill-card__text {
+  margin: 0;
+}
+
+.skill-card__note {
+  font-size: var(--sst-sm);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.skill-card__list {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--sst-md);
+}
+
+.skill-card__list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.skill-card__tag {
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  font-size: var(--sst-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.skill-card__close {
+  flex: none;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--sst-sm);
+  cursor: pointer;
+}
+
+.skill-card__close:hover {
+  color: var(--text);
+  border-color: var(--arrow-emphasis);
+}
+
+/* Пометка в карточке навыка: список статуса и пояснение, ошибка остаётся в самой карточке. */
+.skill-mark {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.skill-mark__note {
+  width: 100%;
+  resize: vertical;
+}
+
+.skill-hint {
+  margin: 0;
+  font-size: var(--sst-md);
+  color: var(--text-muted);
+}
+
+.skill-hint__note {
+  font-size: var(--sst-sm);
+  font-style: italic;
+}
+
+.skill-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--sst-md);
+  color: var(--text-muted);
+}
+
+.skill-legend li {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Запись легенды — переключатель выделения: выбранная подсвечивает свои узлы и рёбра. */
+.skill-legend button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.skill-legend button:hover {
+  color: var(--text);
+  border-color: var(--panel-border);
+}
+
+.skill-legend button[aria-pressed="true"] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--arrow-emphasis) 55%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--arrow-emphasis) 25%, transparent),
+    0 0 12px color-mix(in srgb, var(--arrow-emphasis) 22%, transparent);
+}
+
+.skill-legend button:focus-visible {
+  outline: 2px solid var(--frontend-stroke);
+  outline-offset: 2px;
+}
+
+.skill-legend button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.skill-legend button:disabled:hover {
+  color: inherit;
+  border-color: transparent;
+}
+
+/* Счётчик узлов: сколько карточек выделит запись легенды. */
+.skill-legend__count {
+  min-width: 1.05rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-border) 60%, transparent);
+  font-size: var(--sst-sm);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.skill-legend__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.25rem;
+}
+
+.skill-legend__swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: none;
+  border-radius: 3px;
+  border: 1px solid var(--panel-border);
+}
+
+.skill-legend__swatch--has {
+  background: var(--backend-fill);
+  border-color: var(--backend-stroke);
+}
+
+.skill-legend__swatch--progress {
+  background: var(--cloud-fill);
+  border-color: var(--cloud-stroke);
+}
+
+.skill-legend__swatch--lacks {
+  background: var(--security-fill);
+  border-color: var(--security-stroke);
+}
+
+.skill-legend__swatch--none {
+  background: var(--external-fill);
+  border-color: var(--external-stroke);
+}
+
+.skill-legend__swatch--star {
+  background: var(--arrow-emphasis);
+  border-color: var(--arrow-emphasis);
+  border-radius: 50%;
+}
+
+.skill-legend__swatch--plan {
+  background: var(--panel-solid);
+  border-color: var(--cloud-stroke);
+  border-style: dashed;
+}
+
+.skill-legend__arrow {
+  color: var(--arrow);
+}
+
+.skill-tree-jobs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  font-size: var(--sst-md);
+}
+
+.skill-tree-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--sst-md);
+  color: var(--text-muted);
+}
+
+.graph-shell .react-flow__node-skill {
+  cursor: pointer;
+}
+
+.graph-shell .react-flow__node-skill.selected .skill-node {
+  outline: 2px solid var(--frontend-stroke);
+  outline-offset: 2px;
+}
+
+/* Выбран узел или запись легенды: подсвеченное остаётся ярким, остальное дерево приглушается. */
+.graph-shell .react-flow__node.skill-dim .skill-node {
+  opacity: 0.28;
+}
+
+.graph-shell .react-flow__node.skill-dim {
+  transition: opacity 0.15s ease;
+}
+
+/* Ребро предпосылки: линия идёт по пустой полосе между слоями, клик не перехватывает. */
+.skill-edge {
+  pointer-events: none;
+}
+
+/* Ребро выделенной ветви: яркое свечение и бегущий пунктир, как след в archify. */
+.skill-edge--active {
+  stroke-dasharray: 8 6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px var(--arrow-emphasis)) drop-shadow(0 0 8px var(--arrow-emphasis))
+    drop-shadow(0 0 16px color-mix(in srgb, var(--arrow-emphasis) 70%, transparent));
+  animation: skill-edge-flow 0.9s linear infinite;
+}
+
+@keyframes skill-edge-flow {
+  from {
+    stroke-dashoffset: 26;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-edge--active {
+    animation: none;
+    stroke-dasharray: none;
+    filter: drop-shadow(0 0 2px var(--arrow-emphasis)) drop-shadow(0 0 7px var(--arrow-emphasis));
+  }
+}
+
+/* Раздел дерева: профессиональные, личные и вне профиля — отдельные холсты. */
+.skill-group-block {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.skill-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: var(--sst-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.skill-group-count {
+  padding: 0 0.4rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  font-size: var(--sst-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.skill-group-note {
+  margin: 0;
+  font-size: var(--sst-sm);
+  color: var(--text-faint);
+}
+
+.skill-group-block .graph-shell {
+  height: clamp(520px, 68vh, 820px);
+}
+
+.skill-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--skill-stroke, var(--external-stroke));
+  border-radius: 9px;
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--skill-fill, transparent) 90%, transparent), transparent 70%),
+    var(--panel-solid);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--skill-stroke, var(--panel-border)) 18%, transparent);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.skill-node:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--skill-stroke) 35%, transparent),
+    0 0 14px color-mix(in srgb, var(--skill-stroke) 24%, transparent);
+}
+
+.skill-node--has {
+  --skill-stroke: var(--backend-stroke);
+  --skill-fill: var(--backend-fill);
+}
+
+.skill-node--in_progress {
+  --skill-stroke: var(--cloud-stroke);
+  --skill-fill: var(--cloud-fill);
+}
+
+.skill-node--lacks {
+  --skill-stroke: var(--security-stroke);
+  --skill-fill: var(--security-fill);
+}
+
+.skill-node--none {
+  --skill-stroke: var(--external-stroke);
+  --skill-fill: var(--external-fill);
+}
+
+/* Навык вне текущей должности и цели ИПР: виден, но подчёркнуто необязательный. */
+.skill-node[data-relation="none"] {
+  border-style: dashed;
+  background: var(--panel-solid);
+}
+
+.skill-node--confirmed {
+  box-shadow:
+    0 0 0 1px var(--arrow-emphasis),
+    0 0 16px color-mix(in srgb, var(--arrow-emphasis) 45%, transparent);
+}
+
+/* Шапка узла: пиктограмма темы навыка и название группы справочника. */
+.skill-node__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.skill-node__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--skill-stroke, var(--panel-border)) 30%, transparent);
+  color: var(--skill-stroke, var(--text-muted));
+}
+
+.skill-node__glyph {
+  width: 14px;
+  height: 14px;
+}
+
+.skill-node__group {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sst-sm);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.skill-node__name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: var(--sst-md);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.skill-node__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: auto;
+  overflow: hidden;
+  font-size: var(--sst-sm);
+  color: var(--text-faint);
+}
+
+.skill-node__level {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-node__plan {
+  white-space: nowrap;
+}
+
+.skill-node__plan--done {
+  color: var(--arrow-emphasis);
+}
+
+.skill-node__plan--in_progress {
+  color: var(--cloud-stroke);
+}
+
+.skill-node__badge {
+  position: absolute;
+  top: -9px;
+  right: -7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-solid);
+  background: var(--arrow-emphasis);
+  color: #0f172a;
+  font-size: 11px;
+  line-height: 1;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--arrow-emphasis) 65%, transparent);
+}

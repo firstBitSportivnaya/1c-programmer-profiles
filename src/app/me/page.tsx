@@ -35,6 +35,12 @@ export default async function MePage() {
       </dl>
       <Achievements employeeId={employee.id} />
       <CompetencyMarkSummary employeeId={employee.id} jobId={employee.jobId} />
+      <p className="text-sm">
+        <a className="link-accent" href="/me/skills">
+          Дерево навыков
+        </a>
+        <span className="muted"> — личные пометки и путь активного ИПР на одной карте.</span>
+      </p>
       <EmployeeIdpSummary employeeId={employee.id} />
     </article>
   );

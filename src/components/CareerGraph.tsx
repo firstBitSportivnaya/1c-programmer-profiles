@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Background,
   Controls,
@@ -13,6 +13,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
+import { useThemeMode } from "@/components/useThemeMode";
 
 type Job = {
   id: string;
@@ -144,16 +145,7 @@ function inferHandles(from: { x: number; y: number }, to: { x: number; y: number
 }
 
 function useArchifyTheme(): "dark" | "light" {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  useEffect(() => {
-    const read = () =>
-      setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => observer.disconnect();
-  }, []);
-  return theme;
+  return useThemeMode();
 }
 
 export function CareerGraph({

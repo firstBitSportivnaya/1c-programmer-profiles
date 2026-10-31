@@ -188,7 +188,7 @@ export function IdpBlock({
                   const attemptCount = attempts.get(item.id)?.count ?? 0;
                   const canTake = actor.id === idp.employeeId && open && !acceptedRow && questionCount > 0;
                   return (
-                    <tr key={item.id}>
+                    <tr key={item.id} id={`item-${item.id}`}>
                       <IdpItemEdit
                         itemId={item.id}
                         name={item.assignmentName}
