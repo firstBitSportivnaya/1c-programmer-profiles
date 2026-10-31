@@ -104,6 +104,8 @@ export function DateField({
       required={required}
       value={value}
       form={form}
+      // До гидратации поле выключено: введённая раньше дата иначе стирается первым рендером состояния.
+      disabled={!ready}
       aria-label={label ? undefined : ariaLabel}
       onChange={(event) => setValue(event.target.value)}
     />
