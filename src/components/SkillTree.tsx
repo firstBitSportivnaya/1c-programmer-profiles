@@ -63,11 +63,11 @@ const LEGEND_MATCH: Record<Exclude<LegendKey, "prereq">, (node: SkillTreeNode) =
   plan: (node) => node.plan.total > 0,
 };
 
-type SkillNodeData = { skill: SkillTreeNode; depth: number; dimmed: boolean };
+type SkillNodeData = { skill: SkillTreeNode; depth: number };
 
 /** Узел дерева: планка должности, заливка пометки, значок шага плана и подтверждение. */
 function SkillNodeView({ data }: NodeProps) {
-  const { skill, depth, dimmed } = data as unknown as SkillNodeData;
+  const { skill, depth } = data as unknown as SkillNodeData;
   const mark = skill.mark || "none";
   const planNote =
     skill.plan.total === 0
@@ -87,7 +87,6 @@ function SkillNodeView({ data }: NodeProps) {
       data-mark={mark}
       data-confirmed={skill.confirmed ? "true" : "false"}
       data-plan-state={skill.plan.total === 0 ? "none" : skill.plan.state}
-      data-dimmed={dimmed ? "true" : "false"}
       aria-label={`${skill.name}: ${levelLabel(skill)}, пометка ${MARK_LABEL[mark] ?? "не отмечено"}`}
     >
       <Handle type="target" position={Position.Top} />
@@ -258,7 +257,7 @@ export function SkillTree({ data }: { data: SkillTreeData }) {
         id: `skill:${node.id}`,
         type: "skill",
         position: { x: (spot?.x ?? 0) + PAD, y: (spot?.y ?? 0) + PAD },
-        data: { skill: node, depth: spot?.depth ?? 0, dimmed },
+        data: { skill: node, depth: spot?.depth ?? 0 },
         style: { width: NODE_W, height: NODE_H },
         className: dimmed ? "skill-dim" : highlight !== null ? "skill-lit" : undefined,
         draggable: false,
