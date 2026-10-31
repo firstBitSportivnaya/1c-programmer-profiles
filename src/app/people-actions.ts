@@ -214,6 +214,7 @@ export async function setCompetencyMarkAction(
     }
     revalidatePath("/me");
     revalidatePath("/me/marks");
+    revalidatePath("/me/skills");
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return setCompetencyMarkAction(_prev, formData, true);

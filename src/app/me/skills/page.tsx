@@ -70,6 +70,7 @@ function treeSkills(): TreeSkillRow[] {
       id: row.id,
       name: row.name,
       groupName: row.parentId ? (names.get(row.parentId) ?? null) : null,
+      kind: row.type === "universal" ? "universal" : "professional",
     }));
 }
 
@@ -144,8 +145,8 @@ export default async function SkillTreePage() {
         <h1 className="page-title">Дерево навыков</h1>
       </div>
       <p className="muted text-sm">
-        Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Заливка узла — ваша пометка, значок —
-        шаг активного ИПР, свечение — подтверждение приёмкой. Видите только вы.
+        Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Пиктограмма — тема навыка, заливка узла
+        — ваша пометка, значок шага — активный ИПР, свечение — подтверждение приёмкой. Видите только вы.
       </p>
       <Achievements employeeId={employee.id} />
       {!data.planId ? (
@@ -164,7 +165,7 @@ export default async function SkillTreePage() {
           У должности нет профиля с навыками — дерево появится, когда профиль заполнят. Личные пометки можно вести в
           разделе{" "}
           <a href="/me/marks" className="link-accent">
-            Мои компетенции
+            Мои пометки по компетенциям
           </a>
           .
         </p>

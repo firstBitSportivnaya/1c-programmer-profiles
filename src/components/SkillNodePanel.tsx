@@ -1,13 +1,7 @@
 "use client";
 
+import { SkillMarkForm } from "@/components/SkillMarkForm";
 import type { SkillTreeNode } from "@/lib/skill-tree";
-
-const MARK_LABEL: Record<string, string> = {
-  has: "есть",
-  in_progress: "в процессе",
-  lacks: "нет",
-  "": "не отмечено",
-};
 
 const ITEM_STATUS: Record<string, string> = {
   not_started: "не начат",
@@ -21,13 +15,38 @@ const LINK_KIND: Record<string, string> = {
   video: "Видео",
 };
 
-/** Планка уровня: требование должности и цель активного ИПР, личного уровня нет (ADR 0001, 0007). */
+/**
+ * Название уровня из профиля должности: в справочнике он записан числом 1–3.
+ * Уровни не выводятся из грейда, поэтому у неизвестного числа остаётся само число.
+ */
+export function levelName(level: number): string {
+  if (level === 1) return "базовый";
+  if (level === 2) return "уверенный";
+  if (level === 3) return "эксперт";
+  return `уровень ${level}`;
+}
+
+/**
+ * Требование к навыку словами: что нужно текущей должности и что — цели активного ИПР.
+ * Внутренний термин «планка» в интерфейс не выносим (ADR 0001, 0007), личного уровня нет.
+ */
 export function levelLabel(node: Pick<SkillTreeNode, "currentLevel" | "targetLevel">): string {
   const { currentLevel, targetLevel } = node;
-  if (currentLevel == null && targetLevel == null) return "планка не задана";
-  if (currentLevel == null) return `планка цели ${targetLevel}`;
-  if (targetLevel == null || targetLevel === currentLevel) return `планка ${currentLevel}`;
-  return `планка ${currentLevel} → ${targetLevel}`;
+  if (currentLevel == null && targetLevel == null) return "Уровень не задан ни в должности, ни в цели ИПР";
+  if (currentLevel == null) return `Цель ИПР: ${levelName(targetLevel!)} уровень`;
+  if (targetLevel == null || targetLevel === currentLevel) {
+    return `Должность и цель: ${levelName(currentLevel)} уровень`;
+  }
+  return `Должность: ${levelName(currentLevel)} уровень, цель ИПР — ${levelName(targetLevel)}`;
+}
+
+/** То же короче: место в узкой карточке дерева. */
+export function levelShort(node: Pick<SkillTreeNode, "currentLevel" | "targetLevel">): string {
+  const { currentLevel, targetLevel } = node;
+  if (currentLevel == null && targetLevel == null) return "уровень не задан";
+  if (currentLevel == null) return `цель: ${levelName(targetLevel!)}`;
+  if (targetLevel == null || targetLevel === currentLevel) return `${levelName(currentLevel)} уровень`;
+  return `${levelName(currentLevel)} → цель: ${levelName(targetLevel)}`;
 }
 
 /**
@@ -74,12 +93,9 @@ export function SkillNodePanel({
 
       <section>
         <h3 className="skill-card__label">Пометка</h3>
-        <p className="skill-card__text">
-          <span data-testid="skill-panel-mark">{MARK_LABEL[node.mark] ?? node.mark}</span>
-          {node.note ? <span className="skill-card__note"> · «{node.note}»</span> : null}
-        </p>
+        <SkillMarkForm key={node.id} competencyId={node.id} name={node.name} status={node.mark} note={node.note} />
         <a className="link-accent skill-card__link" href="/me/marks">
-          Изменить пометку
+          Все пометки по компетенциям
         </a>
       </section>
 

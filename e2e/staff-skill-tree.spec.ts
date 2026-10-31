@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
+import { PREREQUISITES } from "../src/lib/skill-tree-graph";
 import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
 
 // Файл идёт после session.spec.ts (алфавит, один воркер): первый админ там уже создан.
@@ -189,12 +190,25 @@ async function expectPrerequisiteLayers(page: Page) {
       const id = element.dataset.testid?.slice("skill-node-".length) ?? "";
       depth.set(id, Number(element.dataset.depth));
     }
-    const edges = [...document.querySelectorAll(".react-flow__edge")].map((element) => element.getAttribute("data-id") ?? "");
-    return { edges, depths: [...depth.entries()] as [string, number][] };
+    const boards = [...document.querySelectorAll<HTMLElement>(".skill-tree-shell")].map((shell) => ({
+      ids: [...shell.querySelectorAll<HTMLElement>('[data-testid^="skill-node-"]')].map(
+        (element) => element.dataset.testid?.slice("skill-node-".length) ?? "",
+      ),
+      edges: [...shell.querySelectorAll(".react-flow__edge")].map((element) => element.getAttribute("data-id") ?? ""),
+    }));
+    return { boards, depths: [...depth.entries()] as [string, number][] };
   });
   const depths = new Map(graph.depths);
-  expect(graph.edges.length).toBeGreaterThan(0);
-  for (const id of graph.edges) {
+  expect(graph.boards.flatMap((board) => board.edges).length).toBeGreaterThan(0);
+  for (const board of graph.boards) {
+    const shown = new Set(board.ids);
+    // Полный набор рёбер раздела: пара из PREREQUISITES, где оба навыка на этом холсте.
+    const expected = PREREQUISITES.filter(([parent, child]) => shown.has(parent) && shown.has(child))
+      .map(([parent, child]) => `prereq:${parent}:${child}`)
+      .sort();
+    expect([...board.edges].sort(), "рёбра раздела").toEqual(expected);
+  }
+  for (const id of graph.boards.flatMap((board) => board.edges)) {
     const [kind, parent, child] = id.split(":");
     expect(kind, id).toBe("prereq");
     expect(depths.get(parent), id).toBe((depths.get(child) ?? Number.NaN) - 1);
@@ -267,12 +281,35 @@ test("админ заводит сотрудников, ИПР, строки п�
   await expect(materials.getByRole("link", { name: MATERIAL })).toHaveAttribute("href", MATERIAL_URL);
 });
 
-test("дерево слоями: предпосылки, планки и один узел на компетенцию, обязанностей нет", async ({ page }) => {
+test("дерево слоями: предпосылки, требования должности и один узел на компетенцию, обязанностей нет", async ({
+  page,
+}) => {
   await login(page, STUDENT);
   await page.goto("/me");
   await page.getByRole("link", { name: "Дерево навыков" }).click();
   await expect(page).toHaveURL(/\/me\/skills$/);
   await expect(page.getByRole("heading", { level: 1, name: "Дерево навыков" })).toBeVisible();
+
+  // Профессиональные и личные компетенции — раздельные разделы, у каждого свой холст.
+  await expect(page.getByRole("heading", { level: 2, name: /Профессиональные компетенции/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /Личные компетенции/ })).toBeVisible();
+  const professionalBoard = page.getByTestId("skill-board-professional");
+  const personalBoard = page.getByTestId("skill-board-personal");
+  await expect(professionalBoard.getByTestId(`skill-node-${PROGRAMMING.id}`)).toBeVisible();
+  await expect(personalBoard.getByTestId(`skill-node-${OBUCHAEMOST}`)).toBeVisible();
+  await expect(personalBoard.getByTestId(`skill-node-${PROGRAMMING.id}`)).toHaveCount(0);
+  await expect(professionalBoard.getByTestId(`skill-node-${OBUCHAEMOST}`)).toHaveCount(0);
+
+  // Пиктограмма темы есть у каждого узла, у профессиональных и личных она своя.
+  await expect(professionalBoard.getByTestId(`skill-node-${PROGRAMMING.id}`).locator("svg[data-icon]")).toHaveCount(1);
+  await expect(personalBoard.getByTestId(`skill-node-${OBUCHAEMOST}`).locator("svg[data-icon]")).toHaveCount(1);
+  const professionalIcons = await professionalBoard.getByTestId(`skill-node-${PROGRAMMING.id}`).locator("svg").evaluate((element) =>
+    element.getAttribute("data-icon"),
+  );
+  const personalIcons = await personalBoard.getByTestId(`skill-node-${OBUCHAEMOST}`).locator("svg").evaluate((element) =>
+    element.getAttribute("data-icon"),
+  );
+  expect(professionalIcons).not.toBe(personalIcons);
 
   const jobs = page.locator(".skill-tree-jobs");
   await expect(jobs).toContainText("Сейчас:");
@@ -282,11 +319,11 @@ test("дерево слоями: предпосылки, планки и оди�
 
   const programming = skillNode(page, PROGRAMMING.id);
   await expect(programming).toHaveAttribute("data-relation", "both");
-  await expect(programming).toContainText("планка 1 → 2");
+  await expect(programming).toContainText("базовый → цель: уверенный");
   await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-relation", "target");
-  await expect(skillNode(page, TESTING.id)).toContainText("планка цели 1");
+  await expect(skillNode(page, TESTING.id)).toContainText("цель: базовый");
   await expect(skillNode(page, OBUCHAEMOST)).toHaveAttribute("data-relation", "both");
-  await expect(skillNode(page, OBUCHAEMOST)).toContainText("планка 2");
+  await expect(skillNode(page, OBUCHAEMOST)).toContainText("уверенный уровень");
   await expect(skillNode(page, OBUCHAEMOST)).toHaveCount(1);
 
   // Предпосылка «высокоуровневый язык → программирование на 1С»: ребро между соседними слоями.
@@ -318,12 +355,28 @@ test("заливка узла — пометка, панель показыва�
   await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-mark", "in_progress");
   await expect(skillNode(page, OBUCHAEMOST)).toHaveAttribute("data-mark", "has");
 
+  // Заливка узла — вычисленный стиль, а не только атрибут: у разных пометок он разный.
+  const fills = await page.evaluate(
+    (ids) => {
+      const read = (id: string) => {
+        const element = document.querySelector<HTMLElement>(`[data-testid="skill-node-${id}"]`);
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        return { border: style.borderTopColor, background: style.backgroundImage };
+      };
+      return { [ids[0]]: read(ids[0]), [ids[1]]: read(ids[1]) };
+    },
+    [TESTING.id, OBUCHAEMOST],
+  );
+  expect(fills[TESTING.id]?.border).not.toBe(fills[OBUCHAEMOST]?.border);
+  expect(fills[TESTING.id]?.background).not.toBe(fills[OBUCHAEMOST]?.background);
+
   await skillNode(page, TESTING.id).click();
   const panel = page.getByTestId("skill-node-panel");
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("skill-panel-criteria")).toContainText("Пишет модульные тесты на YAxUnit");
-  await expect(panel.getByTestId("skill-panel-mark")).toHaveText("в процессе");
-  await expect(panel.getByRole("link", { name: "Изменить пометку" })).toHaveAttribute("href", "/me/marks");
+  await expect(panel.getByLabel(`Статус: ${TESTING.name}`)).toHaveValue("in_progress");
+  await expect(panel.getByRole("link", { name: "Все пометки по компетенциям" })).toHaveAttribute("href", "/me/marks");
   await expect(panel.getByTestId("skill-panel-rows")).toContainText(TESTING_ITEM);
   await expect(panel.getByRole("link", { name: TESTING_ITEM })).toHaveAttribute(
     "href",
@@ -331,17 +384,58 @@ test("заливка узла — пометка, панель показыва�
   );
 
   await skillNode(page, PROGRAMMING.id).click();
-  await expect(panel.getByTestId("skill-panel-level")).toHaveText("планка 1 → 2");
+  await expect(panel.getByTestId("skill-panel-level")).toHaveText("Должность: базовый уровень, цель ИПР — уверенный");
   await expect(panel.getByTestId("skill-panel-criteria")).toContainText(
     "Структурный подход к решению задач, отладке и исправлению ошибок",
   );
   await expect(panel.getByRole("link", { name: MATERIAL })).toHaveAttribute("href", MATERIAL_URL);
   await expect(panel.getByTestId("skill-panel-rows")).toContainText(GOAL_ITEM);
 
+  // Пояснение, сохранённое на странице пометок, видно в карточке навыка.
+  await skillNode(page, OBUCHAEMOST).click();
+  await expect(panel.getByLabel("Пояснение: Обучаемость")).toHaveValue(NOTE);
+
   await expect(page.getByTestId(`skill-plan-${TESTING.id}`)).toContainText("в работе");
   await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-plan-state", "in_progress");
   await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-plan-state", "not_started");
   await expect(skillNode(page, REST)).toHaveAttribute("data-plan-state", "none");
+});
+
+test("пометка ставится в карточке навыка: статус и пояснение, снятие убирает узел из пометок", async ({ page }) => {
+  await login(page, STUDENT);
+  await page.goto("/me/skills");
+
+  // У навыка без пометки карточка сразу предлагает статус, страницу менять не нужно.
+  await skillNode(page, PROGRAMMING.id).click();
+  const panel = page.getByTestId("skill-node-panel");
+  const status = panel.getByLabel(`Статус: ${PROGRAMMING.name}`);
+  await waitHydrated(status);
+  await expect(status).toHaveValue("");
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-mark", "none");
+
+  await savePost(page, () => status.selectOption("has"));
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-mark", "has");
+  await expect(panel.getByLabel(`Статус: ${PROGRAMMING.name}`)).toHaveValue("has");
+
+  // Пояснение уходит при уходе из поля и остаётся в карточке после перезагрузки.
+  const note = panel.getByLabel(`Пояснение: ${PROGRAMMING.name}`);
+  await waitHydrated(note);
+  await savePost(page, async () => {
+    await note.fill(NOTE);
+    await note.blur();
+  });
+
+  await page.reload();
+  await skillNode(page, PROGRAMMING.id).click();
+  await expect(page.getByLabel(`Статус: ${PROGRAMMING.name}`)).toHaveValue("has");
+  await expect(page.getByLabel(`Пояснение: ${PROGRAMMING.name}`)).toHaveValue(NOTE);
+
+  // «Не отмечено» снимает пометку: узел снова без заливки, пояснение стёрто.
+  const kept = page.getByTestId("skill-node-panel").getByLabel(`Статус: ${PROGRAMMING.name}`);
+  await waitHydrated(kept);
+  await savePost(page, () => kept.selectOption(""));
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-mark", "none");
+  await expect(page.getByLabel(`Пояснение: ${PROGRAMMING.name}`)).toHaveCount(0);
 });
 
 test("карточка поверх холста, рёбра ветви светятся, легенда выделяет по пометке", async ({ page }) => {
@@ -361,7 +455,16 @@ test("карточка поверх холста, рёбра ветви свет
   await expect
     .poll(() => activeEdge.evaluate((element) => getComputedStyle(element).animationName))
     .toBe("skill-edge-flow");
+  // Приглушение — вычисленная прозрачность, иначе пропажу stylesheet тест не заметит.
   await expect(page.locator(".react-flow__node.skill-dim").first()).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .locator(".react-flow__node.skill-dim .skill-node")
+        .first()
+        .evaluate((element) => Number(getComputedStyle(element).opacity)),
+    )
+    .toBeLessThan(0.5);
 
   // Легенда: запись с узлами выделяет их и остаётся нажатой.
   const hasChip = page.getByTestId("skill-legend-has");
@@ -442,7 +545,7 @@ test("без профиля — пустое состояние, без план
   await page.goto("/me/skills");
   const noProfile = page.getByTestId("skill-tree-no-profile");
   await expect(noProfile).toContainText("У должности нет профиля с навыками");
-  await expect(noProfile.getByRole("link", { name: "Мои компетенции" })).toHaveAttribute("href", "/me/marks");
+  await expect(noProfile.getByRole("link", { name: "Мои пометки по компетенциям" })).toHaveAttribute("href", "/me/marks");
   await expect(page.locator(".skill-tree-shell")).toHaveCount(0);
 
   await login(page, ALONE);
@@ -496,8 +599,37 @@ test("отбор «Мои» убирает чужие ветви, переклю
   await expect(nodes).toHaveCount(SKILL_COUNT);
   await expectPrerequisiteLayers(page);
 
-  const ids = await nodes.evaluateAll((list) => list.map((element) => element.getAttribute("data-testid")));
+  // Полное дерево: кто в должности, в цели или отмечен — и все их предки по PREREQUISITES.
+  const all = await nodes.evaluateAll((list) =>
+    list.map((element) => ({
+      id: element.getAttribute("data-testid")!.slice("skill-node-".length),
+      relation: element.getAttribute("data-relation"),
+      mark: element.getAttribute("data-mark"),
+    })),
+  );
+  const ids = all.map((row) => row.id);
   expect(new Set(ids).size).toBe(ids.length);
+
+  const parentOf = new Map<string, string>();
+  for (const [parent, child] of PREREQUISITES) {
+    if (!parentOf.has(child)) parentOf.set(child, parent);
+  }
+  const expected = new Set<string>();
+  for (const row of all) {
+    if (row.relation === "none" && (row.mark === "none" || row.mark === null)) continue;
+    let id: string | undefined = row.id;
+    while (id !== undefined && !expected.has(id)) {
+      expected.add(id);
+      id = parentOf.get(id);
+    }
+  }
+
+  await page.getByLabel("Показывать всё дерево").uncheck();
+  await expect(nodes).toHaveCount(expected.size);
+  const shown = await nodes.evaluateAll((list) =>
+    list.map((element) => element.getAttribute("data-testid")!.slice("skill-node-".length)),
+  );
+  expect([...shown].sort()).toEqual([...expected].sort());
 });
 
 test("гость уходит на вход, чужой сотрудник дерево и пометки не видит", async ({ page }) => {
@@ -508,7 +640,7 @@ test("гость уходит на вход, чужой сотрудник де�
   await page.goto(studentHref!);
   await expect(page.getByRole("heading", { level: 1, name: STUDENT.name })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Дерево навыков" })).toHaveCount(0);
-  await expect(page.getByText("Мои компетенции")).toHaveCount(0);
+  await expect(page.getByText("Мои пометки по компетенциям")).toHaveCount(0);
 
   await page.goto("/me/skills");
   await expect(page.locator(".skill-tree-jobs")).toContainText("Сейчас:");

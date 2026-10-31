@@ -12,10 +12,14 @@ export type SkillMarkStatus = "has" | "lacks" | "in_progress";
 /** Отношение навыка к сотруднику: текущая должность, цель активного ИПР или оба. */
 export type SkillRelation = "current" | "target" | "both" | "none";
 
+/** Вид компетенции: профессиональная или личная (универсальная). Обязанности в дерево не входят. */
+export type SkillKind = "professional" | "universal";
+
 export type TreeSkillRow = {
   id: string;
   name: string;
   groupName: string | null;
+  kind: SkillKind;
 };
 
 export type TreeItemRow = {
@@ -53,6 +57,7 @@ export type SkillTreeNode = {
   id: string;
   name: string;
   groupName: string | null;
+  kind: SkillKind;
   /** Планка текущей должности: требование, не оценка сотрудника. */
   currentLevel: number | null;
   /** Планка цели активного ИПР. */
@@ -113,7 +118,9 @@ export function buildSkillTree(input: BuildSkillTreeInput): SkillTreeData {
   const marks = new Map(input.marks.map((row) => [row.competencyId, row]));
   const items = new Map<string, TreeItemRow[]>();
   for (const row of input.items) {
-    items.set(row.competencyId, [...(items.get(row.competencyId) ?? []), row]);
+    const list = items.get(row.competencyId);
+    if (list) list.push(row);
+    else items.set(row.competencyId, [row]);
   }
 
   const nodes: SkillTreeNode[] = input.skills.map((skill) => {
@@ -125,6 +132,7 @@ export function buildSkillTree(input: BuildSkillTreeInput): SkillTreeData {
       id: skill.id,
       name: skill.name,
       groupName: skill.groupName,
+      kind: skill.kind,
       currentLevel: input.currentLevels.get(skill.id) ?? null,
       targetLevel: input.targetLevels.get(skill.id) ?? null,
       relation: relationOf(inCurrent, inTarget),
