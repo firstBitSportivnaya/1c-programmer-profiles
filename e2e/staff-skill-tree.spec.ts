@@ -344,6 +344,68 @@ test("заливка узла — пометка, панель показыва�
   await expect(skillNode(page, REST)).toHaveAttribute("data-plan-state", "none");
 });
 
+test("карточка поверх холста, рёбра ветви светятся, легенда выделяет по пометке", async ({ page }) => {
+  await login(page, STUDENT);
+  await page.goto("/me/skills");
+  await expect(skillNode(page, OBUCHAEMOST)).toBeVisible();
+
+  // Карточка навыка — всплывающее окно над холстом, а не отдельная колонка.
+  await skillNode(page, PROGRAMMING.id).click();
+  const panel = page.getByTestId("skill-node-panel");
+  await expect(panel).toBeVisible();
+  await expect(page.locator(".skill-tree-shell .skill-popup")).toHaveCount(1);
+
+  // Ветвь: рёбра со свечением и бегущим пунктиром, посторонние узлы приглушены.
+  const activeEdge = page.locator(".skill-edge--active").first();
+  await expect(activeEdge).toBeVisible();
+  await expect
+    .poll(() => activeEdge.evaluate((element) => getComputedStyle(element).animationName))
+    .toBe("skill-edge-flow");
+  await expect(page.locator(".react-flow__node.skill-dim").first()).toBeVisible();
+
+  // Легенда: запись с узлами выделяет их и остаётся нажатой.
+  const hasChip = page.getByTestId("skill-legend-has");
+  await hasChip.click();
+  await expect(hasChip).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-id="skill:comp-obuchaemost"]')).not.toHaveClass(/skill-dim/);
+  await expect(page.locator('[data-id="skill:comp-obuchaemost"]')).toHaveClass(/skill-lit/);
+  await expect(page.locator(".react-flow__node.skill-dim").first()).toBeVisible();
+
+  // Запись без узлов не выбирается: холст не гаснет целиком.
+  const lacksChip = page.getByTestId("skill-legend-lacks");
+  await expect(lacksChip).toBeDisabled();
+  await expect(lacksChip).toHaveAttribute("aria-pressed", "false");
+
+  // Повторный клик по выбранной записи снимает выделение.
+  await hasChip.click();
+  await expect(hasChip).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".react-flow__node.skill-dim")).toHaveCount(0);
+
+  // Три размера шрифта на экране: подпись, текст, заголовок карточки.
+  await skillNode(page, PROGRAMMING.id).click();
+  await expect(panel).toBeVisible();
+  const sizes = await page.evaluate(() => {
+    const seen = new Set<string>();
+    for (const element of document.querySelectorAll<HTMLElement>(".skill-tree-layout *")) {
+      if (!element.textContent?.trim()) continue;
+      seen.add(getComputedStyle(element).fontSize);
+    }
+    return [...seen].sort();
+  });
+  expect(sizes.length).toBeLessThanOrEqual(3);
+
+  // Карточка не уезжает под край холста и не растягивает страницу.
+  const fits = await page.evaluate(() => {
+    const shell = document.querySelector(".skill-tree-shell")!.getBoundingClientRect();
+    const card = document.querySelector(".skill-popup")!.getBoundingClientRect();
+    return card.right <= shell.right && document.documentElement.scrollWidth <= window.innerWidth;
+  });
+  expect(fits).toBe(true);
+
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+});
+
 test("приёмка подтверждает узел и его шаг плана, снятие убирает значок и ачивку", async ({ page }) => {
   await login(page);
   await page.goto(studentPlanPath);

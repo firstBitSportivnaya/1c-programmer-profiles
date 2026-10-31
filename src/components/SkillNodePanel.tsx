@@ -30,7 +30,10 @@ export function levelLabel(node: Pick<SkillTreeNode, "currentLevel" | "targetLev
   return `планка ${currentLevel} → ${targetLevel}`;
 }
 
-/** Панель узла: критерий профиля, материалы, личная пометка и строки активного плана. */
+/**
+ * Карточка узла поверх холста: критерий профиля, материалы, личная пометка и строки активного плана.
+ * Размеров шрифта три: заголовок, текст и подпись; иерархия — весом и регистром.
+ */
 export function SkillNodePanel({
   node,
   context,
@@ -43,52 +46,52 @@ export function SkillNodePanel({
   onClose: () => void;
 }) {
   return (
-    <aside className="skill-panel panel panel-pad space-y-4" data-testid="skill-node-panel" aria-label={`Узел: ${node.name}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="muted text-xs uppercase tracking-widest">{context}</p>
-          <h2 className="text-base font-semibold leading-snug">{node.name}</h2>
+    <aside className="skill-card" role="dialog" aria-label={`Узел: ${node.name}`} data-testid="skill-node-panel">
+      <div className="skill-card__head">
+        <div>
+          <p className="skill-card__label">{context}</p>
+          <h2 className="skill-card__title">{node.name}</h2>
         </div>
-        <button type="button" className="btn-quiet" onClick={onClose}>
+        <button type="button" className="skill-card__close" onClick={onClose}>
           Закрыть
         </button>
       </div>
 
-      <p className="text-sm" data-testid="skill-panel-level">
+      <p className="skill-card__text" data-testid="skill-panel-level">
         {levelLabel(node)}
       </p>
 
-      <section className="space-y-1">
-        <h3 className="section-title mb-0">Критерий</h3>
+      <section>
+        <h3 className="skill-card__label">Критерий</h3>
         {node.criteria ? (
-          <p className="skill-criteria" data-testid="skill-panel-criteria">
+          <p className="skill-card__text" data-testid="skill-panel-criteria">
             {node.criteria}
           </p>
         ) : (
-          <p className="muted text-sm">Критерий не заполнен.</p>
+          <p className="skill-card__note">Критерий не заполнен.</p>
         )}
       </section>
 
-      <section className="space-y-1">
-        <h3 className="section-title mb-0">Пометка</h3>
-        <p className="text-sm">
+      <section>
+        <h3 className="skill-card__label">Пометка</h3>
+        <p className="skill-card__text">
           <span data-testid="skill-panel-mark">{MARK_LABEL[node.mark] ?? node.mark}</span>
-          {node.note ? <span className="muted"> · «{node.note}»</span> : null}
+          {node.note ? <span className="skill-card__note"> · «{node.note}»</span> : null}
         </p>
-        <a className="link-accent text-sm" href="/me/marks">
+        <a className="link-accent skill-card__link" href="/me/marks">
           Изменить пометку
         </a>
       </section>
 
-      <section className="space-y-1">
-        <h3 className="section-title mb-0">Материалы</h3>
+      <section>
+        <h3 className="skill-card__label">Материалы</h3>
         {node.materials.length === 0 ? (
-          <p className="muted text-sm">Материалов нет.</p>
+          <p className="skill-card__note">Материалов нет.</p>
         ) : (
-          <ul className="space-y-1 text-sm" aria-label="Материалы">
+          <ul className="skill-card__list" aria-label="Материалы">
             {node.materials.map((link, index) => (
-              <li key={`${link.kind}-${link.url}-${index}`} className="flex flex-wrap items-center gap-2">
-                <span className="chip">{LINK_KIND[link.kind] ?? link.kind}</span>
+              <li key={`${link.kind}-${link.url}-${index}`}>
+                <span className="skill-card__tag">{LINK_KIND[link.kind] ?? link.kind}</span>
                 <a className="link-accent" href={link.url} target="_blank" rel="noopener noreferrer">
                   {link.title}
                 </a>
@@ -98,12 +101,12 @@ export function SkillNodePanel({
         )}
       </section>
 
-      <section className="space-y-1" data-testid="skill-panel-rows">
-        <h3 className="section-title mb-0">Строки ИПР</h3>
+      <section data-testid="skill-panel-rows">
+        <h3 className="skill-card__label">Строки ИПР</h3>
         {node.rows.length === 0 ? (
-          <p className="muted text-sm">В активном плане строк по этой компетенции нет.</p>
+          <p className="skill-card__note">В активном плане строк по этой компетенции нет.</p>
         ) : (
-          <ul className="space-y-1 text-sm">
+          <ul className="skill-card__list">
             {node.rows.map((row) => (
               <li key={row.id}>
                 {planId ? (
@@ -113,7 +116,7 @@ export function SkillNodePanel({
                 ) : (
                   <span>{row.name}</span>
                 )}
-                <span className="muted">
+                <span className="skill-card__note">
                   {" · "}
                   {ITEM_STATUS[row.status] ?? row.status}
                   {row.accepted ? " · принято" : ""}
