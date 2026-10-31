@@ -138,18 +138,28 @@ test("день вне периода не записывается, пустой
   await expect(again.getByLabel("Срок")).toHaveCount(0);
 });
 
-test("кнопка календаря неактивна до гидратации и доступна после", async ({ page }) => {
+test("поле даты и календарь неактивны до гидратации и доступны после", async ({ page }) => {
   await login(page);
   await page.goto("/idps");
   await page.locator("li", { hasText: STAFF.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
   const due = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
 
-  // Разметка с сервера: до монтирования кнопка выключена, иначе первый клик теряется.
+  // Разметка с сервера: до монтирования кнопка и поле даты выключены, иначе первый клик и ввод теряются.
   const raw = await page.request.get(new URL(page.url()).pathname);
   expect(raw.ok()).toBeTruthy();
-  const tags = (await raw.text()).match(/<button[^>]*aria-label="Показать календарь"[^>]*>/g) ?? [];
+  const html = await raw.text();
+  const tags = html.match(/<button[^>]*aria-label="Показать календарь"[^>]*>/g) ?? [];
   expect(tags.length).toBeGreaterThan(0);
   for (const tag of tags) expect(tag).toContain("disabled");
+  const dateInputs = html.match(/<input[^>]*type="date"[^>]*>/g) ?? [];
+  expect(dateInputs.length).toBeGreaterThan(0);
+  for (const tag of dateInputs) expect(tag).toContain("disabled");
+
+  // После монтирования поле принимает введённую дату и не сбрасывает её до отправки формы.
+  const dueOn = due.getByLabel("Срок");
+  await expect(dueOn).toBeEnabled();
+  await dueOn.fill(ADDED);
+  await expect(dueOn).toHaveValue(ADDED);
 
   const open = due.getByRole("button", { name: "Показать календарь" });
   await expect(open).toBeEnabled();

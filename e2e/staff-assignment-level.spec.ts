@@ -77,9 +77,11 @@ test("в списке планки 2 есть уровни 1 и 2 и нет 3", 
 
   const add = addForm(page);
   const competency = add.getByLabel(/^Компетенция/);
-  const label = (await competency.locator("option").allInnerTexts()).find((text) => /ур\.\s*2\s*$/.test(text.trim()));
-  expect(label).toBeTruthy();
-  await competency.selectOption({ label: label ?? "" });
+  // Список приходит с сервером, но чтение без ожидания ловит ещё предыдущую страницу: ждём саму опцию.
+  const level2 = competency.locator("option", { hasText: /· ур\. 2$/ }).first();
+  await expect(level2).toBeAttached();
+  const label = (await level2.innerText()).trim();
+  await competency.selectOption({ label });
   competencyId = await competency.inputValue();
 
   await createAssignment(page, LOW, "1");
