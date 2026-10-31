@@ -246,12 +246,63 @@ async function expectEdgesClearOfNodes(page: Page) {
   expect(hits).toEqual([]);
 }
 
+/** Справочник и профили из seed: независимый источник ожиданий для холстов и отбора «Мои». */
+const SEED = JSON.parse(readFileSync("seed/data.json", "utf8")) as {
+  competencies: { id: string; parentId: string | null; type: string }[];
+  profiles: { jobId: string; skills: { competencyId: string }[] }[];
+};
+
 /** Навыки справочника без обязанностей и групп разделов: столько узлов в полном дереве. */
-const SKILL_COUNT = (
-  JSON.parse(readFileSync("seed/data.json", "utf8")) as {
-    competencies: { parentId: string | null; type: string }[];
+const TREE_SKILLS = new Set(
+  SEED.competencies.filter((row) => row.parentId !== null && row.type !== "duty").map((row) => row.id),
+);
+const SKILL_COUNT = TREE_SKILLS.size;
+
+/**
+ * Ветви предпосылок от навыков профилей должностей и личных пометок — с предками по PREREQUISITES.
+ * Набор считается по seed, а не по атрибутам показанных узлов: так ошибка классификации не спрячется.
+ */
+function seededChain(jobIds: string[], marked: string[] = []): Set<string> {
+  const parentOf = new Map<string, string>();
+  for (const [parent, child] of PREREQUISITES) if (!parentOf.has(child)) parentOf.set(child, parent);
+
+  const roots = new Set<string>();
+  for (const jobId of jobIds) {
+    for (const skill of SEED.profiles.find((row) => row.jobId === jobId)?.skills ?? []) {
+      if (TREE_SKILLS.has(skill.competencyId)) roots.add(skill.competencyId);
+    }
   }
-).competencies.filter((row) => row.parentId !== null && row.type !== "duty").length;
+  for (const id of marked) if (TREE_SKILLS.has(id)) roots.add(id);
+
+  const chain = new Set<string>();
+  for (const id of roots) {
+    let cursor: string | undefined = id;
+    while (cursor !== undefined && !chain.has(cursor)) {
+      chain.add(cursor);
+      cursor = parentOf.get(cursor);
+    }
+  }
+  return chain;
+}
+
+/** Ожидаемые холсты: навыки цепочки, разложенные по типу компетенции. */
+function seededBoards(jobIds: string[]): { professional: string[]; personal: string[] } {
+  const kindOf = new Map(
+    SEED.competencies.map((row) => [row.id, row.type === "universal" ? "personal" : "professional"]),
+  );
+  const chain = seededChain(jobIds);
+  return {
+    professional: [...chain].filter((id) => kindOf.get(id) === "professional").sort(),
+    personal: [...chain].filter((id) => kindOf.get(id) === "personal").sort(),
+  };
+}
+
+/** ID узлов внутри холста в отсортированном виде. */
+function boardIds(board: Locator) {
+  return board
+    .locator('[data-testid^="skill-node-comp-"]')
+    .evaluateAll((list) => list.map((element) => element.getAttribute("data-testid")!.slice("skill-node-".length)).sort());
+}
 
 test("админ заводит сотрудников, ИПР, строки плана и материал", async ({ page }) => {
   await login(page);
@@ -299,6 +350,14 @@ test("дерево слоями: предпосылки, требования д
   await expect(personalBoard.getByTestId(`skill-node-${OBUCHAEMOST}`)).toBeVisible();
   await expect(personalBoard.getByTestId(`skill-node-${PROGRAMMING.id}`)).toHaveCount(0);
   await expect(professionalBoard.getByTestId(`skill-node-${OBUCHAEMOST}`)).toHaveCount(0);
+
+  // Полный состав каждого холста — из seed: профиль junior, цель ИПР programmer и предки по PREREQUISITES.
+  const boards = seededBoards(["junior", "programmer"]);
+  expect(await boardIds(professionalBoard)).toEqual(boards.professional);
+  expect(await boardIds(personalBoard)).toEqual(boards.personal);
+  await expect(page.locator('[data-testid^="skill-node-comp-"]')).toHaveCount(
+    boards.professional.length + boards.personal.length,
+  );
 
   // Пиктограмма темы есть у каждого узла, у профессиональных и личных она своя.
   await expect(professionalBoard.getByTestId(`skill-node-${PROGRAMMING.id}`).locator("svg[data-icon]")).toHaveCount(1);
@@ -599,37 +658,19 @@ test("отбор «Мои» убирает чужие ветви, переклю
   await expect(nodes).toHaveCount(SKILL_COUNT);
   await expectPrerequisiteLayers(page);
 
-  // Полное дерево: кто в должности, в цели или отмечен — и все их предки по PREREQUISITES.
+  // Полное дерево: один узел на компетенцию, без повторов.
   const all = await nodes.evaluateAll((list) =>
-    list.map((element) => ({
-      id: element.getAttribute("data-testid")!.slice("skill-node-".length),
-      relation: element.getAttribute("data-relation"),
-      mark: element.getAttribute("data-mark"),
-    })),
+    list.map((element) => element.getAttribute("data-testid")!.slice("skill-node-".length)),
   );
-  const ids = all.map((row) => row.id);
-  expect(new Set(ids).size).toBe(ids.length);
+  expect(new Set(all).size).toBe(all.length);
 
-  const parentOf = new Map<string, string>();
-  for (const [parent, child] of PREREQUISITES) {
-    if (!parentOf.has(child)) parentOf.set(child, parent);
-  }
-  const expected = new Set<string>();
-  for (const row of all) {
-    if (row.relation === "none" && (row.mark === "none" || row.mark === null)) continue;
-    let id: string | undefined = row.id;
-    while (id !== undefined && !expected.has(id)) {
-      expected.add(id);
-      id = parentOf.get(id);
-    }
-  }
+  // «Мои» — навыки профиля junior, цели ИПР programmer и пометок со всеми предками. Набор из seed,
+  // а не из data-relation и data-mark тех же узлов: иначе неверная классификация спрячется в ожидании.
+  const expected = seededChain(["junior", "programmer"], [TESTING.id, OBUCHAEMOST]);
 
   await page.getByLabel("Показывать всё дерево").uncheck();
   await expect(nodes).toHaveCount(expected.size);
-  const shown = await nodes.evaluateAll((list) =>
-    list.map((element) => element.getAttribute("data-testid")!.slice("skill-node-".length)),
-  );
-  expect([...shown].sort()).toEqual([...expected].sort());
+  expect(await boardIds(page.locator(".skill-tree-layout"))).toEqual([...expected].sort());
 });
 
 test("гость уходит на вход, чужой сотрудник дерево и пометки не видит", async ({ page }) => {
