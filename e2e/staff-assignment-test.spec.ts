@@ -1,46 +1,17 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const NAME = `E2E тест ${STAMP}`;
 const PLAIN = { login: `e2e.no-test.${STAMP}`, name: `Без теста ${STAMP}`, password: "e2e-plain-password" };
 let cardPath = "";
 
-test.beforeAll(async ({ browser }) => {
-  const page = await browser.newPage();
-  try {
-    await page.goto("/login");
-    const form = page.locator("#bootstrap-admin");
-    if ((await form.count()) === 0) return;
-    await form.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await form.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await form.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await form.getByLabel("Должность").selectOption("team-lead");
-    await form.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await form.getByRole("button", { name: "Создать первого админа" }).click();
-    await expect(page).toHaveURL(/\/me$/);
-  } finally {
-    await page.close();
-  }
-});
-
-async function login(page: Page, account: { login: string; password: string }) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const form = page.locator('form:has(input[name="intent"][value="login"])');
-  await form.getByLabel("Логин").fill(account.login);
-  await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-  await form.getByRole("button", { name: "Войти" }).click();
-  await expect(page).toHaveURL(/\/me$/);
-}
-
 async function openNewCard(page: Page) {
-  await login(page, E2E_ADMIN);
   await page.goto("/assignments/new");
   const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Создать" }) });
   await form.getByLabel(/^Компетенция/).selectOption({ index: 0 });
@@ -81,7 +52,6 @@ test("вопрос с одним верным вариантом сохраня�
 });
 
 test("вопрос без одного верного варианта не записывается", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto(cardPath);
   const testForm = page.locator("form", { has: page.getByRole("button", { name: "Сохранить тест" }) });
   await testForm.getByRole("checkbox", { name: /^Верный/ }).nth(0).uncheck();
@@ -98,7 +68,6 @@ test("вопрос без одного верного варианта не за
 });
 
 test("скрытое задание не правит тест", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto(cardPath);
   await page.getByRole("button", { name: "Перенести в архив" }).click();
   const testForm = page.locator("form", { has: page.getByRole("button", { name: "Сохранить тест" }) });
@@ -107,7 +76,6 @@ test("скрытое задание не правит тест", async ({ page }
 });
 
 test("сотрудник без подчинённых не видит редактор теста", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await form.getByLabel("Логин").fill(PLAIN.login);

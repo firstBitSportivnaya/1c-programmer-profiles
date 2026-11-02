@@ -1,22 +1,27 @@
 /**
  * Один прогон проверок перед коммитом.
- * Порты 3000 и 3100 не освобождает: если любой занят, выходит до первой команды.
+ * Порты 3000 и порты e2e-серверов (3100 и дальше, по числу воркеров) не освобождает: если любой занят,
+ * выходит до первой команды.
+ * Тесты идут `next start` по готовой сборке, поэтому сборка стоит перед ними и повторно не запускается.
  * Упавшая команда останавливает следующие, таблица для pull request печатается всё равно.
  */
 import { spawn } from "node:child_process";
 import net from "node:net";
+import { E2E_PORT, E2E_WORKERS } from "../e2e/env";
 
 type Row = { command: string; result: string };
+type Step = { command: string; args: string[]; env?: Record<string, string> };
 
-const STEPS: { command: string; args: string[] }[] = [
+const STEPS: Step[] = [
   { command: "npm", args: ["run", "check:seed"] },
   { command: "npx", args: ["tsc", "--noEmit"] },
   { command: "npm", args: ["run", "lint"] },
-  { command: "npm", args: ["run", "test:e2e"] },
   { command: "npm", args: ["run", "build"] },
+  // Сборка только что прошла: e2e не собирает её второй раз (см. e2e/ensure-build.ts).
+  { command: "npm", args: ["run", "test:e2e"], env: { E2E_BUILD_FRESH: "1" } },
 ];
 
-function label(step: { command: string; args: string[] }): string {
+function label(step: Step): string {
   return [step.command, ...step.args].join(" ");
 }
 
@@ -34,11 +39,11 @@ function portBusy(port: number): Promise<boolean> {
   });
 }
 
-function run(step: { command: string; args: string[] }): Promise<{ code: number; output: string }> {
+function run(step: Step): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
     const child = spawn(step.command, step.args, {
       cwd: process.cwd(),
-      env: process.env,
+      env: { ...process.env, ...step.env },
       shell: process.platform === "win32",
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -125,7 +130,8 @@ function printTable(rows: Row[]) {
 async function main() {
   const rows: Row[] = STEPS.map((step) => ({ command: label(step), result: "не запускалась" }));
   const busy = [];
-  for (const port of [3000, 3100]) {
+  const ports = [3000, ...Array.from({ length: E2E_WORKERS + 1 }, (_, index) => E2E_PORT + index)];
+  for (const port of ports) {
     if (await portBusy(port)) busy.push(port);
   }
   if (busy.length > 0) {

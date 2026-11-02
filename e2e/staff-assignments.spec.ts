@@ -1,7 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
+import { E2E_ADMIN } from "./env";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const NAME = `E2E задание ${STAMP}`;
@@ -9,33 +13,6 @@ const LEARN = `Узнать ${STAMP}`;
 const VERIFY = `Проверить ${STAMP}`;
 const PLAIN = { login: `e2e.no-reports.${STAMP}`, name: `Без подчинённых ${STAMP}`, password: "e2e-plain-password" };
 let cardPath = "";
-
-test.beforeAll(async ({ browser }) => {
-  const page = await browser.newPage();
-  try {
-    await page.goto("/login");
-    const form = page.locator("#bootstrap-admin");
-    if ((await form.count()) === 0) return;
-    await form.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await form.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await form.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await form.getByLabel("Должность").selectOption("team-lead");
-    await form.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await form.getByRole("button", { name: "Создать первого админа" }).click();
-    await expect(page).toHaveURL(/\/me$/);
-  } finally {
-    await page.close();
-  }
-});
-
-async function login(page: Page, account: { login: string; password: string }) {
-  await page.goto("/login");
-  const form = page.locator('form:has(input[name="intent"][value="login"])');
-  await form.getByLabel("Логин").fill(account.login);
-  await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-  await form.getByRole("button", { name: "Войти" }).click();
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 async function fillCreate(page: Page, name: string, learn: string, verify: string) {
   const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Создать" }) });
@@ -47,7 +24,6 @@ async function fillCreate(page: Page, name: string, learn: string, verify: strin
 }
 
 test("создание открывает карточку, и ссылка есть в списке", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/assignments");
   await page.getByRole("link", { name: "Новое задание" }).click();
   await expect(page).toHaveURL(/\/assignments\/new$/);
@@ -92,7 +68,6 @@ test("создание открывает карточку, и ссылка ес
 });
 
 test("правка названия, узнать и проверить сохраняется, компетенция та же", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto(cardPath);
   const competency = await page.getByLabel(/^Компетенция/).inputValue();
   const nextName = `${NAME} правка`;
@@ -113,7 +88,6 @@ test("правка названия, узнать и проверить сохр
 });
 
 test("скрытие убирает форму правки, возврат её возвращает", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto(cardPath);
   const edited = `${NAME} правка`;
   await Promise.all([
@@ -138,7 +112,6 @@ test("скрытие убирает форму правки, возврат её
 });
 
 test("сотрудник без подчинённых уходит на ИПР и задание не меняется", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/people");
   const create = page.locator("form").filter({ has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await create.getByLabel("Логин").fill(PLAIN.login);
@@ -165,7 +138,6 @@ test("сотрудник без подчинённых уходит на ИПР 
 });
 
 test("пустые название, узнать или проверить не пишут строку", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/assignments/new");
   const missing = `E2E пустое ${STAMP}`;
   const form = await fillCreate(page, missing, "", VERIFY);
@@ -176,7 +148,6 @@ test("пустые название, узнать или проверить не
 });
 
 test("то же название без учёта регистра не создаёт вторую строку", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/assignments/new");
   const lower = `${NAME} правка`.toLowerCase();
   const form = await fillCreate(page, lower, LEARN, VERIFY);
@@ -187,7 +158,6 @@ test("то же название без учёта регистра не соз�
 });
 
 test("чужой идентификатор — 404", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   const response = await page.goto("/assignments/no-such-assignment");
   expect(response?.status()).toBe(404);
   const broken = await page.goto("/assignments/%25");

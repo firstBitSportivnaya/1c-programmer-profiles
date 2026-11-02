@@ -42,16 +42,23 @@ function FormBody({
   className,
   error,
   pending,
+  generation,
   children,
 }: {
   className?: string;
   error: string | null;
   pending: boolean;
+  generation: number;
   children: React.ReactNode;
 }) {
   return (
     <>
-      <fieldset disabled={pending} className={`form-fields col-span-full w-full ${className ?? ""}`}>
+      {/*
+        Поля некотролируемые: браузерный `form.reset()` после действия возвращает `select`
+        к значению первого рендера, даже если сервер уже прислал новое. Номер поколения
+        пересоздаёт поля из свежих данных — иначе после сохранения видно старое «не задан».
+      */}
+      <fieldset key={generation} disabled={pending} className={`form-fields col-span-full w-full ${className ?? ""}`}>
         {children}
       </fieldset>
       {error ? (
@@ -105,6 +112,7 @@ export function ActionForm({
   // сбрасывает pending, и тест не ждёт «Сохраняем…».
   const [state, formAction, pending] = useActionState(successPath ? runAndLeave : action, null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [generation, setGeneration] = useState(0);
   const error = localError ?? state?.error ?? null;
   const wasPending = useRef(false);
 
@@ -115,7 +123,11 @@ export function ActionForm({
     }
     if (!wasPending.current) return;
     wasPending.current = false;
-    if (!error) onSuccess?.();
+    if (!error) {
+      // Сервер уже прислал сохранённые значения: пересоздаём поля, чтобы браузерный reset их не отменил.
+      setGeneration((value) => value + 1);
+      onSuccess?.();
+    }
   }, [pending, error, onSuccess]);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -136,7 +148,7 @@ export function ActionForm({
 
   return (
     <form id={id} action={formAction} className={className} noValidate onSubmit={onSubmit}>
-      <FormBody className={className} error={error} pending={pending}>
+      <FormBody className={className} error={error} pending={pending} generation={generation}>
         {children}
       </FormBody>
     </form>

@@ -1,9 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
 import { ASSIGNMENT_IMPORT_COLUMNS } from "../src/lib/assignment-workbook";
 import { writeXlsxSheet } from "../src/lib/xlsx-sheet";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const CMP = `e2exls${STAMP}`;
@@ -48,34 +51,6 @@ function pair(
   ];
 }
 
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await page.goto("/login");
-    }
-  }
-  if (!/\/me$/.test(page.url())) {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
-
 function uploadForm(page: Page) {
   return page.getByRole("form", { name: "Загрузка" });
 }
@@ -95,7 +70,6 @@ async function upload(page: Page, rows: string[][]) {
 }
 
 test("новое задание из файла появляется в справочнике с вопросом", async ({ page }) => {
-  await login(page);
   await page.goto("/admin/competencies/new");
   await page.getByLabel("Идентификатор").fill(CMP);
   await page.getByLabel("Название").fill(CMP_NAME);
@@ -118,7 +92,6 @@ test("новое задание из файла появляется в спра
 });
 
 test("повторная загрузка меняет тексты и вопрос, чужое задание остаётся", async ({ page }) => {
-  await login(page);
   await page.goto("/assignments/new");
   const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Создать" }) });
   await form.getByLabel(/^Компетенция/).selectOption(CMP);
@@ -151,7 +124,6 @@ test("повторная загрузка меняет тексты и вопр�
 });
 
 test("строка ИПР хранит тексты и вопрос до загрузки", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(STAFF.login);
@@ -216,7 +188,6 @@ test("строка ИПР хранит тексты и вопрос до заг�
 });
 
 test("ошибочный файл ничего не записывает и показывает перечень", async ({ page }) => {
-  await login(page);
   await upload(page, [
     [`no-such-${STAMP}`, `Чужой ${STAMP}`, L1, V1, "Чужой вопрос", "Один", "да"],
     [`no-such-${STAMP}`, `Чужой ${STAMP}`, L1, V1, "Чужой вопрос", "Два", "нет"],
@@ -237,7 +208,6 @@ test("ошибочный файл ничего не записывает и по
 });
 
 test("не админ не видит загрузку", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(MANAGER.login);
@@ -262,7 +232,6 @@ test("не админ не видит загрузку", async ({ page }) => {
 });
 
 test("скрытое задание файл не меняет и называет в итоге", async ({ page }) => {
-  await login(page);
   await page.goto("/assignments");
   await page.getByRole("link", { name: STAY, exact: true }).click();
   await page.getByRole("button", { name: "Перенести в архив" }).click();
@@ -305,7 +274,6 @@ test("колонка уровня записывает 1–3, пустая яч�
     await done;
   }
 
-  await login(page);
   await send(leveledFile("2"));
   await expect(uploadForm(page).getByRole("status")).toContainText("Загружено заданий: 1.");
   await page.getByRole("link", { name: leveled, exact: true }).click();
@@ -358,7 +326,6 @@ test("колонка уровня записывает 1–3, пустая яч�
 
 test("json создаёт задание с уровнем, битый json ничего не пишет", async ({ page }) => {
   const fromJson = `Из json ${STAMP}`;
-  await login(page);
   await page.goto("/assignments");
   await uploadForm(page).getByLabel("Файл", { exact: true }).setInputFiles({
     name: "assignments.json",

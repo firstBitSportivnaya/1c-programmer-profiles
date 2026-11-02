@@ -1,7 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import { expect, login, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const NAME = `Итог ${STAMP}`;
@@ -11,36 +13,7 @@ const WRONG = `Лишний итог ${STAMP}`;
 const STAFF = { login: `e2e.result.${STAMP}`, name: `Итог ${STAMP}`, password: "e2e-result-password" };
 let idpPath = "";
 
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await login(page, account);
-      return;
-    }
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
-
 test("рядом с приёмкой видно «сдан» и число попыток, без выбранных ответов", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(STAFF.login);
@@ -101,6 +74,7 @@ test("рядом с приёмкой видно «сдан» и число по�
   await page.getByRole("button", { name: "Сдать тест" }).click();
   await posted;
 
+  // Сдать тест мог только сотрудник: кнопку приёмки видит админ, поэтому вход возвращаем.
   await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(NAME) });
@@ -121,6 +95,7 @@ test("не сданный тест не мешает приёмке", async ({ p
   await page.getByRole("button", { name: "Сдать тест" }).click();
   await posted;
 
+  // Приёмка снова от админа.
   await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(NAME) });
@@ -130,7 +105,6 @@ test("не сданный тест не мешает приёмке", async ({ p
 });
 
 test("строка без теста принимается и не помечается «сдан»", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(PLAIN) });
   await expect(row.getByText("сдан", { exact: true })).toHaveCount(0);

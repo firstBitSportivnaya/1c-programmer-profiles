@@ -1,7 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const MANAGER = { login: `e2e.idp.filter.m.${STAMP}`, name: `Руководитель фильтра ${STAMP}`, password: "e2e-filter-password" };
@@ -10,34 +13,6 @@ const SECOND = { login: `e2e.idp.filter.b.${STAMP}`, name: `Второй фил�
 
 let firstId = "";
 let secondId = "";
-
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await login(page, account);
-      return;
-    }
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 async function createPerson(
   page: Page,
@@ -76,7 +51,6 @@ function rows(page: Page) {
 }
 
 test("выбор сотрудника оставляет только его планы", async ({ page }) => {
-  await login(page);
   await createPerson(page, MANAGER);
   firstId = await createPerson(page, FIRST, MANAGER.name);
   secondId = await createPerson(page, SECOND, MANAGER.name);

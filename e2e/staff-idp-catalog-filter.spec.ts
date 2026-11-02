@@ -1,7 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { E2E_ADMIN } from "./env";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const NAME = "Задание первой компетенции";
 let idpPath = "";
@@ -10,35 +14,11 @@ let secondId = "";
 let firstName = "";
 let assignmentId = "";
 
-async function login(page: Page) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(E2E_ADMIN.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
-
 function addForm(page: Page) {
   return page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
 }
 
 test("список справочника показывает задания только выбранной компетенции", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill("e2e.idp.catalog");
@@ -86,7 +66,6 @@ test("список справочника показывает задания т
 });
 
 test("задание выбранной компетенции садится в её группу", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const add = addForm(page);
   await add.getByLabel(/^Компетенция/).selectOption(firstId);
@@ -97,7 +76,6 @@ test("задание выбранной компетенции садится в
 });
 
 test("задание чужой компетенции не создаёт строку", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const add = addForm(page);
   await add.getByLabel(/^Компетенция/).selectOption(secondId);

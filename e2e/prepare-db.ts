@@ -1,28 +1,12 @@
 /**
- * Запускается перед тестовым сервером: удаляет прошлую e2e-базу, seed загружает её заново.
- * Отказывается работать, если слушает порт 3000: обычный `next dev` и тестовый делят папку .next.
+ * Запускается перед тестовым сервером: удаляет прошлую базу воркера, seed загружает её заново.
+ * Путь к базе — первый аргумент: у каждого сервера своя, иначе параллельные прогоны делят данные.
  */
-import net from "node:net";
 import { removeDatabase } from "../scripts/lib/sqlite-tools";
-import { E2E_DB_PATH } from "./env";
 
-function portIsListening(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = net.connect({ host: "127.0.0.1", port });
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once("error", () => resolve(false));
-  });
+const dbPath = process.argv[2];
+if (!dbPath) {
+  console.error("Нужен путь к базе: npx tsx e2e/prepare-db.ts tmp/e2e-1.sqlite");
+  process.exit(1);
 }
-
-async function main() {
-  if (await portIsListening(3000)) {
-    console.error("Порт 3000 занят dev-сервером. Остановите его перед e2e: тестовый сервер пишет в ту же папку .next.");
-    process.exit(1);
-  }
-  removeDatabase(E2E_DB_PATH);
-}
-
-main();
+removeDatabase(dbPath);

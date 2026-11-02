@@ -1,38 +1,15 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Locator, Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
+import { E2E_ADMIN } from "./env";
 
-// Шаги делят одну базу. Админ создаётся здесь, если его ещё нет.
+// Шаги делят одну базу: первый тест заводит сотрудника, дальше тесты правят его карточку.
 test.describe.configure({ mode: "serial" });
 
-test.beforeAll(async ({ browser }) => {
-  const page = await browser.newPage();
-  try {
-    await page.goto("/login");
-    const form = page.locator("#bootstrap-admin");
-    if ((await form.count()) === 0) return;
-    await form.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await form.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await form.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await form.getByLabel("Должность").selectOption("team-lead");
-    await form.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await form.getByRole("button", { name: "Создать первого админа" }).click();
-    await expect(page).toHaveURL(/\/me$/);
-  } finally {
-    await page.close();
-  }
-});
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAFF = { login: "e2e.plain", name: "Обычный E2E", password: "e2e-plain-password" };
 let staffPath = "";
-
-async function login(page: Page, account: { login: string; password: string }) {
-  await page.goto("/login");
-  const form = page.locator('form:has(input[name="intent"][value="login"])');
-  await form.getByLabel("Логин").fill(account.login);
-  await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-  await form.getByRole("button", { name: "Войти" }).click();
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 function editForm(page: Page) {
   return page.locator("form").filter({ has: page.getByLabel(/^Админ/) });
@@ -50,7 +27,6 @@ async function boxMetrics(box: Locator) {
 }
 
 test("создание с отмеченным «Админ»: на карточке подпись сверху и ящик как у должности", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/people");
 
   const create = page.locator("form").filter({ has: page.getByRole("heading", { name: "Новый сотрудник" }) });
@@ -86,7 +62,6 @@ test("создание с отмеченным «Админ»: на карточ
 });
 
 test("снятие «Админ» у не единственного админа сохраняется", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto(staffPath);
   const edit = editForm(page);
   await edit.getByLabel(/^Админ/).selectOption("");
@@ -107,7 +82,6 @@ test("снятие «Админ» у не единственного админ�
 });
 
 test("последнего админа снять нельзя", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/people");
   await page.getByRole("link", { name: E2E_ADMIN.name, exact: true }).click();
   const edit = editForm(page);

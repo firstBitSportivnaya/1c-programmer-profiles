@@ -1,7 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const NAME = `Сдача ${STAMP}`;
@@ -12,34 +15,6 @@ const STAFF = { login: `e2e.take.${STAMP}`, name: `Сдаёт ${STAMP}`, passwor
 const OTHER = { login: `e2e.take.other.${STAMP}`, name: `Чужой ${STAMP}`, password: "e2e-take-other-password" };
 let idpPath = "";
 let takePath = "";
-
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await login(page, account);
-      return;
-    }
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 async function createPerson(page: Page, account: { login: string; name: string; password: string }) {
   await page.goto("/people");
@@ -53,7 +28,6 @@ async function createPerson(page: Page, account: { login: string; name: string; 
 }
 
 test("верный ответ показывает «сдан», строка не принята", async ({ page }) => {
-  await login(page);
   await createPerson(page, STAFF);
   await createPerson(page, OTHER);
   await page.goto("/idps");
@@ -133,7 +107,6 @@ test("неверный ответ показывает «не сдан», сда
 });
 
 test("после приёмки попытка не записывается", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(NAME) });
   await row.getByRole("button", { name: "Подтвердить" }).click();
@@ -165,7 +138,6 @@ test("дальше не ругается, если вариант уже выб�
   const first = `Первый ${STAMP}`;
   const second = `Второй ${STAMP}`;
   const title = `Два вопроса ${STAMP}`;
-  await login(page);
   await page.goto(idpPath);
   const add = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
   const competencyLabel = await add.getByLabel(/^Компетенция/).locator("option").nth(0).innerText();
