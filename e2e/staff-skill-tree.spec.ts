@@ -551,8 +551,9 @@ test("приёмка подтверждает узел и его шаг план
   await expect(page.getByTestId(`skill-badge-${PROGRAMMING.id}`)).toBeVisible();
   await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-plan-state", "done");
   await expect(page.getByTestId(`skill-plan-${PROGRAMMING.id}`)).toContainText("принято");
-  await expect(page.getByRole("heading", { name: "Достижения" })).toBeVisible();
-  await expect(page.getByText("Компетенция подтверждена")).toBeVisible();
+  // Достижения живут на отдельной странице: в дереве только ссылка, самого списка нет.
+  await expect(page.getByRole("link", { name: "Достижения", exact: true })).toBeVisible();
+  await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
   await expect(page.getByTestId(`skill-badge-${TESTING.id}`)).toHaveCount(0);
   await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-plan-state", "in_progress");
 
@@ -569,7 +570,9 @@ test("приёмка подтверждает узел и его шаг план
   await expect(page.getByTestId(`skill-badge-${PROGRAMMING.id}`)).toHaveCount(0);
   await expect(skillNode(page, PROGRAMMING.id)).not.toHaveAttribute("data-plan-state", "done");
   await expect(page.getByTestId(`skill-plan-${PROGRAMMING.id}`)).not.toContainText("принято");
-  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await page.goto("/me/achievements");
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
+  await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
 });
 
 test("без профиля — пустое состояние, без плана — только текущая должность и приглашение", async ({ page }) => {
@@ -616,7 +619,8 @@ test("пометка вне профиля остаётся в дереве, о�
   await expect(outsideNode).toHaveAttribute("data-relation", "none");
   await expect(outsideNode).toHaveAttribute("data-mark", "in_progress");
   await expect(page.getByTestId(`skill-badge-${TESTING.id}`)).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Достижения", exact: true })).toBeVisible();
+  await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
   await expect(page.locator('[data-plan-state]:not([data-plan-state="none"])')).toHaveCount(0);
 });
 
