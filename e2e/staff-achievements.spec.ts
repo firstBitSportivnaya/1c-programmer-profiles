@@ -28,6 +28,8 @@ let aPlanPath = "";
 let cPlanPath = "";
 let cCompetencyPath = "";
 let dPlanPath = "";
+let aGoalCompetency = "";
+let aGoalCompetencyId = "";
 let aOtherCompetency = "";
 
 /** Вход учёткой; на первом прогоне сначала создаёт админа и переключается на нужного сотрудника. */
@@ -95,13 +97,16 @@ async function acceptItem(page: Page, name: string) {
 async function openAchievements(page: Page) {
   await page.goto("/me/achievements");
   await expect(page.getByRole("heading", { level: 1, name: "Достижения" })).toBeVisible();
+  await expect(page.getByText("очков нет", { exact: false })).toBeVisible();
 }
 
-/** На `/me` и в дереве навыков списка нет: только ссылка на страницу достижений. */
+/** На `/me` и в дереве навыков списка нет: только ссылка на страницу достижений, ни одной строки ачивки. */
 async function expectOnlyLink(page: Page) {
   await expect(page.getByRole("link", { name: "Достижения", exact: true })).toBeVisible();
-  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
-  await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
+  await expect(page.getByText("Первая принятая строка", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Компетенция подтверждена", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Все компетенции пула подтверждены", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("ИПР выполнен", { exact: true })).toHaveCount(0);
 }
 
 test("принятая строка даёт ачивки первой строки и компетенции — только на странице достижений", async ({ page }) => {
@@ -119,7 +124,10 @@ test("принятая строка даёт ачивки первой стро�
   await addItem(page, A_GOAL);
 
   const options = addItemForm(page).getByLabel(/^Компетенция/).locator("option");
+  aGoalCompetencyId = (await options.nth(0).getAttribute("value")) ?? "";
+  aGoalCompetency = (await options.nth(0).innerText()).replace(/\s·\sур\.\s\d+$/, "");
   aOtherCompetency = (await options.nth(1).innerText()).replace(/\s·\sур\.\s\d+$/, "");
+  expect(aGoalCompetencyId, "id компетенции первой строки найден в форме").not.toBe("");
   await addItem(page, A_SECOND, 1);
   await acceptItem(page, A_GOAL);
 
@@ -141,17 +149,19 @@ test("принятая строка даёт ачивки первой стро�
   await expect(anchor).toBeVisible();
   await expect(anchor).toBeInViewport();
 
-  // Компетенция ведёт в свою карточку; её название остаётся текстом рядом.
+  // Компетенция ведёт в карточку той компетенции, чью строку приняли: сверяем и адрес, и заголовок с ней,
+  // а не с текстом самой ачивки — иначе подмена компетенции «и в тексте, и в href» прошла бы незамеченной.
   await openAchievements(page);
   const competencyRow = page
     .getByTestId("achievements-list")
     .getByRole("listitem")
     .filter({ hasText: "Компетенция подтверждена" });
-  const competencyName = (await competencyRow.locator(".muted").innerText()).trim();
-  const competencyLink = competencyRow.getByRole("link", { name: "Компетенция подтверждена" });
-  await expect(competencyLink).toHaveAttribute("href", /^\/competencies\//);
+  await expect(competencyRow).toHaveCount(1);
+  await expect(competencyRow).toContainText(aGoalCompetency);
+  const competencyLink = competencyRow.getByRole("link", { name: /^Компетенция подтверждена/ });
+  await expect(competencyLink).toHaveAttribute("href", `/competencies/${aGoalCompetencyId}`);
   await competencyLink.click();
-  await expect(page.getByRole("heading", { level: 1, name: competencyName })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: aGoalCompetency })).toBeVisible();
 
   // В кабинете и в дереве списка нет — только ссылка со счётчиком.
   await page.goto("/me");
@@ -201,7 +211,8 @@ test("все четыре ачивки: каждая строка ведёт к 
     "Все компетенции пула подтверждены",
     "ИПР выполнен",
   ]) {
-    await expect(list.getByRole("link", { name: title })).toBeVisible();
+    // У ссылки на компетенцию доступное имя включает название: «Компетенция подтверждена: <название>».
+    await expect(list.getByRole("link", { name: new RegExp(`^${title}`) })).toBeVisible();
   }
 
   await expect(list.getByRole("link", { name: "Первая принятая строка" })).toHaveAttribute(
@@ -214,7 +225,7 @@ test("все четыре ачивки: каждая строка ведёт к 
   );
   await expect(list.getByRole("link", { name: "ИПР выполнен" })).toHaveAttribute("href", cPlanPath);
 
-  const competencyLink = list.getByRole("link", { name: "Компетенция подтверждена" });
+  const competencyLink = list.getByRole("link", { name: /^Компетенция подтверждена/ });
   cCompetencyPath = (await competencyLink.getAttribute("href")) ?? "";
   expect(cCompetencyPath, "компетенция ведёт в свою карточку").toMatch(/^\/competencies\//);
   await competencyLink.click();

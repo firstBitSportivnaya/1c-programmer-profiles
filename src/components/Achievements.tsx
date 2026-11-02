@@ -19,7 +19,13 @@ export function Achievements({ employeeId }: { employeeId: string }) {
       {list.map((row) => (
         <li key={row.key} className="list-row">
           {row.href ? (
-            <a className="link-accent" href={row.href}>
+            // Имя компетенции рядом — отдельным текстом, поэтому в доступное имя ссылки его добавляем сами:
+            // иначе несколько ссылок «Компетенция подтверждена» звучат для диктора одинаково.
+            <a
+              className="link-accent"
+              href={row.href}
+              aria-label={row.detail ? `${row.title}: ${row.detail}` : undefined}
+            >
               {row.title}
             </a>
           ) : (
