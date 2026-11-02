@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { Achievements } from "@/components/Achievements";
 import { SkillTree } from "@/components/SkillTree";
 import { employeeAchievements } from "@/lib/achievements";
 import { getSessionEmployee } from "@/lib/auth";
@@ -146,9 +145,13 @@ export default async function SkillTreePage() {
       </div>
       <p className="muted">
         Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Пиктограмма — тема навыка, заливка узла
-        — ваша пометка, значок шага — активный ИПР, свечение — подтверждение приёмкой. Видите только вы.
+        — ваша пометка, значок шага — активный ИПР, свечение — подтверждение приёмкой. Видите только вы. Подтверждения
+        собираются на странице{" "}
+        <a href="/me/achievements" className="link-accent">
+          Достижения
+        </a>
+        .
       </p>
-      <Achievements employeeId={employee.id} />
       {!data.planId ? (
         <p className="muted" data-testid="skill-tree-no-plan">
           Активного ИПР нет — дерево покажет только вашу текущую должность. План открывает руководитель в разделе{" "}

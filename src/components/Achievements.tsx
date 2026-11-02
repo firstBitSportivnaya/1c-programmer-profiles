@@ -1,20 +1,33 @@
 import { employeeAchievements } from "@/lib/achievements";
 
-/** Достижения в кабинете: следствия текущих приёмок, своей таблицы нет (ADR 0006). Видит только сам сотрудник. */
+/**
+ * Достижения: следствия текущих приёмок, своей таблицы нет (ADR 0006). Видит только сам сотрудник.
+ * Заголовок и пояснение ставит страница `/me/achievements` — здесь только список или пустое состояние.
+ */
 export function Achievements({ employeeId }: { employeeId: string }) {
   const list = employeeAchievements(employeeId);
-  if (list.length === 0) return null;
+  if (list.length === 0) {
+    return (
+      <p className="muted" data-testid="achievements-empty">
+        Пока ни одной ачивки: примите строку ИПР — руководитель подтверждает задание в плане, и достижение появится
+        здесь.
+      </p>
+    );
+  }
   return (
-    <section className="space-y-3">
-      <h2 className="section-title">Достижения</h2>
-      <ul className="panel">
-        {list.map((row) => (
-          <li key={row.key} className="list-row">
+    <ul className="panel" data-testid="achievements-list">
+      {list.map((row) => (
+        <li key={row.key} className="list-row">
+          {row.href ? (
+            <a className="link-accent" href={row.href}>
+              {row.title}
+            </a>
+          ) : (
             <span>{row.title}</span>
-            {row.detail ? <span className="muted">{row.detail}</span> : null}
-          </li>
-        ))}
-      </ul>
-    </section>
+          )}
+          {row.detail ? <span className="muted">{row.detail}</span> : null}
+        </li>
+      ))}
+    </ul>
   );
 }

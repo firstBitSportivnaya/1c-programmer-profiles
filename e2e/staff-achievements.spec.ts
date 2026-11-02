@@ -26,6 +26,7 @@ const D_SECOND = `Цель D2 ${STAMP}`;
 const F_GOAL = `Цель F ${STAMP}`;
 let aPlanPath = "";
 let cPlanPath = "";
+let cCompetencyPath = "";
 let dPlanPath = "";
 let aOtherCompetency = "";
 
@@ -90,18 +91,27 @@ async function acceptItem(page: Page, name: string) {
   await expect(row.getByText("принято", { exact: true })).toBeVisible();
 }
 
-/** Раздел достижений на `/me`. Когда ачивок нет, раздела нет и в разметке. */
-function achievements(page: Page) {
-  return page.locator("section", { has: page.getByRole("heading", { name: "Достижения", exact: true }) });
+/** Страница достижений: заголовок и пояснение на месте и при пустом списке. */
+async function openAchievements(page: Page) {
+  await page.goto("/me/achievements");
+  await expect(page.getByRole("heading", { level: 1, name: "Достижения" })).toBeVisible();
 }
 
-test("принятая строка даёт ачивки первой строки и компетенции", async ({ page }) => {
+/** На `/me` и в дереве навыков списка нет: только ссылка на страницу достижений. */
+async function expectOnlyLink(page: Page) {
+  await expect(page.getByRole("link", { name: "Достижения", exact: true })).toBeVisible();
+  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
+  await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
+}
+
+test("принятая строка даёт ачивки первой строки и компетенции — только на странице достижений", async ({ page }) => {
   await createStaff(page, A, "junior");
   aPlanPath = await createPlan(page, A, "programmer");
 
   await login(page, A);
-  await page.goto("/me");
-  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
+  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
 
   // Строки плана заводит админ.
   await login(page);
@@ -114,28 +124,66 @@ test("принятая строка даёт ачивки первой стро�
   await acceptItem(page, A_GOAL);
 
   await login(page, A);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-empty")).toHaveCount(0);
+  await expect(page.getByText("Первая принятая строка", { exact: true })).toBeVisible();
+  await expect(page.getByText("Компетенция подтверждена", { exact: true })).toBeVisible();
+  await expect(page.getByText(aOtherCompetency, { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Все компетенции пула подтверждены", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("ИПР выполнен", { exact: true })).toHaveCount(0);
+
+  // Первая строка ведёт к той самой принятой строке плана и прокручивает к ней страницу.
+  const firstRow = page.getByRole("link", { name: "Первая принятая строка" });
+  await expect(firstRow).toHaveAttribute("href", new RegExp(`^${aPlanPath}#item-\\d+$`));
+  await firstRow.click();
+  await expect(page).toHaveURL(new RegExp(`${aPlanPath}#item-\\d+$`));
+  const anchor = page.locator(new URL(page.url()).hash);
+  await expect(anchor).toBeVisible();
+  await expect(anchor).toBeInViewport();
+
+  // Компетенция ведёт в свою карточку; её название остаётся текстом рядом.
+  await openAchievements(page);
+  const competencyRow = page
+    .getByTestId("achievements-list")
+    .getByRole("listitem")
+    .filter({ hasText: "Компетенция подтверждена" });
+  const competencyName = (await competencyRow.locator(".muted").innerText()).trim();
+  const competencyLink = competencyRow.getByRole("link", { name: "Компетенция подтверждена" });
+  await expect(competencyLink).toHaveAttribute("href", /^\/competencies\//);
+  await competencyLink.click();
+  await expect(page.getByRole("heading", { level: 1, name: competencyName })).toBeVisible();
+
+  // В кабинете и в дереве списка нет — только ссылка со счётчиком.
   await page.goto("/me");
-  const section = achievements(page);
-  await expect(section.getByText("Первая принятая строка", { exact: true })).toBeVisible();
-  await expect(section.getByText("Компетенция подтверждена", { exact: true })).toBeVisible();
-  await expect(section.getByText(aOtherCompetency, { exact: true })).toHaveCount(0);
-  await expect(section.getByText("Все компетенции пула подтверждены", { exact: true })).toHaveCount(0);
-  await expect(section.getByText("ИПР выполнен", { exact: true })).toHaveCount(0);
+  await expectOnlyLink(page);
+  await expect(page.getByText(/открыто: 2/)).toBeVisible();
+  await page.goto("/me/skills");
+  await expectOnlyLink(page);
 });
 
-test("снятая приёмка убирает ачивки, без приёмок раздела нет", async ({ page }) => {
+test("снятая приёмка убирает ачивки: пустое состояние и ссылка в кабинете без счёта", async ({ page }) => {
   await page.goto(aPlanPath);
   const row = page.getByRole("row", { name: new RegExp(A_GOAL) });
   await row.getByRole("button", { name: "Снять подтверждение" }).click();
   await expect(row.getByText("принято", { exact: true })).toHaveCount(0);
 
   await login(page, A);
+  const response = await page.goto("/me/achievements");
+  expect(response?.status(), "страница достижений без ачивок отвечает 200").toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Достижения" })).toBeVisible();
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
+  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
+  await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
+  // Ссылки на пропавшую компетенцию не остаётся — битых адресов нет.
+  await expect(page.locator('a[href^="/competencies/"]')).toHaveCount(0);
+
   await page.goto("/me");
-  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Достижения", exact: true })).toBeVisible();
+  await expect(page.getByText(/пока ни одной/)).toBeVisible();
   await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
 });
 
-test("когда приняты все компетенции пула, видны все четыре ачивки", async ({ page }) => {
+test("все четыре ачивки: каждая строка ведёт к своему плану или компетенции", async ({ page }) => {
   await createStaff(page, C, "lead");
   cPlanPath = await createPlan(page, C, "programmer");
   await addItem(page, C_GOAL);
@@ -144,16 +192,39 @@ test("когда приняты все компетенции пула, видн
   await login(page, C);
   await page.goto(cPlanPath);
   await expect(page.getByText("выполнен", { exact: true })).toBeVisible();
-  await page.goto("/me");
-  const section = achievements(page);
+
+  await openAchievements(page);
+  const list = page.getByTestId("achievements-list");
   for (const title of [
     "Первая принятая строка",
     "Компетенция подтверждена",
     "Все компетенции пула подтверждены",
     "ИПР выполнен",
   ]) {
-    await expect(section.getByText(title, { exact: true })).toBeVisible();
+    await expect(list.getByRole("link", { name: title })).toBeVisible();
   }
+
+  await expect(list.getByRole("link", { name: "Первая принятая строка" })).toHaveAttribute(
+    "href",
+    new RegExp(`^${cPlanPath}#item-\\d+$`),
+  );
+  await expect(list.getByRole("link", { name: "Все компетенции пула подтверждены" })).toHaveAttribute(
+    "href",
+    cPlanPath,
+  );
+  await expect(list.getByRole("link", { name: "ИПР выполнен" })).toHaveAttribute("href", cPlanPath);
+
+  const competencyLink = list.getByRole("link", { name: "Компетенция подтверждена" });
+  cCompetencyPath = (await competencyLink.getAttribute("href")) ?? "";
+  expect(cCompetencyPath, "компетенция ведёт в свою карточку").toMatch(/^\/competencies\//);
+  await competencyLink.click();
+  await expect(page).toHaveURL(new RegExp(`${cCompetencyPath}$`));
+  await expect(page.getByRole("heading", { level: 2, name: "Материалы" })).toBeVisible();
+
+  await openAchievements(page);
+  await list.getByRole("link", { name: "Все компетенции пула подтверждены" }).click();
+  await expect(page).toHaveURL(new RegExp(`${cPlanPath}$`));
+  await expect(page.getByRole("heading", { level: 1, name: /^ИПР:/ })).toBeVisible();
 });
 
 test("приёмки отменённого плана в ачивках не видны", async ({ page }) => {
@@ -164,8 +235,8 @@ test("приёмки отменённого плана в ачивках не в
   await acceptItem(page, D_FIRST);
 
   await login(page, D);
-  await page.goto("/me");
-  await expect(achievements(page).getByText("Первая принятая строка", { exact: true })).toBeVisible();
+  await openAchievements(page);
+  await expect(page.getByRole("link", { name: "Первая принятая строка" })).toBeVisible();
 
   // Отменяет план админ.
   await login(page);
@@ -174,16 +245,29 @@ test("приёмки отменённого плана в ачивках не в
   await expect(page.getByText("отменён", { exact: true })).toBeVisible();
 
   await login(page, D);
-  await page.goto("/me");
-  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
+  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
 });
 
-test("чужой кабинет чужих ачивок не показывает", async ({ page }) => {
+test("страница только своя: чужой сотрудник и его id в адресе ачивок не дают", async ({ page }) => {
   await createStaff(page, B, "junior");
+
+  // Ачивки есть у C. Его id берём из каталога, пока в контексте админ: сотруднику чужие карточки не ссылками.
+  await page.goto("/people");
+  const cHref = await page.getByRole("link", { name: C.name, exact: true }).getAttribute("href");
+  const cEmployeeId = cHref?.split("/").pop() ?? "";
+  expect(cEmployeeId, "id сотрудника C не найден в каталоге").not.toBe("");
+
   await login(page, B);
-  await page.goto("/me");
-  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
   await expect(page.getByText("Все компетенции пула подтверждены")).toHaveCount(0);
+
+  // Чужой id в строке запроса страницу не переключает: она всегда своя.
+  await page.goto(`/me/achievements?employeeId=${encodeURIComponent(cEmployeeId)}`);
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
+  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
 });
 
 test("план без компетенций в пуле ачивку пула не даёт", async ({ page }) => {
@@ -192,9 +276,12 @@ test("план без компетенций в пуле ачивку пула �
   await createPlan(page, E, "programmer", { emptyPool: true });
 
   await login(page, E);
-  await page.goto("/me");
-  await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
   await expect(page.getByText("Все компетенции пула подтверждены")).toHaveCount(0);
+
+  await page.goto("/me");
+  await expect(page.getByText(/пока ни одной/)).toBeVisible();
 });
 
 test("приёмка в первом плане видна, когда появился второй план", async ({ page }) => {
@@ -207,6 +294,30 @@ test("приёмка в первом плане видна, когда появ�
   await createPlan(page, F, "programmer", { rowText: "активен" });
 
   await login(page, F);
+  await openAchievements(page);
+  await expect(page.getByRole("link", { name: "Первая принятая строка" })).toBeVisible();
+
   await page.goto("/me");
-  await expect(achievements(page).getByText("Первая принятая строка", { exact: true })).toBeVisible();
+  await expectOnlyLink(page);
+  await expect(page.getByText(/открыто: \d+/)).toBeVisible();
+});
+
+test.describe("гость", () => {
+  // Гостевые проверки идут без cookie админа (см. e2e/fixtures.ts).
+  test.use({ asAdmin: false });
+
+  test("достижения и их цели закрыты для гостя", async ({ page }) => {
+    await page.goto("/me/achievements");
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+
+    // Цели кросс-ссылок тоже закрыты: содержимое плана и карточки компетенции не показывается.
+    await page.goto(cCompetencyPath);
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { level: 2, name: "Материалы" })).toHaveCount(0);
+
+    await page.goto(cPlanPath);
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { level: 1, name: /^ИПР:/ })).toHaveCount(0);
+  });
 });
