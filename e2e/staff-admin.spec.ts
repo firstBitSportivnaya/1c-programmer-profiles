@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, login, test } from "./fixtures";
+import { expect, login, logout, test } from "./fixtures";
 import { E2E_ADMIN } from "./env";
 
 // Шаги делят одну базу: первый тест заводит сотрудника, дальше тесты правят его карточку.
@@ -76,7 +76,7 @@ test("снятие «Админ» у не единственного админ�
   const row = page.locator("li").filter({ has: page.getByRole("link", { name: STAFF.name, exact: true }) });
   await expect(row).not.toContainText("· админ");
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, STAFF);
   await expect(page.getByRole("link", { name: "Компетенции", exact: true })).toHaveCount(0);
 });

@@ -65,6 +65,15 @@ async function hasAdminSession(page: Page) {
 }
 
 /**
+ * Выход учётки. Клик только отправляет POST `/api/session`, и следующий `page.goto` успевает оборвать
+ * навигацию до ответа: cookie сессии остаётся, и тест продолжает от старой учётки. Ждём ссылку «Войти».
+ */
+export async function logout(page: Page) {
+  await page.getByRole("button", { name: "Выйти" }).click();
+  await expect(page.getByRole("link", { name: "Войти" })).toBeVisible();
+}
+
+/**
  * Вход учёткой через страницу входа. Админская сессия приходит из фикстуры: если тест её не сбрасывал,
  * вход — пустой шаг, а после «Выйти» учётка вводится заново.
  */
@@ -74,7 +83,7 @@ export async function login(page: Page, account: Account = E2E_ADMIN) {
   const form = page.locator('form:has(input[name="intent"][value="login"])');
   if ((await form.count()) === 0) {
     // Страница входа уже пустила в кабинет: сначала выходим из текущей учётки.
-    await page.getByRole("button", { name: "Выйти" }).click();
+    await logout(page);
     await page.goto("/login");
   }
   await form.getByLabel("Логин").fill(account.login);

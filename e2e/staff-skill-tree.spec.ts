@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Locator, Page, Request } from "@playwright/test";
-import { expect, login, test } from "./fixtures";
+import { expect, login, logout, test } from "./fixtures";
 import { PREREQUISITES } from "../src/lib/skill-tree-graph";
 
 test.describe.configure({ mode: "serial" });
@@ -660,7 +660,7 @@ test("гость уходит на вход, чужой сотрудник де�
   await expect(page.locator(".skill-tree-jobs")).toContainText("Сейчас:");
   await expect(page.getByText(NOTE)).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await page.goto("/me/skills");
   await expect(page).toHaveURL(/\/login$/);
 });

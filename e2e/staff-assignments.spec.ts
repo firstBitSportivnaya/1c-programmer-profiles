@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, login, test } from "./fixtures";
+import { expect, login, logout, test } from "./fixtures";
 import { E2E_ADMIN } from "./env";
 
 test.describe.configure({ mode: "serial" });
@@ -122,7 +122,7 @@ test("сотрудник без подчинённых уходит на ИПР 
   await page.goto(cardPath);
   const name = await page.getByLabel(/^Название/).inputValue();
   const learn = await page.getByLabel(/^Узнать/).inputValue();
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, PLAIN);
   await page.goto("/assignments");
   await expect(page).toHaveURL(/\/idps$/);
@@ -130,7 +130,7 @@ test("сотрудник без подчинённых уходит на ИПР 
   await expect(page).toHaveURL(/\/idps$/);
   await page.goto(cardPath);
   await expect(page).toHaveURL(/\/idps$/);
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, E2E_ADMIN);
   await page.goto(cardPath);
   await expect(page.getByLabel(/^Название/)).toHaveValue(name);

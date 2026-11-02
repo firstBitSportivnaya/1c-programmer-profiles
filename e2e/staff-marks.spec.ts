@@ -1,5 +1,5 @@
 import type { Page, Request } from "@playwright/test";
-import { expect, login, test } from "./fixtures";
+import { expect, login, logout, test } from "./fixtures";
 import { E2E_ADMIN } from "./env";
 
 // Шаги делят базу: админ заводит сотрудника и ИПР, дальше входит сотрудник.
@@ -193,7 +193,7 @@ test("пометка вне набора правится, снятие убир
   await expect(page.getByTestId("marks-has")).toHaveText("1");
   await expect(page.getByTestId("marks-progress")).toHaveText("1");
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, E2E_ADMIN);
   await page.goto("/idps");
   await page
@@ -203,7 +203,7 @@ test("пометка вне набора правится, снятие убир
   await page.getByRole("button", { name: "Отменить" }).click();
   await expect(page.getByText("отменён", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, JUNIOR);
   await expect(page.getByTestId("marks-has")).toHaveText("1");
   await expect(page.getByTestId("marks-progress")).toHaveText("0");
@@ -240,7 +240,7 @@ test("руководитель-админ и гость пометок сотр�
   await expect(page.getByLabel(/^Статус:/)).toHaveCount(0);
   await expect(page.getByText("смотрю ИТС")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await page.goto("/jobs/junior/profile");
   await expect(page.getByLabel(/^Статус:/)).toHaveCount(0);
   await page.goto("/me/marks");

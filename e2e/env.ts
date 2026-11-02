@@ -12,7 +12,12 @@ export const E2E_SESSION_SECRET = "e2e-session-secret-0123456789abcdef";
 export const E2E_ADMIN = { login: "e2e.admin", name: "Админ E2E", password: "e2e-account-password" };
 
 /** Воркеров в основном проекте: столько же серверов и баз. */
-export const E2E_WORKERS = Number(process.env.E2E_WORKERS ?? 4);
+// Без сервера воркера фикстура не подключится, поэтому значение проверяется до запуска Playwright.
+const workers = Number(process.env.E2E_WORKERS ?? 4);
+if (!Number.isInteger(workers) || workers < 1) {
+  throw new Error(`E2E_WORKERS должен быть целым числом от 1, получено: ${process.env.E2E_WORKERS}`);
+}
+export const E2E_WORKERS = workers;
 
 /** База сервера `session.spec.ts`: админа здесь нет, его создаёт сам тест. */
 export const E2E_BOOTSTRAP_DB_PATH = "tmp/e2e-bootstrap.sqlite";
