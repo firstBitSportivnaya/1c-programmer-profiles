@@ -47,7 +47,7 @@ export default async function CompetenciesPage() {
                         {item.name}
                       </a>
                       {item.parentId ? (
-                        <div className="mt-1 muted">родитель: {nameById.get(item.parentId) ?? item.parentId}</div>
+                        <div className="mt-1 muted caption">родитель: {nameById.get(item.parentId) ?? item.parentId}</div>
                       ) : null}
                     </div>
                     <span className={competencyTypeChip(item.type)}>{competencyTypeLabel(item.type)}</span>

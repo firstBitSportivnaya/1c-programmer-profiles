@@ -54,7 +54,7 @@ export function BootstrapAdminForm({ jobs }: { jobs: { id: string; name: string 
           minLength={8}
         />
       </label>
-      <p className="muted">Пароль учётки — не короче 8 символов. Это не пароль из .env.local.</p>
+      <p className="muted caption">Пароль учётки — не короче 8 символов. Это не пароль из .env.local.</p>
       <button className="btn-primary w-full" type="submit">
         Создать первого админа
       </button>

@@ -73,7 +73,7 @@ export default async function AssignmentsPage({
                   <a href={`/assignments/${encodeURIComponent(row.id)}`} className="link-accent font-medium">
                     {row.name}
                   </a>
-                  <div className="mt-1 muted">
+                  <div className="mt-1 muted caption">
                     {row.competencyName}
                     {row.level != null ? ` · ур. ${row.level}` : ""}
                   </div>

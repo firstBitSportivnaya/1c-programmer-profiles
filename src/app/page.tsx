@@ -38,7 +38,7 @@ export default function HomePage() {
                 >
                   {job.name}
                 </a>
-                <div className="mt-1 muted">
+                <div className="mt-1 muted caption">
                   {LANE[job.lane]}
                   {profiled.has(job.id) ? " · профиль есть" : " · профиль не заполнен"}
                 </div>

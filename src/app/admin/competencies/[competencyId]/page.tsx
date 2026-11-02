@@ -33,7 +33,7 @@ export default async function CompetencyPage({ params }: { params: Promise<{ com
         <span className="pulse-dot" />
         <h1 className="page-title">{competency.name}</h1>
       </div>
-      <p className="muted">{competency.id}</p>
+      <p className="muted caption">{competency.id}</p>
       <ActionForm action={saveCompetencyAction} className="panel panel-pad grid gap-3 md:grid-cols-2">
         <CompetencyFields competency={competency} roots={roots} />
         <button className="btn-primary w-fit" type="submit">

@@ -97,12 +97,6 @@ body {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* База rem — 16px, как у браузера по умолчанию: шкала и отступы заданы в rem и не должны
-   зависеть от размера основного текста. Иначе --fs-sm считался бы от размера body. */
-html {
-  font-size: 16px;
-}
-
 body {
   font-size: var(--fs-md);
 }
@@ -480,6 +474,12 @@ details[open] > .skill-summary::before {
 
 .dim {
   color: var(--text-dim);
+}
+
+/* Подпись: вторая строка под названием в списке, пояснение под полем.
+   Отличается от основного текста шагом шкалы, не цветом и не весом. */
+.caption {
+  font-size: var(--fs-sm);
 }
 
 .link-accent {

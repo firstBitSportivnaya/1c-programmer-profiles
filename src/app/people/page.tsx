@@ -27,7 +27,7 @@ export default async function PeoplePage() {
               <a href={`/people/${row.id}`} className="link-accent font-medium">
                 {row.name}
               </a>
-              <div className="mt-1 muted">
+              <div className="mt-1 muted caption">
                 {jobName.get(row.jobId) ?? row.jobId}
                 {row.isActive !== 1 ? " · не активен" : ""}
                 {row.isAdmin === 1 ? " · админ" : ""}

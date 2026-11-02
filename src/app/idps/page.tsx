@@ -127,7 +127,7 @@ export default async function IdpsPage({
                 <a href={`/idps/${idp.id}`} className="link-accent font-medium">
                   {source?.name ?? idp.sourceJobId} → {target?.name ?? idp.targetJobId}
                 </a>
-                <div className="mt-1 muted">
+                <div className="mt-1 muted caption">
                   {owner?.name ?? idp.employeeId}
                   {creator ? ` · создал ${creator.name}` : ""}
                   {idp.periodStart && idp.periodEnd ? ` · ${idp.periodStart} — ${idp.periodEnd}` : ""}

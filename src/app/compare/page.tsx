@@ -96,13 +96,13 @@ export default async function ComparePage({
                       <td>
                         {formatPresence(line.type, line.presentA, line.levelA)}
                         {line.change === "criteria" && line.criteriaA ? (
-                          <div className="mt-1 muted">{line.criteriaA}</div>
+                          <div className="mt-1 muted caption">{line.criteriaA}</div>
                         ) : null}
                       </td>
                       <td>
                         {formatPresence(line.type, line.presentB, line.levelB)}
                         {line.change === "criteria" && line.criteriaB ? (
-                          <div className="mt-1 muted">{line.criteriaB}</div>
+                          <div className="mt-1 muted caption">{line.criteriaB}</div>
                         ) : null}
                       </td>
                       <td>{changeLabel(line.change)}</td>

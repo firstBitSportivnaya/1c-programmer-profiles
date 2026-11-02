@@ -85,6 +85,19 @@ for (const [path, label] of PAGES) {
   });
 }
 
+test("подпись под названием мельче названия: шаг шкалы, а не один размер", async ({ page }) => {
+  await page.goto("/");
+  const row = page.locator("li.list-row").first();
+  const name = row.getByRole("link").first();
+  const caption = row.locator(".caption").first();
+  await expect(caption).toBeVisible();
+
+  const [nameSize, captionSize] = await Promise.all(
+    [name, caption].map((locator) => locator.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))),
+  );
+  expect(captionSize, `подпись ${captionSize}px не мельче названия ${nameSize}px`).toBeLessThan(nameSize);
+});
+
 test("проверка замечает размер вне шкалы", async ({ page }) => {
   await page.goto("/");
   // Проба с размером, которого нет в шкале: 0.7rem — 11.2px, не 11px из --fs-sm.
