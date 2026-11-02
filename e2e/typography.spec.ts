@@ -100,7 +100,7 @@ test("подпись под названием мельче названия: ш
 
 test("проверка замечает размер вне шкалы", async ({ page }) => {
   await page.goto("/");
-  // Проба с размером, которого нет в шкале: 0.7rem — 11.2px, не 11px из --fs-sm.
+  // Проба с размером, которого нет в шкале: 0.7rem — 11.2px, не 12px из --fs-sm.
   await page.evaluate(() => {
     const probe = document.createElement("p");
     probe.textContent = "проба вне шкалы";
