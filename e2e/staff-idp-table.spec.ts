@@ -36,7 +36,9 @@ test("карточка ИПР показывает сотрудника, пер�
   await add.getByLabel("Название (если новое)").fill(GOAL);
   await add.getByLabel("Узнать").fill(LEARN);
   await add.getByLabel("Проверить").fill(VERIFY);
-  await add.getByLabel("Срок").fill("2026-06-15");
+  // Поле даты ищем по роли: у `select` «Из справочника» в подпись попадают названия вариантов,
+  // и задание «Срок из календаря» из соседней спецификации делает getByLabel("Срок") неоднозначным.
+  await add.getByRole("textbox", { name: "Срок" }).fill("2026-06-15");
   await add.getByRole("button", { name: "Добавить" }).click();
 
   idpPath = new URL(page.url()).pathname;

@@ -73,7 +73,7 @@ function MarkRow({ row }: { row: MarkBoardRow }) {
   }, [state, row.status]);
 
   return (
-    <li className={`list-row mark-row text-sm ${rowClass(status)}`}>
+    <li className={`list-row mark-row ${rowClass(status)}`}>
       <div>
         <div>
           {row.name}
@@ -122,7 +122,7 @@ function MarkRow({ row }: { row: MarkBoardRow }) {
           </p>
         ) : null}
         {pending ? (
-          <p className="muted text-sm" aria-live="polite">
+          <p className="muted" aria-live="polite">
             Сохраняем…
           </p>
         ) : null}
@@ -146,7 +146,7 @@ export function CompetencyMarkBoard({ rows }: { rows: MarkBoardRow[] }) {
   });
 
   if (rows.length === 0) {
-    return <p className="muted text-sm">У должности нет профиля с навыками.</p>;
+    return <p className="muted">У должности нет профиля с навыками.</p>;
   }
 
   return (
@@ -185,7 +185,7 @@ export function CompetencyMarkBoard({ rows }: { rows: MarkBoardRow[] }) {
           только цель ИПР
         </button>
       </div>
-      {visible.length === 0 ? <p className="muted text-sm">Ничего не найдено.</p> : null}
+      {visible.length === 0 ? <p className="muted">Ничего не найдено.</p> : null}
       {SECTIONS.map((section) => {
         const items = visible.filter((row) => (section.outside ? row.outside : !row.outside && row.section === section.key));
         if (items.length === 0) return null;
@@ -193,7 +193,7 @@ export function CompetencyMarkBoard({ rows }: { rows: MarkBoardRow[] }) {
           <div key={section.key} className="space-y-2">
             <h2 className="section-title mb-0">{section.title}</h2>
             {section.outside ? (
-              <p className="muted text-sm">
+              <p className="muted">
                 «Не отмечено» убирает навык, пока он снова не войдёт в должность или цель ИПР.
               </p>
             ) : null}

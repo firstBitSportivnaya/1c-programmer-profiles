@@ -13,7 +13,7 @@ export default async function NewCompetencyPage() {
   const roots = listCompetencies().filter((item) => !item.parentId);
   return (
     <div className="space-y-6">
-      <p className="text-sm">
+      <p>
         <a href="/admin/competencies" className="link-accent">
           ← Все компетенции
         </a>
@@ -25,7 +25,7 @@ export default async function NewCompetencyPage() {
       <ActionForm
         action={saveCompetencyAction}
         successPath="/admin/competencies/{id}"
-        className="panel panel-pad grid gap-3 text-sm md:grid-cols-2"
+        className="panel panel-pad grid gap-3 md:grid-cols-2"
       >
         <input type="hidden" name="create" value="1" />
         <CompetencyFields roots={roots} />

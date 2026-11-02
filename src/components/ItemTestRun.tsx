@@ -29,7 +29,7 @@ export function ItemTestRun({ itemId, questions }: { itemId: number; questions: 
   }
 
   return (
-    <div className="panel panel-pad space-y-3 text-sm">
+    <div className="panel panel-pad space-y-3">
       <ActionForm
         id={formId}
         key={step}

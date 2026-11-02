@@ -30,7 +30,7 @@ export function AddIdpItemForm({
   return (
     <ActionForm
       action={addIdpItemAction}
-      className="grid gap-2 text-sm md:grid-cols-2"
+      className="grid gap-2 md:grid-cols-2"
       beforeSubmit={(formData) => {
         if (String(formData.get("assignmentId") ?? "").trim()) return null;
         const name = String(formData.get("name") ?? "").trim();

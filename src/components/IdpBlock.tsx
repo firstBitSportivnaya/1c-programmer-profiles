@@ -53,7 +53,7 @@ export function EmployeeIdpSummary({ employeeId }: { employeeId: string }) {
           </span>
         </p>
       ) : (
-        <p className="muted text-sm">
+        <p className="muted">
           Активного плана нет. Создать можно в разделе{" "}
           <a href="/idps" className="link-accent">
             ИПР
@@ -64,7 +64,7 @@ export function EmployeeIdpSummary({ employeeId }: { employeeId: string }) {
       {history.length > 0 ? (
         <ul className="panel">
           {history.map((row) => (
-            <li key={row.id} className="list-row text-sm">
+            <li key={row.id} className="list-row">
               <a href={`/idps/${row.id}`} className="link-accent">
                 {getJob(row.sourceJobId)?.name ?? row.sourceJobId} → {getJob(row.targetJobId)?.name ?? row.targetJobId}
               </a>
@@ -161,7 +161,7 @@ export function IdpBlock({
                 <span className="chip ml-2">{group.confirmed ? "компетенция подтверждена" : "не подтверждена"}</span>
               </span>
               {materialCount > 0 ? (
-                <a className="link-accent ml-auto text-sm font-normal" href={materialHref}>
+                <a className="link-accent ml-auto font-normal" href={materialHref}>
                   Материалы
                 </a>
               ) : null}
@@ -202,11 +202,11 @@ export function IdpBlock({
                           <>
                             {questionCount === 0 ? <p className="muted">нет</p> : null}
                             {attemptCount > 0 ? (
-                              <p className="text-sm">
+                              <p>
                                 Итог теста: {attempts.get(item.id)?.passed ? "сдан" : "не сдан"}, попыток {attemptCount}
                               </p>
                             ) : null}
-                            {questionCount > 0 && attemptCount === 0 && !canTake ? <p className="text-sm">Тест есть</p> : null}
+                            {questionCount > 0 && attemptCount === 0 && !canTake ? <p>Тест есть</p> : null}
                             {canTake ? (
                               <p className="mt-2">
                                 <a className="link-accent" href={`/idps/${idp.id}/items/${item.id}`}>
@@ -257,7 +257,7 @@ export function IdpBlock({
           );
         })}
         {items.length === 0 ? (
-          <p className="muted text-sm">
+          <p className="muted">
             Заданий пока нет. ИПР станет выполненным, когда добавите хотя бы одно и примете все.
           </p>
         ) : null}
@@ -265,7 +265,7 @@ export function IdpBlock({
           <AddIdpItemForm idpId={idp.id} pool={pool} catalog={catalog} />
         ) : null}
         {manage && pool.length === 0 ? (
-          <p className="muted text-sm">В пуле нет компетенций. Нажмите «Обновить доступные компетенции».</p>
+          <p className="muted">В пуле нет компетенций. Нажмите «Обновить доступные компетенции».</p>
         ) : null}
       </div>
     </section>

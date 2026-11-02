@@ -27,7 +27,7 @@ export default async function PeoplePage() {
               <a href={`/people/${row.id}`} className="link-accent font-medium">
                 {row.name}
               </a>
-              <div className="mt-1 text-xs muted">
+              <div className="mt-1 muted caption">
                 {jobName.get(row.jobId) ?? row.jobId}
                 {row.isActive !== 1 ? " · не активен" : ""}
                 {row.isAdmin === 1 ? " · админ" : ""}
@@ -41,7 +41,7 @@ export default async function PeoplePage() {
         {rows.length === 0 ? <li className="list-row muted">Нет записей</li> : null}
       </ul>
       {actor.isAdmin ? (
-        <ActionForm action={saveEmployeeAction} className="panel panel-pad grid gap-3 text-sm md:grid-cols-2">
+        <ActionForm action={saveEmployeeAction} className="panel panel-pad grid gap-3 md:grid-cols-2">
           <h2 className="section-title md:col-span-2 mb-0">Новый сотрудник</h2>
           <label className="lbl">
             Логин

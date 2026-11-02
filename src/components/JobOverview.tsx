@@ -14,7 +14,7 @@ const LANE = {
 /** Ветка, требуемый опыт и профстандарт должности. */
 export function JobFacts({ job }: { job: Job }) {
   return (
-    <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+    <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3">
       <dt className="muted">Ветка</dt>
       <dd>{LANE[job.lane]}</dd>
       <dt className="muted">Требуемый опыт, лет</dt>
@@ -34,7 +34,7 @@ export function NextJobs({ jobId, admin }: { jobId: string; admin: boolean }) {
       <h2 className="section-title">Следующие должности</h2>
       <ul className="panel">
         {outs.map((tr) => (
-          <li key={`${tr.fromJobId}-${tr.toJobId}`} className="list-row text-sm">
+          <li key={`${tr.fromJobId}-${tr.toJobId}`} className="list-row">
             <div className="flex items-center gap-3">
               <a className="link-accent" href={jobHref(tr.toJobId)}>
                 {nameById[tr.toJobId] ?? tr.toJobId}
@@ -66,7 +66,7 @@ export function JobAdminPanel({ job }: { job: Job }) {
   return (
     <section className="panel panel-pad space-y-4">
       <h2 className="section-title">Правка должности</h2>
-      <ActionForm action={saveJobAction} className="grid grid-cols-2 gap-3 text-sm">
+      <ActionForm action={saveJobAction} className="grid grid-cols-2 gap-3">
         <input type="hidden" name="id" value={job.id} />
         <label className="lbl">
           Название
@@ -96,7 +96,7 @@ export function JobAdminPanel({ job }: { job: Job }) {
           Сохранить
         </button>
       </ActionForm>
-      <ActionForm action={addTransitionAction} className="flex flex-wrap items-end gap-3 text-sm">
+      <ActionForm action={addTransitionAction} className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="fromJobId" value={job.id} />
         <label className="lbl">
           Куда
@@ -127,7 +127,7 @@ export function JobAdminPanel({ job }: { job: Job }) {
           Удалить должность
         </button>
       </ActionForm>
-      <a className="link-accent text-sm" href="/">
+      <a className="link-accent" href="/">
         К схеме
       </a>
     </section>

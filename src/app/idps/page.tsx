@@ -67,7 +67,7 @@ export default async function IdpsPage({
         <h1 className="page-title">ИПР</h1>
       </div>
       {creatable.length > 0 && targets.length > 0 ? (
-        <ActionForm action={createIdpAction} className="panel panel-pad flex flex-wrap items-end gap-3 text-sm">
+        <ActionForm action={createIdpAction} className="panel panel-pad flex flex-wrap items-end gap-3">
           <h2 className="section-title w-full mb-0">Новый ИПР</h2>
           <label className="lbl">
             Сотрудник
@@ -127,7 +127,7 @@ export default async function IdpsPage({
                 <a href={`/idps/${idp.id}`} className="link-accent font-medium">
                   {source?.name ?? idp.sourceJobId} → {target?.name ?? idp.targetJobId}
                 </a>
-                <div className="mt-1 text-xs muted">
+                <div className="mt-1 muted caption">
                   {owner?.name ?? idp.employeeId}
                   {creator ? ` · создал ${creator.name}` : ""}
                   {idp.periodStart && idp.periodEnd ? ` · ${idp.periodStart} — ${idp.periodEnd}` : ""}

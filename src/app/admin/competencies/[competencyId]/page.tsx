@@ -24,7 +24,7 @@ export default async function CompetencyPage({ params }: { params: Promise<{ com
   const assignments = listIdpAssignments(competency.id);
   return (
     <div className="space-y-6">
-      <p className="text-sm">
+      <p>
         <a href="/admin/competencies" className="link-accent">
           ← Все компетенции
         </a>
@@ -33,8 +33,8 @@ export default async function CompetencyPage({ params }: { params: Promise<{ com
         <span className="pulse-dot" />
         <h1 className="page-title">{competency.name}</h1>
       </div>
-      <p className="text-xs muted">{competency.id}</p>
-      <ActionForm action={saveCompetencyAction} className="panel panel-pad grid gap-3 text-sm md:grid-cols-2">
+      <p className="muted caption">{competency.id}</p>
+      <ActionForm action={saveCompetencyAction} className="panel panel-pad grid gap-3 md:grid-cols-2">
         <CompetencyFields competency={competency} roots={roots} />
         <button className="btn-primary w-fit" type="submit">
           Сохранить

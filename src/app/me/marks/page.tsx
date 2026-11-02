@@ -13,12 +13,12 @@ export default async function MyMarksPage() {
   return (
     <article className="space-y-6">
       <div className="page-kicker">
-        <a href="/me" className="link-accent text-sm">
+        <a href="/me" className="link-accent">
           Кабинет
         </a>
         <h1 className="page-title">Мои пометки по компетенциям</h1>
       </div>
-      <p className="muted text-sm">Видите только вы. Статусы не меняют разрыв, ИПР и должность.</p>
+      <p className="muted">Видите только вы. Статусы не меняют разрыв, ИПР и должность.</p>
       <CompetencyMarkBoard rows={[...current, ...outside]} />
     </article>
   );

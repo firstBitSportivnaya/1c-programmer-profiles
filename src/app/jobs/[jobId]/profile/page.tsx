@@ -64,7 +64,7 @@ function SkillCard({
         </span>
       </summary>
       {admin ? (
-        <ActionForm action={upsertSkillAction} className="mt-2 space-y-2 text-sm">
+        <ActionForm action={upsertSkillAction} className="mt-2 space-y-2">
           <input type="hidden" name="jobId" value={jobId} />
           <input type="hidden" name="competencyId" value={row.competency.id} />
           {row.competency.type !== "duty" ? (
@@ -150,7 +150,7 @@ function Section({
         )}
       </div>
       {admin && unused.length > 0 ? (
-        <ActionForm action={upsertSkillAction} className="mt-4 space-y-2 text-sm">
+        <ActionForm action={upsertSkillAction} className="mt-4 space-y-2">
           <input type="hidden" name="jobId" value={jobId} />
           {type === "duty" ? <input type="hidden" name="level" value="" /> : null}
           <select name="competencyId" className="field">
