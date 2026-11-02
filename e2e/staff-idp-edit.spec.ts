@@ -1,40 +1,16 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
+import { E2E_ADMIN } from "./env";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAFF = { login: "e2e.idp.edit", name: "Правка ИПР E2E", password: "e2e-idp-edit-password" };
 const OTHER = { login: "e2e.idp.other", name: "Чужой ИПР E2E", password: "e2e-idp-other-password" };
 const GOAL = "Собрать отчёт";
 let idpPath = "";
-
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await login(page, account);
-      return;
-    }
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 async function createEmployee(page: Page, account: { login: string; name: string; password: string }) {
   await page.goto("/people");
@@ -49,7 +25,6 @@ async function createEmployee(page: Page, account: { login: string; name: string
 }
 
 test("форма правки строки закрыта, пока её не раскроют", async ({ page }) => {
-  await login(page);
   await createEmployee(page, STAFF);
   await createEmployee(page, OTHER);
 
@@ -92,7 +67,6 @@ test("форма правки строки закрыта, пока её не р
 });
 
 test("новое название остаётся в ячейке после перезагрузки", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(GOAL) });
   await row.getByText("Править", { exact: true }).click();
@@ -120,7 +94,6 @@ test("новое название остаётся в ячейке после п
 });
 
 test("пустое название не записывается, прежний текст остаётся", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(GOAL) });
   await row.getByText("Править", { exact: true }).click();
@@ -136,7 +109,6 @@ test("пустое название не записывается, прежни�
 });
 
 test("срок вне периода не записывается", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(GOAL) });
   await row.getByText("Править", { exact: true }).click();
@@ -151,7 +123,6 @@ test("срок вне периода не записывается", async ({ pa
 });
 
 test("пустое узнать или проверить не записывается", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(GOAL) });
   await row.getByText("Править", { exact: true }).click();
@@ -167,7 +138,6 @@ test("пустое узнать или проверить не записыва�
 });
 
 test("узнать, проверить и срок сохраняются, строка снова становится текстом", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(GOAL) });
   await row.getByText("Править", { exact: true }).click();
@@ -218,7 +188,6 @@ test("сотрудник меняет статус строки, после пе
 });
 
 test("подтверждение в своей колонке, без теста строка тоже подтверждается", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const row = page.getByRole("row", { name: new RegExp(GOAL) });
   const confirm = row.getByRole("button", { name: "Подтвердить" });
@@ -275,7 +244,6 @@ test("чужой сотрудник не видит приёмку и правк
 });
 
 test("после подтверждения единственной строки новое задание всё ещё добавляется", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const add = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
   await expect(add).toBeVisible();

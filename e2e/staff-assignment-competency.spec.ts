@@ -1,7 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
+import { E2E_ADMIN } from "./env";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const NAME = `Смена компетенции ${STAMP}`;
@@ -17,29 +21,6 @@ let secondId = "";
 let firstName = "";
 let secondName = "";
 
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
-
 function addForm(page: Page) {
   return page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
 }
@@ -49,7 +30,6 @@ function saveForm(page: Page) {
 }
 
 test("после сохранения карточка показывает новую компетенцию", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(`e2e.comp.${STAMP}`);
@@ -113,7 +93,6 @@ test("после сохранения карточка показывает но
 });
 
 test("строка открытого ИПР остаётся на старой компетенции", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const oldGroup = page.getByRole("heading", { level: 3, name: new RegExp(firstName) }).locator("xpath=..");
   await expect(oldGroup.getByRole("row", { name: new RegExp(NAME) })).toBeVisible();
@@ -124,7 +103,6 @@ test("строка открытого ИПР остаётся на старой 
 });
 
 test("то же название в другой компетенции без учёта регистра не переносится", async ({ page }) => {
-  await login(page);
   await page.goto("/assignments/new");
   const create = page.locator("form").filter({ has: page.getByRole("button", { name: "Создать" }) });
   await create.getByLabel(/^Компетенция/).selectOption(firstId);
@@ -144,7 +122,6 @@ test("то же название в другой компетенции без �
 });
 
 test("скрытое задание не меняет компетенцию", async ({ page }) => {
-  await login(page);
   await page.goto(cardPath);
   await expect(page.getByLabel(/^Компетенция/)).toHaveValue(secondId);
 
@@ -164,7 +141,6 @@ test("скрытое задание не меняет компетенцию", a
 });
 
 test("сотрудник без подчинённых не видит форму правки", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(PLAIN.login);

@@ -1,7 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const STAFF = { login: `e2e.pool.${STAMP}`, name: `Пул ${STAMP}`, password: "e2e-pool-password" };
@@ -10,40 +13,11 @@ const BUTTON = "Обновить доступные компетенции";
 let idpPath = "";
 let freshName = "";
 
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await login(page, account);
-      return;
-    }
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
-
 function addForm(page: Page) {
   return page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
 }
 
 test("на карточке кнопка про доступные компетенции", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(STAFF.login);
@@ -68,7 +42,6 @@ test("на карточке кнопка про доступные компет�
 });
 
 test("кнопка дописывает новую компетенцию и не трогает строки", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const add = addForm(page);
   await add.getByLabel("Название (если новое)").fill(ROW);
@@ -103,7 +76,6 @@ test("кнопка дописывает новую компетенцию и н�
 });
 
 test("сотрудник плана кнопку не видит и пул не меняет", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const before = await addForm(page).getByLabel(/^Компетенция/).locator("option").allInnerTexts();
 
@@ -112,6 +84,7 @@ test("сотрудник плана кнопку не видит и пул не 
   await expect(page.getByRole("button", { name: BUTTON })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Обновить разрыв" })).toHaveCount(0);
 
+  // Пул снова смотрит админ: сотрудник форму добавления не видит.
   await login(page);
   await page.goto(idpPath);
   await expect(addForm(page).getByLabel(/^Компетенция/).locator("option")).toHaveText(before);

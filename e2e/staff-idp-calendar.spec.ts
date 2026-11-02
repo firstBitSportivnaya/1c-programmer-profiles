@@ -1,7 +1,10 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Locator } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const STAFF = { login: `e2e.cal.${STAMP}`, name: `Календарь ${STAMP}`, password: "e2e-cal-password" };
@@ -12,25 +15,6 @@ const EDITED = "2026-07-02";
 const OUTSIDE = "2026-01-15";
 const WITH_DUE = "Срок из календаря";
 const WITHOUT_DUE = "Пустой срок";
-
-async function login(page: Page) {
-  await page.goto("/login");
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(E2E_ADMIN.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 async function visibleButton(button: Locator) {
   await expect(button).toBeVisible();
@@ -65,7 +49,6 @@ async function pickDay(scope: Locator, inputName: string, iso: string) {
 }
 
 test("в тёмной теме день начала и конца выбирается календарём", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(STAFF.login);
@@ -89,9 +72,8 @@ test("в тёмной теме день начала и конца выбира�
 
 test("в светлой теме срок задания выбирается календарём в обеих формах", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("pp-theme", "light"));
-  await login(page);
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.goto("/idps");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.locator("li", { hasText: STAFF.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
 
   const add = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
@@ -116,7 +98,6 @@ test("в светлой теме срок задания выбирается к
 });
 
 test("день вне периода не записывается, пустой срок остаётся", async ({ page }) => {
-  await login(page);
   await page.goto("/idps");
   await page.locator("li", { hasText: STAFF.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
   const add = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
@@ -139,7 +120,6 @@ test("день вне периода не записывается, пустой
 });
 
 test("поле даты и календарь неактивны до гидратации и доступны после", async ({ page }) => {
-  await login(page);
   await page.goto("/idps");
   await page.locator("li", { hasText: STAFF.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
   const due = page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
@@ -167,10 +147,15 @@ test("поле даты и календарь неактивны до гидра
   await expect(due.getByRole("dialog", { name: "Календарь" })).toBeVisible();
 });
 
-test("гость со списка ИПР не видит поля даты", async ({ page }) => {
-  await page.goto("/idps");
-  await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByLabel("Начало")).toHaveCount(0);
-  await expect(page.getByLabel("Конец")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Показать календарь" })).toHaveCount(0);
+// Гость идёт без сессии: файл по умолчанию от админа, здесь это выключено.
+test.describe("гость", () => {
+  test.use({ asAdmin: false });
+
+  test("гость со списка ИПР не видит поля даты", async ({ page }) => {
+    await page.goto("/idps");
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByLabel("Начало")).toHaveCount(0);
+    await expect(page.getByLabel("Конец")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Показать календарь" })).toHaveCount(0);
+  });
 });

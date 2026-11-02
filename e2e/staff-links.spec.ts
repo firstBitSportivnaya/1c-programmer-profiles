@@ -1,22 +1,16 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
 import { E2E_ADMIN } from "./env";
 
-// Файл идёт после session.spec.ts (алфавит, один воркер): админ там уже создан.
 // Шаги делят базу: админ заводит ссылки, сотрудника и ИПР, дальше входит сотрудник.
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const READER = { login: "e2e.reader", name: "Читатель E2E", password: "e2e-reader-password" };
 const COMPETENCY = { id: "comp-avtomatizirovannoe-testirovanie", name: "Автоматизированное тестирование" };
 const ITS = { title: "Тестирование в 1С", url: "https://its.1c.ru/db/v8std/testing" };
-
-async function login(page: Page, account: { login: string; password: string }) {
-  await page.goto("/login");
-  const form = page.locator('form:has(input[name="intent"][value="login"])');
-  await form.getByLabel("Логин").fill(account.login);
-  await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-  await form.getByRole("button", { name: "Войти" }).click();
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 function materials(page: Page, competencyName = COMPETENCY.name) {
   return page.getByRole("group", { name: `Материалы: ${competencyName}` });
@@ -44,7 +38,6 @@ async function openAllDetails(page: Page) {
 }
 
 test("админ добавляет и удаляет ссылку у компетенции", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/admin/competencies");
   await expect(page.getByRole("button", { name: "Добавить ссылку" })).toHaveCount(0);
   await openCompetency(page);
@@ -64,7 +57,6 @@ test("админ добавляет и удаляет ссылку у компе
 });
 
 test("адрес не http(s) или пустое название — ошибка, строка не сохраняется", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await openCompetency(page);
 
   await addLink(page, "training", "Курс", "ftp://example.org/course");
@@ -81,7 +73,6 @@ test("адрес не http(s) или пустое название — ошиб�
 });
 
 test("создание с занятым id не перезаписывает компетенцию", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/admin/competencies/new");
   const create = page.locator("form", { has: page.getByRole("button", { name: "Создать" }) });
   await create.getByLabel("Идентификатор").fill(COMPETENCY.id);
@@ -97,7 +88,6 @@ test("создание с занятым id не перезаписывает к
 
 test("удалённая компетенция уносит свои ссылки: пересозданная с тем же id — без материалов", async ({ page }) => {
   const temp = { id: "e2e-temp-competency", name: "Временная компетенция E2E" };
-  await login(page, E2E_ADMIN);
   await page.goto("/admin/competencies");
 
   const createTemp = async () => {
@@ -124,8 +114,6 @@ test("удалённая компетенция уносит свои ссылк
 });
 
 test("админ заводит сотрудника и ИПР с заданием по компетенции со ссылкой", async ({ page }) => {
-  await login(page, E2E_ADMIN);
-
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await form.getByLabel("Логин").fill(READER.login);
@@ -180,13 +168,18 @@ test("вошедший сотрудник видит ссылку в карто�
   await expect(materials(page).getByRole("link", { name: ITS.title })).toHaveAttribute("href", ITS.url);
 });
 
-test("гость ссылок не видит", async ({ page }) => {
-  await page.goto("/jobs/programmer/profile");
-  await openAllDetails(page);
-  await expect(page.getByText(COMPETENCY.name, { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: ITS.title })).toHaveCount(0);
-  await expect(page.getByRole("list", { name: "Материалы" })).toHaveCount(0);
+// Гость идёт без сессии: файл по умолчанию от админа, здесь это выключено.
+test.describe("гость", () => {
+  test.use({ asAdmin: false });
 
-  await page.goto(`/competencies/${COMPETENCY.id}`);
-  await expect(page).toHaveURL(/\/login/);
+  test("гость ссылок не видит", async ({ page }) => {
+    await page.goto("/jobs/programmer/profile");
+    await openAllDetails(page);
+    await expect(page.getByText(COMPETENCY.name, { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: ITS.title })).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Материалы" })).toHaveCount(0);
+
+    await page.goto(`/competencies/${COMPETENCY.id}`);
+    await expect(page).toHaveURL(/\/login/);
+  });
 });

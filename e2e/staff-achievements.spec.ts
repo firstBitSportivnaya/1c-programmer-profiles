@@ -1,7 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, login, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const ACCOUNT = (suffix: string, name: string) => ({
@@ -27,34 +30,6 @@ let dPlanPath = "";
 let aOtherCompetency = "";
 
 /** Вход учёткой; на первом прогоне сначала создаёт админа и переключается на нужного сотрудника. */
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await login(page, account);
-      return;
-    }
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
-
 async function createStaff(page: Page, staff: { login: string; name: string; password: string }, jobId: string) {
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
@@ -121,7 +96,6 @@ function achievements(page: Page) {
 }
 
 test("принятая строка даёт ачивки первой строки и компетенции", async ({ page }) => {
-  await login(page);
   await createStaff(page, A, "junior");
   aPlanPath = await createPlan(page, A, "programmer");
 
@@ -129,6 +103,7 @@ test("принятая строка даёт ачивки первой стро�
   await page.goto("/me");
   await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
 
+  // Строки плана заводит админ.
   await login(page);
   await page.goto(aPlanPath);
   await addItem(page, A_GOAL);
@@ -149,7 +124,6 @@ test("принятая строка даёт ачивки первой стро�
 });
 
 test("снятая приёмка убирает ачивки, без приёмок раздела нет", async ({ page }) => {
-  await login(page);
   await page.goto(aPlanPath);
   const row = page.getByRole("row", { name: new RegExp(A_GOAL) });
   await row.getByRole("button", { name: "Снять подтверждение" }).click();
@@ -162,7 +136,6 @@ test("снятая приёмка убирает ачивки, без приём
 });
 
 test("когда приняты все компетенции пула, видны все четыре ачивки", async ({ page }) => {
-  await login(page);
   await createStaff(page, C, "lead");
   cPlanPath = await createPlan(page, C, "programmer");
   await addItem(page, C_GOAL);
@@ -184,7 +157,6 @@ test("когда приняты все компетенции пула, видн
 });
 
 test("приёмки отменённого плана в ачивках не видны", async ({ page }) => {
-  await login(page);
   await createStaff(page, D, "junior");
   dPlanPath = await createPlan(page, D, "programmer");
   await addItem(page, D_FIRST);
@@ -195,6 +167,7 @@ test("приёмки отменённого плана в ачивках не в
   await page.goto("/me");
   await expect(achievements(page).getByText("Первая принятая строка", { exact: true })).toBeVisible();
 
+  // Отменяет план админ.
   await login(page);
   await page.goto(dPlanPath);
   await page.getByRole("button", { name: "Отменить" }).click();
@@ -206,7 +179,6 @@ test("приёмки отменённого плана в ачивках не в
 });
 
 test("чужой кабинет чужих ачивок не показывает", async ({ page }) => {
-  await login(page);
   await createStaff(page, B, "junior");
   await login(page, B);
   await page.goto("/me");
@@ -215,7 +187,6 @@ test("чужой кабинет чужих ачивок не показывае�
 });
 
 test("план без компетенций в пуле ачивку пула не даёт", async ({ page }) => {
-  await login(page);
   await createStaff(page, E, "senior");
   // Профиль senior полностью покрывает профиль programmer: разрыв пуст, строк пула не появляется.
   await createPlan(page, E, "programmer", { emptyPool: true });
@@ -227,7 +198,6 @@ test("план без компетенций в пуле ачивку пула �
 });
 
 test("приёмка в первом плане видна, когда появился второй план", async ({ page }) => {
-  await login(page);
   await createStaff(page, F, "junior");
   await createPlan(page, F, "programmer");
   await addItem(page, F_GOAL);

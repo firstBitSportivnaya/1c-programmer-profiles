@@ -1,7 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const STAFF = { login: `e2e.level.${STAMP}`, name: `Уровень ${STAMP}`, password: "e2e-level-password" };
@@ -14,29 +17,6 @@ let idpPath = "";
 let competencyId = "";
 let highPath = "";
 let barePath = "";
-
-async function login(page: Page) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(E2E_ADMIN.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 function addForm(page: Page) {
   return page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
@@ -56,7 +36,6 @@ async function createAssignment(page: Page, name: string, level: string) {
 }
 
 test("в списке планки 2 есть уровни 1 и 2 и нет 3", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await person.getByLabel("Логин").fill(STAFF.login);
@@ -99,7 +78,6 @@ test("в списке планки 2 есть уровни 1 и 2 и нет 3", 
 });
 
 test("задание уровня 3 в план с планкой 2 не попадает", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const add = addForm(page);
   await add.getByLabel(/^Компетенция/).selectOption(competencyId);
@@ -115,7 +93,6 @@ test("задание уровня 3 в план с планкой 2 не поп�
 });
 
 test("строка хранит уровень, который был при добавлении", async ({ page }) => {
-  await login(page);
   await page.goto(idpPath);
   const add = addForm(page);
   await add.getByLabel(/^Компетенция/).selectOption(competencyId);
@@ -140,7 +117,6 @@ test("строка хранит уровень, который был при д�
 });
 
 test("задание без уровня не предлагается, скрытое уровень не получает", async ({ page }) => {
-  await login(page);
   barePath = await createAssignment(page, BARE, "");
   await expect(page.getByLabel(/^Уровень/)).toHaveValue("");
 

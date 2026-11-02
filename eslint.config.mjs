@@ -14,6 +14,11 @@ const eslintConfig = [
     },
   },
   {
+    // Фикстуры Playwright передают значение через `use` — это не React-хук.
+    files: ["e2e/**"],
+    rules: { "react-hooks/rules-of-hooks": "off" },
+  },
+  {
     ignores: [".next/**", "out/**", "build/**", "tmp/**", "test-results/**", "playwright-report/**", "next-env.d.ts"],
   },
 ];

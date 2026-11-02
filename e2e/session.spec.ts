@@ -33,7 +33,8 @@ test("неверный пароль из окружения не создаёт 
   await page.goto("/login");
   await fillBootstrap(page, "wrong-env-password");
 
-  await expect(page.getByRole("alert")).toHaveText("Неверный пароль из окружения");
+  const errorAlert = page.locator('.form-error[role="alert"]');
+  await expect(errorAlert).toHaveText("Неверный пароль из окружения");
   await expect(bootstrapForm(page)).toBeVisible();
 });
 
@@ -61,7 +62,7 @@ test("неверный пароль учётки — ошибка на стра�
   await form.getByLabel("Пароль", { exact: true }).fill("wrong-password");
   await form.getByRole("button", { name: "Войти" }).click();
 
-  await expect(page.getByRole("alert")).toHaveText("Неверный логин или пароль");
+  await expect(page.locator('.form-error[role="alert"]')).toHaveText("Неверный логин или пароль");
 });
 
 async function loginAsAdmin(page: Page) {

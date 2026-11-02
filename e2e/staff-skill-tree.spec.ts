@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
-import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
+import type { Locator, Page, Request } from "@playwright/test";
+import { expect, login, logout, test } from "./fixtures";
 import { PREREQUISITES } from "../src/lib/skill-tree-graph";
-import { E2E_ADMIN, E2E_ADMIN_PASSWORD } from "./env";
 
-// Файл идёт после session.spec.ts (алфавит, один воркер): первый админ там уже создан.
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const STAMP = Date.now();
 const STUDENT = {
@@ -48,35 +50,7 @@ const NOTE = `Дерево: личная заметка ${STAMP}`;
 let studentPlanPath = "";
 let outsidePlanPath = "";
 
-/** Вход учёткой; на первом прогоне сначала создаёт админа и переключается на нужного сотрудника. */
-async function login(page: Page, account: { login: string; password: string } = E2E_ADMIN) {
-  await page.goto("/login");
-  if (/\/me$/.test(page.url())) {
-    await page.getByRole("button", { name: "Выйти" }).click();
-    await page.goto("/login");
-  }
-  const bootstrap = page.locator("#bootstrap-admin");
-  if (await bootstrap.isVisible()) {
-    await bootstrap.getByLabel("Пароль из .env.local").fill(E2E_ADMIN_PASSWORD);
-    await bootstrap.getByLabel("Логин").fill(E2E_ADMIN.login);
-    await bootstrap.getByLabel("Имя").fill(E2E_ADMIN.name);
-    await bootstrap.getByLabel("Должность").selectOption("team-lead");
-    await bootstrap.getByLabel("Пароль учётки").fill(E2E_ADMIN.password);
-    await bootstrap.getByRole("button", { name: "Создать первого админа" }).click();
-    if (account.login !== E2E_ADMIN.login) {
-      await page.getByRole("button", { name: "Выйти" }).click();
-      await login(page, account);
-      return;
-    }
-  } else {
-    const form = page.locator('form:has(input[name="intent"][value="login"])');
-    await form.getByLabel("Логин").fill(account.login);
-    await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-    await form.getByRole("button", { name: "Войти" }).click();
-  }
-  await expect(page).toHaveURL(/\/me$/);
-}
-
+/** Заводит сотрудника через интерфейс: карточка, должность и руководитель. */
 async function createStaff(page: Page, staff: { login: string; name: string; password: string }, jobId: string) {
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
@@ -305,7 +279,6 @@ function boardIds(board: Locator) {
 }
 
 test("админ заводит сотрудников, ИПР, строки плана и материал", async ({ page }) => {
-  await login(page);
   await createStaff(page, STUDENT, "junior");
   studentPlanPath = await createPlan(page, STUDENT, "programmer");
   await addItem(page, PROGRAMMING.id, GOAL_ITEM);
@@ -569,7 +542,6 @@ test("карточка поверх холста, рёбра ветви свет
 });
 
 test("приёмка подтверждает узел и его шаг плана, снятие убирает значок и ачивку", async ({ page }) => {
-  await login(page);
   await page.goto(studentPlanPath);
   await acceptItem(page, GOAL_ITEM);
 
@@ -584,6 +556,7 @@ test("приёмка подтверждает узел и его шаг план
   await expect(page.getByTestId(`skill-badge-${TESTING.id}`)).toHaveCount(0);
   await expect(skillNode(page, TESTING.id)).toHaveAttribute("data-plan-state", "in_progress");
 
+  // Снимает подтверждение админ.
   await login(page);
   await page.goto(studentPlanPath);
   const row = page.getByRole("row", { name: new RegExp(GOAL_ITEM) });
@@ -629,6 +602,7 @@ test("пометка вне профиля остаётся в дереве, о�
   await waitHydrated(outsideStatus);
   await savePost(page, () => outsideStatus.selectOption("in_progress"));
 
+  // План отменяет админ.
   await login(page);
   await page.goto(outsidePlanPath);
   await page.getByRole("button", { name: "Отменить" }).click();
@@ -674,7 +648,6 @@ test("отбор «Мои» убирает чужие ветви, переклю
 });
 
 test("гость уходит на вход, чужой сотрудник дерево и пометки не видит", async ({ page }) => {
-  await login(page);
   await page.goto("/people");
   const studentHref = await page.getByRole("link", { name: STUDENT.name, exact: true }).getAttribute("href");
   expect(studentHref).toBeTruthy();
@@ -687,7 +660,7 @@ test("гость уходит на вход, чужой сотрудник де�
   await expect(page.locator(".skill-tree-jobs")).toContainText("Сейчас:");
   await expect(page.getByText(NOTE)).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await page.goto("/me/skills");
   await expect(page).toHaveURL(/\/login$/);
 });

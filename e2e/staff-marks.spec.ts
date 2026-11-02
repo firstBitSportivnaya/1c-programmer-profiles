@@ -1,23 +1,17 @@
-import { expect, test, type Page, type Request } from "@playwright/test";
+import type { Page, Request } from "@playwright/test";
+import { expect, login, logout, test } from "./fixtures";
 import { E2E_ADMIN } from "./env";
 
-// Файл идёт после session.spec.ts (алфавит, один воркер): админ там уже создан.
 // Шаги делят базу: админ заводит сотрудника и ИПР, дальше входит сотрудник.
 test.describe.configure({ mode: "serial" });
+
+// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 const JUNIOR = { login: "e2e.junior", name: "Младший E2E", password: "e2e-junior-password" };
 const OUTSIDE_ID = "comp-arhitektura-resheniya-granicy-sistem-i-konturov";
 const JUNIOR_CRITERIA = "Осваивает незнакомый механизм платформы по ИТС и документации";
 const TARGET_CRITERIA = "Пишет модульные тесты на YAxUnit";
-
-async function login(page: Page, account: { login: string; password: string }) {
-  await page.goto("/login");
-  const form = page.locator('form:has(input[name="intent"][value="login"])');
-  await form.getByLabel("Логин").fill(account.login);
-  await form.getByLabel("Пароль", { exact: true }).fill(account.password);
-  await form.getByRole("button", { name: "Войти" }).click();
-  await expect(page).toHaveURL(/\/me$/);
-}
 
 function markRow(page: Page, competency: string) {
   return page.locator("li", { has: page.getByLabel(`Статус: ${competency}`) });
@@ -59,8 +53,6 @@ async function saveMark(page: Page, run: () => Promise<unknown>) {
 }
 
 test("админ заводит сотрудника на младшего программиста и ИПР на программиста", async ({ page }) => {
-  await login(page, E2E_ADMIN);
-
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await form.getByLabel("Логин").fill(JUNIOR.login);
@@ -201,7 +193,7 @@ test("пометка вне набора правится, снятие убир
   await expect(page.getByTestId("marks-has")).toHaveText("1");
   await expect(page.getByTestId("marks-progress")).toHaveText("1");
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, E2E_ADMIN);
   await page.goto("/idps");
   await page
@@ -211,7 +203,7 @@ test("пометка вне набора правится, снятие убир
   await page.getByRole("button", { name: "Отменить" }).click();
   await expect(page.getByText("отменён", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, JUNIOR);
   await expect(page.getByTestId("marks-has")).toHaveText("1");
   await expect(page.getByTestId("marks-progress")).toHaveText("0");
@@ -241,7 +233,6 @@ test("пометка вне набора правится, снятие убир
 });
 
 test("руководитель-админ и гость пометок сотрудника не видят", async ({ page }) => {
-  await login(page, E2E_ADMIN);
   await page.goto("/people");
   await page.getByRole("link", { name: JUNIOR.name, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: JUNIOR.name })).toBeVisible();
@@ -249,7 +240,7 @@ test("руководитель-админ и гость пометок сотр�
   await expect(page.getByLabel(/^Статус:/)).toHaveCount(0);
   await expect(page.getByText("смотрю ИТС")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await page.goto("/jobs/junior/profile");
   await expect(page.getByLabel(/^Статус:/)).toHaveCount(0);
   await page.goto("/me/marks");
