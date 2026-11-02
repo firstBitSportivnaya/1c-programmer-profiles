@@ -25,7 +25,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ ass
 
   return (
     <div className="space-y-6">
-      <p className="text-sm">
+      <p>
         <a href="/assignments" className="link-accent">
           ← Все задания
         </a>
@@ -35,13 +35,13 @@ export default async function AssignmentPage({ params }: { params: Promise<{ ass
         <h1 className="page-title">{row.name}</h1>
       </div>
       {row.archived !== 0 ? (
-        <p className="text-sm">
+        <p>
           <span className="lbl">Компетенция</span>
           <span className="mt-1 block">{competency?.name ?? row.competencyId}</span>
         </p>
       ) : null}
       {row.archived === 0 ? (
-        <ActionForm action={saveAssignmentAction} className="panel panel-pad grid gap-3 text-sm md:grid-cols-2">
+        <ActionForm action={saveAssignmentAction} className="panel panel-pad grid gap-3 md:grid-cols-2">
           <input type="hidden" name="id" value={row.id} />
           <label className="lbl md:col-span-2">
             Компетенция
@@ -79,7 +79,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ ass
           </button>
         </ActionForm>
       ) : null}
-      <ActionForm action={saveAssignmentTestAction} className="panel panel-pad space-y-3 text-sm">
+      <ActionForm action={saveAssignmentTestAction} className="panel panel-pad space-y-3">
         <h2 className="section-title mb-0">Тест</h2>
         <input type="hidden" name="id" value={row.id} />
         <AssignmentTestFields

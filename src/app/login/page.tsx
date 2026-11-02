@@ -31,13 +31,13 @@ export default async function LoginPage({
       {needBootstrap ? (
         <div className="panel panel-pad">
           <h2 className="section-title">Первый админ</h2>
-          <p className="muted mb-3 text-sm">
+          <p className="muted mb-3">
             Пока нет сотрудника-админа, пароль из окружения создаёт первого. После этого он сессию не выдаёт.
           </p>
           <BootstrapAdminForm jobs={listJobs().map((job) => ({ id: job.id, name: job.name }))} />
         </div>
       ) : (
-        <p className="muted text-sm">Админ уже создан — войдите логином и паролем учётки.</p>
+        <p className="muted">Админ уже создан — войдите логином и паролем учётки.</p>
       )}
     </div>
   );

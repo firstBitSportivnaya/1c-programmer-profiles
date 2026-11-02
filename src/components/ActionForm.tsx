@@ -67,7 +67,7 @@ function FormBody({
         </p>
       ) : null}
       {pending ? (
-        <p className="muted text-sm md:col-span-2" aria-live="polite">
+        <p className="muted md:col-span-2" aria-live="polite">
           Сохраняем…
         </p>
       ) : null}

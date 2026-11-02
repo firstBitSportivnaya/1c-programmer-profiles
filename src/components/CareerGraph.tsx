@@ -236,7 +236,7 @@ export function CareerGraph({
           targetHandle: handles?.target,
           type: "smoothstep",
           label: EDGE_LABELS[key],
-          labelStyle: { fill: "var(--text-muted)", fontSize: 10, fontFamily: "inherit" },
+          labelStyle: { fill: "var(--text-muted)", fontFamily: "inherit" },
           labelBgStyle: { fill: "var(--mask)", fillOpacity: 0.9 },
           labelBgPadding: [4, 6] as [number, number],
           labelBgBorderRadius: 4,

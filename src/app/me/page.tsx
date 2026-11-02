@@ -19,7 +19,7 @@ export default async function MePage() {
         <span className="pulse-dot" />
         <h1 className="page-title">{employee.name}</h1>
       </div>
-      <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+      <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3">
         <dt className="muted">Логин</dt>
         <dd>{employee.login}</dd>
         <dt className="muted">Текущая должность</dt>
@@ -35,7 +35,7 @@ export default async function MePage() {
       </dl>
       <Achievements employeeId={employee.id} />
       <CompetencyMarkSummary employeeId={employee.id} jobId={employee.jobId} />
-      <p className="text-sm">
+      <p>
         <a className="link-accent" href="/me/skills">
           Дерево навыков
         </a>

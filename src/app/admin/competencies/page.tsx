@@ -37,7 +37,7 @@ export default async function CompetenciesPage() {
               {section.title}
             </h2>
             {rows.length === 0 ? (
-              <p className="muted text-sm">Нет записей</p>
+              <p className="muted">Нет записей</p>
             ) : (
               <ul className="panel">
                 {rows.map((item) => (
@@ -47,7 +47,7 @@ export default async function CompetenciesPage() {
                         {item.name}
                       </a>
                       {item.parentId ? (
-                        <div className="mt-1 text-xs muted">родитель: {nameById.get(item.parentId) ?? item.parentId}</div>
+                        <div className="mt-1 muted">родитель: {nameById.get(item.parentId) ?? item.parentId}</div>
                       ) : null}
                     </div>
                     <span className={competencyTypeChip(item.type)}>{competencyTypeLabel(item.type)}</span>

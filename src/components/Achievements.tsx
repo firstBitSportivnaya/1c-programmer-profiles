@@ -11,7 +11,7 @@ export function Achievements({ employeeId }: { employeeId: string }) {
         {list.map((row) => (
           <li key={row.key} className="list-row">
             <span>{row.title}</span>
-            {row.detail ? <span className="muted text-sm">{row.detail}</span> : null}
+            {row.detail ? <span className="muted">{row.detail}</span> : null}
           </li>
         ))}
       </ul>

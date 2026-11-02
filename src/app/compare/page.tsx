@@ -43,7 +43,7 @@ export default async function ComparePage({
         <span className="pulse-dot" />
         <h1 className="page-title">Сравнение профилей</h1>
       </div>
-      <form className="panel panel-pad flex flex-wrap items-end gap-4 text-sm" method="get">
+      <form className="panel panel-pad flex flex-wrap items-end gap-4" method="get">
         <label className="lbl">
           Первая должность
           <select name="a" defaultValue={a} className="field">
@@ -96,13 +96,13 @@ export default async function ComparePage({
                       <td>
                         {formatPresence(line.type, line.presentA, line.levelA)}
                         {line.change === "criteria" && line.criteriaA ? (
-                          <div className="mt-1 text-xs muted">{line.criteriaA}</div>
+                          <div className="mt-1 muted">{line.criteriaA}</div>
                         ) : null}
                       </td>
                       <td>
                         {formatPresence(line.type, line.presentB, line.levelB)}
                         {line.change === "criteria" && line.criteriaB ? (
-                          <div className="mt-1 text-xs muted">{line.criteriaB}</div>
+                          <div className="mt-1 muted">{line.criteriaB}</div>
                         ) : null}
                       </td>
                       <td>{changeLabel(line.change)}</td>
@@ -123,7 +123,7 @@ export default async function ComparePage({
       ) : (
         <p className="muted">Нет профилей для сравнения.</p>
       )}
-      <p className="text-sm">
+      <p>
         <a href="/" className="link-accent">
           На граф
         </a>

@@ -16,7 +16,7 @@ export default async function NewAssignmentPage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm">
+      <p>
         <a href="/assignments" className="link-accent">
           ← Все задания
         </a>
@@ -28,7 +28,7 @@ export default async function NewAssignmentPage() {
       <ActionForm
         action={saveAssignmentAction}
         successPath="/assignments/{id}"
-        className="panel panel-pad grid gap-3 text-sm md:grid-cols-2"
+        className="panel panel-pad grid gap-3 md:grid-cols-2"
       >
         <label className="lbl">
           Компетенция

@@ -139,18 +139,18 @@ export default async function SkillTreePage() {
   return (
     <article className="space-y-6">
       <div className="page-kicker">
-        <a href="/me" className="link-accent text-sm">
+        <a href="/me" className="link-accent">
           Кабинет
         </a>
         <h1 className="page-title">Дерево навыков</h1>
       </div>
-      <p className="muted text-sm">
+      <p className="muted">
         Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Пиктограмма — тема навыка, заливка узла
         — ваша пометка, значок шага — активный ИПР, свечение — подтверждение приёмкой. Видите только вы.
       </p>
       <Achievements employeeId={employee.id} />
       {!data.planId ? (
-        <p className="muted text-sm" data-testid="skill-tree-no-plan">
+        <p className="muted" data-testid="skill-tree-no-plan">
           Активного ИПР нет — дерево покажет только вашу текущую должность. План открывает руководитель в разделе{" "}
           <a href="/idps" className="link-accent">
             ИПР
@@ -161,7 +161,7 @@ export default async function SkillTreePage() {
       {hasProfile || hasMarks ? (
         <SkillTree data={data} />
       ) : (
-        <p className="muted text-sm" data-testid="skill-tree-no-profile">
+        <p className="muted" data-testid="skill-tree-no-profile">
           У должности нет профиля с навыками — дерево появится, когда профиль заполнят. Личные пометки можно вести в
           разделе{" "}
           <a href="/me/marks" className="link-accent">

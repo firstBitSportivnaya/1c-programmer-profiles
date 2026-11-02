@@ -7,7 +7,7 @@ export const CareerGraphView = nextDynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="graph-shell panel flex items-center justify-center text-sm muted">
+      <div className="graph-shell panel flex items-center justify-center muted">
         Загрузка графа…
       </div>
     ),

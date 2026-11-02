@@ -27,7 +27,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
         <span className="pulse-dot" />
         <h1 className="page-title">{row.name}</h1>
       </div>
-      <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+      <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3">
         <dt className="muted">Логин</dt>
         <dd>{row.login}</dd>
         <dt className="muted">Должность</dt>
@@ -45,7 +45,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
       </dl>
 
       {manage && row.isActive === 1 ? (
-        <ActionForm action={assignJobAction} className="panel panel-pad flex flex-wrap items-end gap-3 text-sm">
+        <ActionForm action={assignJobAction} className="panel panel-pad flex flex-wrap items-end gap-3">
           <input type="hidden" name="employeeId" value={row.id} />
           <label className="lbl">
             Назначить должность
@@ -66,7 +66,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
       {actor.isAdmin ? (
         <section className="panel panel-pad space-y-4">
           <h2 className="section-title">Правка</h2>
-          <ActionForm action={saveEmployeeAction} className="grid grid-cols-2 gap-3 text-sm">
+          <ActionForm action={saveEmployeeAction} className="grid grid-cols-2 gap-3">
             <input type="hidden" name="id" value={row.id} />
             <label className="lbl">
               Логин

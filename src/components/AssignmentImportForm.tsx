@@ -7,7 +7,7 @@ import { ASSIGNMENT_IMPORT_COLUMNS } from "@/lib/assignment-workbook";
 export function AssignmentImportForm() {
   const [state, action, pending] = useActionState(importAssignmentsAction, null);
   return (
-    <form action={action} className="panel panel-pad space-y-3 text-sm" aria-label="Загрузка">
+    <form action={action} className="panel panel-pad space-y-3" aria-label="Загрузка">
       <h2 className="section-title mb-0">Загрузка</h2>
       <p className="muted">
         Excel или JSON того же состава. Колонки Excel: {ASSIGNMENT_IMPORT_COLUMNS.join(", ")}. Строка — один вариант
@@ -37,7 +37,7 @@ export function AssignmentImportForm() {
           {state.notice}
         </p>
       ) : null}
-      {pending ? <p className="muted text-sm">Сохраняем…</p> : null}
+      {pending ? <p className="muted">Сохраняем…</p> : null}
     </form>
   );
 }

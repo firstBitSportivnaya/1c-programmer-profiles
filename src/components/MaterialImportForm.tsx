@@ -7,7 +7,7 @@ import { MATERIAL_IMPORT_COLUMNS } from "@/lib/material-workbook";
 export function MaterialImportForm() {
   const [state, action, pending] = useActionState(importCompetencyLinksAction, null);
   return (
-    <form action={action} className="panel panel-pad space-y-3 text-sm" aria-label="Загрузка материалов">
+    <form action={action} className="panel panel-pad space-y-3" aria-label="Загрузка материалов">
       <h2 className="section-title mb-0">Загрузка материалов</h2>
       <p className="muted">
         Excel или JSON того же состава. Колонки Excel: {MATERIAL_IMPORT_COLUMNS.join(", ")}. Вид: ИТС, обучение или

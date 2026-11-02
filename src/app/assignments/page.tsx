@@ -65,7 +65,7 @@ export default async function AssignmentsPage({
               Показать
             </button>
           </form>
-          {visible.length === 0 ? <p className="muted text-sm">Ничего не найдено.</p> : null}
+          {visible.length === 0 ? <p className="muted">Ничего не найдено.</p> : null}
           <ul className="panel">
             {visible.map((row) => (
               <li key={row.id} className="list-row">
@@ -73,7 +73,7 @@ export default async function AssignmentsPage({
                   <a href={`/assignments/${encodeURIComponent(row.id)}`} className="link-accent font-medium">
                     {row.name}
                   </a>
-                  <div className="mt-1 text-xs muted">
+                  <div className="mt-1 muted">
                     {row.competencyName}
                     {row.level != null ? ` · ур. ${row.level}` : ""}
                   </div>

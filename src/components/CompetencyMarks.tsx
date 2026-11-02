@@ -7,10 +7,10 @@ export function CompetencyMarkSummary({ employeeId, jobId }: { employeeId: strin
   return (
     <section className="space-y-3">
       <h2 className="section-title">Мои пометки по компетенциям</h2>
-      <p className="muted text-sm">Видите только вы. Статусы не меняют разрыв, ИПР и должность.</p>
-      {empty ? <p className="muted text-sm">У должности нет профиля с навыками.</p> : null}
+      <p className="muted">Видите только вы. Статусы не меняют разрыв, ИПР и должность.</p>
+      {empty ? <p className="muted">У должности нет профиля с навыками.</p> : null}
       {!empty && current.length > 0 ? (
-        <p className="text-sm">
+        <p>
           не отмечено <span data-testid="marks-unmarked">{summary.unmarked}</span>
           {" · есть "}
           <span data-testid="marks-has">{summary.has}</span>

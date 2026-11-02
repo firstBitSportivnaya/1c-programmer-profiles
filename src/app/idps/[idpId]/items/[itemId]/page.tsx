@@ -25,7 +25,7 @@ export default async function IdpItemTestPage({ params }: { params: Promise<{ id
 
   return (
     <article className="space-y-6">
-      <p className="text-sm">
+      <p>
         <a href={`/idps/${idp.id}`} className="link-accent">
           ← ИПР
         </a>
@@ -34,12 +34,12 @@ export default async function IdpItemTestPage({ params }: { params: Promise<{ id
         <span className="pulse-dot" />
         <h1 className="page-title">{item.assignmentName}</h1>
       </div>
-      <section className="panel panel-pad space-y-3 text-sm">
+      <section className="panel panel-pad space-y-3">
         <h2 className="section-title mb-0">Проверить</h2>
         <p className="whitespace-pre-wrap">{item.verifyText}</p>
         {attempt?.passed === true ? <p>сдан</p> : null}
         {attempt?.passed === false ? <p>не сдан</p> : null}
-        {(attempt?.count ?? 0) > 0 ? <p className="muted text-sm">Попыток: {attempt?.count}</p> : null}
+        {(attempt?.count ?? 0) > 0 ? <p className="muted">Попыток: {attempt?.count}</p> : null}
       </section>
       {canTake ? <ItemTestRun itemId={item.id} questions={questions} /> : null}
     </article>

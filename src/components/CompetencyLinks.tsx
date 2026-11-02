@@ -22,7 +22,7 @@ export function CompetencyLinks({
 }) {
   if (links.length === 0) return null;
   return (
-    <ul className="mt-2 space-y-1 text-sm" aria-label="Материалы">
+    <ul className="mt-2 space-y-1" aria-label="Материалы">
       {links.map((link) => (
         <li key={link.id} className="flex flex-wrap items-center gap-2">
           <span className="chip">{kindLabel(link.kind)}</span>

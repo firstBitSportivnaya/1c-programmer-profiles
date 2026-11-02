@@ -96,7 +96,7 @@ export function SkillMarkForm({
         </p>
       ) : null}
       {pending ? (
-        <p className="muted text-sm" aria-live="polite">
+        <p className="muted" aria-live="polite">
           Сохраняем…
         </p>
       ) : null}

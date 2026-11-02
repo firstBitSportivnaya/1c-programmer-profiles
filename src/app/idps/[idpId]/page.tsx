@@ -42,7 +42,7 @@ export default async function IdpPage({ params }: { params: Promise<{ idpId: str
 
   return (
     <article className="space-y-6">
-      <p className="text-sm">
+      <p>
         <a href="/idps" className="link-accent">
           ← Все ИПР
         </a>
@@ -51,7 +51,7 @@ export default async function IdpPage({ params }: { params: Promise<{ idpId: str
         <span className="pulse-dot" />
         <h1 className="page-title">ИПР: {target?.name ?? idp.targetJobId}</h1>
       </div>
-      <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+      <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3">
         <dt className="muted">Сотрудник</dt>
         <dd>
           <PersonName actor={actor} employeeId={idp.employeeId} />
