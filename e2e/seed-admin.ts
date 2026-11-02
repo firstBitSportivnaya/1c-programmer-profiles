@@ -1,7 +1,7 @@
 /**
  * Заводит админа в базу воркера до старта сервера. Вход в тестах тогда не тратит шаги интерфейса,
  * а создание первого админа через форму остаётся проверкой `session.spec.ts` на отдельной базе.
- * Пароль админа лежит в репозитории, поэтому без явного DB_PATH и с путём в `data/` скрипт не пишет.
+ * Пароль админа лежит в репозитории, поэтому скрипт пишет только в базу из `tmp/` и только при явном `DB_PATH`.
  */
 import path from "node:path";
 import { getDb, now } from "../src/db";
@@ -14,9 +14,10 @@ if (!dbPath) {
   console.error("DB_PATH не задан. seed-admin.ts не пишет в data/profiles.sqlite.");
   process.exit(1);
 }
-const fromData = path.relative(path.resolve("data"), path.resolve(dbPath));
-if (fromData === "" || (!fromData.startsWith("..") && !path.isAbsolute(fromData))) {
-  console.error("DB_PATH указывает в data/. Админа с паролем из репозитория скрипт туда не пишет.");
+// Пароль админа закоммичен, поэтому разрешена только тестовая база: как в e2e/prepare-db.ts.
+const fromTmp = path.relative(path.resolve("tmp"), path.resolve(dbPath));
+if (fromTmp === "" || fromTmp.startsWith("..") || path.isAbsolute(fromTmp)) {
+  console.error(`DB_PATH должен указывать в tmp/: ${dbPath}. Админа с паролем из репозитория скрипт пишет только в тестовую базу.`);
   process.exit(1);
 }
 
