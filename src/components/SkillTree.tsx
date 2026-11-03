@@ -16,11 +16,12 @@ import {
   type Node,
   type NodeProps,
   type ReactFlowInstance,
+  type Viewport,
 } from "@xyflow/react";
 import { useThemeMode } from "@/components/useThemeMode";
 import { SkillIcon } from "@/components/skill-icons";
 import { levelLabel, levelShort, SkillNodePanel } from "@/components/SkillNodePanel";
-import type { SkillTreeData, SkillTreeNode } from "@/lib/skill-tree";
+import { skillTreeStats, type SkillTreeData, type SkillTreeNode } from "@/lib/skill-tree";
 import { buildPrerequisiteTree } from "@/lib/skill-tree-graph";
 import { layoutSkillTree } from "@/lib/skill-tree-layout";
 
@@ -64,11 +65,14 @@ const LEGEND_MATCH: Record<LegendKey, (node: SkillTreeNode) => boolean> = {
   plan: (node) => node.plan.total > 0,
 };
 
-type SkillNodeData = { skill: SkillTreeNode; depth: number };
+/** Сколько тем навыков получают свой цвет бейджа: столько же пар stroke/fill в палитре. */
+const TOPIC_COUNT = 6;
 
-/** Узел дерева: пиктограмма темы, название, требование должности и шаг плана. */
+type SkillNodeData = { skill: SkillTreeNode; depth: number; topic: number; selected: boolean };
+
+/** Узел дерева: бейдж темы, название, требование должности и шаг плана. */
 function SkillNodeView({ data }: NodeProps) {
-  const { skill, depth } = data as unknown as SkillNodeData;
+  const { skill, depth, topic, selected } = data as unknown as SkillNodeData;
   const mark = skill.mark || "none";
   const planNote =
     skill.plan.total === 0
@@ -82,13 +86,18 @@ function SkillNodeView({ data }: NodeProps) {
   return (
     <div
       className={`skill-node skill-node--${mark}${skill.confirmed ? " skill-node--confirmed" : ""}`}
+      // Ссылка на предпосылку ведёт на этот якорь: её можно открыть в новой вкладке.
+      id={`skill-node-${skill.id}`}
       data-testid={`skill-node-${skill.id}`}
+      data-skill={skill.id}
+      data-selected={selected ? "true" : "false"}
       data-depth={depth}
       data-kind={skill.kind}
       data-relation={skill.relation}
       data-mark={mark}
       data-confirmed={skill.confirmed ? "true" : "false"}
       data-plan-state={skill.plan.total === 0 ? "none" : skill.plan.state}
+      data-topic={topic >= 0 ? topic : undefined}
       aria-label={`${skill.name}: ${levelLabel(skill)}, пометка ${MARK_LABEL[mark] ?? "не отмечено"}`}
     >
       <Handle type="target" position={Position.Top} />
@@ -101,7 +110,15 @@ function SkillNodeView({ data }: NodeProps) {
         <span className="skill-node__icon" title={skill.groupName ?? undefined}>
           <SkillIcon id={skill.id} kind={skill.kind} className="skill-node__glyph" />
         </span>
-        {skill.groupName ? <span className="skill-node__group">{skill.groupName}</span> : null}
+        {skill.groupName && topic >= 0 ? (
+          <span
+            className={`skill-node__topic skill-node__topic--${topic}`}
+            data-testid={`skill-topic-${skill.id}`}
+            title={`Тема навыка: ${skill.groupName}`}
+          >
+            {skill.groupName}
+          </span>
+        ) : null}
       </span>
       <span className="skill-node__name">{skill.name}</span>
       <span className="skill-node__foot">
@@ -161,15 +178,41 @@ type BoardProps = {
   highlight: Set<string> | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Заголовок карточки холста: он же шапка панели, чтобы холст начинался с верхнего края колонки. */
+  title: string;
+  headingId: string;
+  /** Управление отбором стоит в шапке первого холста: над деревом нет отдельной полосы. */
+  actions?: React.ReactNode;
   label: string;
   testId: string;
+  /** Цвет бейджа темы по группе справочника: один и тот же на всех холстах. */
+  topicOf: Map<string, number>;
+  /** Предпосылка выбранного навыка: из неё панель ведёт на соседний узел. */
+  prerequisiteOf: Map<string, { id: string; name: string }>;
 };
 
-/** Один холст раздела: своя раскладка, свой зум и своя карточка узла. */
-function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testId }: BoardProps) {
+/** Один холст раздела: своя раскладка, свой зум и своя панель узла. */
+function SkillBoard({
+  nodes,
+  data,
+  highlight,
+  selectedId,
+  onSelect,
+  title,
+  headingId,
+  actions,
+  label,
+  testId,
+  topicOf,
+  prerequisiteOf,
+}: BoardProps) {
   const theme = useThemeMode();
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const flowRef = useRef<ReactFlowInstance | null>(null);
+  /** Камера до автосдвига: к ней возвращаемся при закрытии, если человек не двигал холст сам. */
+  const baseViewportRef = useRef<Viewport | null>(null);
+  const shiftedRef = useRef<{ x: number; y: number; zoom: number; at: number } | null>(null);
 
   // Дерево строится по навыкам своего раздела: слои не зависят от соседнего холста.
   const tree = useMemo(() => buildPrerequisiteTree(nodes.map((node) => node.id)), [nodes]);
@@ -191,11 +234,19 @@ function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testI
         id: `skill:${node.id}`,
         type: "skill",
         position: { x: (spot?.x ?? 0) + PAD, y: (spot?.y ?? 0) + PAD },
-        data: { skill: node, depth: spot?.depth ?? 0 },
+        data: {
+          skill: node,
+          depth: spot?.depth ?? 0,
+          topic: node.groupId ? (topicOf.get(node.groupId) ?? -1) : -1,
+          selected: node.id === selectedId,
+        },
         style: { width: NODE_W, height: NODE_H },
         className: dimmed ? "skill-dim" : highlight !== null ? "skill-lit" : undefined,
+        // Выделение ведёт состояние панели, а не внутренний выбор React Flow:
+        // Escape и крестик тогда снимают рамку с узла вместе с панелью.
+        selected: node.id === selectedId,
         draggable: false,
-        selectable: true,
+        selectable: false,
         zIndex: 2,
       };
     });
@@ -226,32 +277,60 @@ function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testI
     });
 
     return { nodes: flowNodes, edges };
-  }, [highlight, nodes, tree]);
+  }, [highlight, nodes, selectedId, topicOf, tree]);
 
   /**
-   * Карточка стоит поверх правого края холста: если выбранный узел оказался под ней,
-   * сдвигаем холст влево, чтобы ветвь осталась на виду (как камера в archify).
+   * Панель перекрывает правый край холста. Если выбранный узел оказался под ней,
+   * сдвигаем камеру влево, а при закрытии возвращаем её на место — и только если
+   * человек не двигал холст сам, иначе возврат отменил бы его панораму.
    */
   useEffect(() => {
-    if (!selectedId || !nodes.some((node) => node.id === selectedId)) return;
+    const instance = flowRef.current;
+    if (!instance) return;
+    const inBoard = selectedId !== null && nodes.some((node) => node.id === selectedId);
+    if (!inBoard) {
+      const base = baseViewportRef.current;
+      const shifted = shiftedRef.current;
+      baseViewportRef.current = null;
+      shiftedRef.current = null;
+      if (!base || !shifted) return;
+      const current = instance.getViewport();
+      // Сразу после сдвига идёт анимация: тогда это точно наш сдвиг, а не панорама.
+      const settling = Date.now() - shifted.at < 600;
+      const same = Math.abs(current.x - shifted.x) < 0.5 && Math.abs(current.y - shifted.y) < 0.5;
+      if (settling || same) instance.setViewport(base, { duration: 0 });
+      return;
+    }
     const timer = window.setTimeout(() => {
       const shell = shellRef.current;
-      const instance = flowRef.current;
-      const popup = shell?.querySelector<HTMLElement>(".skill-popup");
+      const popup = popupRef.current;
       const node = shell?.querySelector<HTMLElement>(`[data-id="skill:${selectedId}"]`);
-      if (!shell || !instance || !popup || !node) return;
+      if (!popup || !node) return;
       const pop = popup.getBoundingClientRect();
       const box = node.getBoundingClientRect();
       const overlaps = box.right > pop.left && box.left < pop.right && box.bottom > pop.top && box.top < pop.bottom;
       if (!overlaps) return;
-      const shift = box.right + 24 - pop.left;
       const viewport = instance.getViewport();
-      instance.setViewport({ ...viewport, x: viewport.x - shift }, { duration: 260 });
+      if (baseViewportRef.current === null) baseViewportRef.current = viewport;
+      const shift = box.right + 24 - pop.left;
+      const next = { ...viewport, x: viewport.x - shift };
+      shiftedRef.current = { ...next, at: Date.now() };
+      instance.setViewport(next, { duration: 260 });
     }, 0);
     return () => window.clearTimeout(timer);
   }, [nodes, selectedId]);
 
-  /** Открытие карточки с клавиатуры: Enter и Space на узле, как клик мышью. */
+  /** Панель в другом холсте (переход по предпосылке) может оказаться вне экрана. */
+  useEffect(() => {
+    if (selectedId === null || !nodes.some((node) => node.id === selectedId)) return;
+    const popup = popupRef.current;
+    if (!popup) return;
+    const box = popup.getBoundingClientRect();
+    const visible = box.bottom > 0 && box.top < window.innerHeight;
+    if (!visible) popup.scrollIntoView({ block: "nearest" });
+  }, [nodes, selectedId]);
+
+  /** Открытие панели с клавиатуры: Enter и Space на узле, как клик мышью. */
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const target = event.target as HTMLElement | null;
@@ -271,55 +350,70 @@ function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testI
       aria-label={label}
       data-testid={testId}
     >
-      <ReactFlowProvider>
-        <ReactFlow
-          colorMode={theme}
-          nodes={graph.nodes}
-          edges={graph.edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={FIT}
-          minZoom={0.4}
-          maxZoom={1.4}
-          panOnDrag
-          zoomOnScroll
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable
-          noPanClassName="nopan"
-          proOptions={{ hideAttribution: true }}
-          onNodeClick={(_, node) => {
-            if (node.type !== "skill") return;
-            onSelect(node.id.slice("skill:".length));
-          }}
-          onPaneClick={() => onSelect(null)}
-          onInit={(instance) => {
-            flowRef.current = instance;
-            instance.fitView(FIT);
-          }}
-        >
-          <Background color="var(--grid)" gap={24} />
-          <Controls />
-        </ReactFlow>
-      </ReactFlowProvider>
+      {/* Заголовок — шапка самой панели: верх карточки дерева совпадает с верхом колонки легенды. */}
+      <div className="skill-board-head">
+        <h2 className="skill-board-title" id={headingId}>
+          {title}
+          <span className="skill-group-count">{nodes.length}</span>
+        </h2>
+        {actions}
+      </div>
+      <div className="skill-board-canvas">
+        <ReactFlowProvider>
+          <ReactFlow
+            colorMode={theme}
+            nodes={graph.nodes}
+            edges={graph.edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={FIT}
+            minZoom={0.4}
+            maxZoom={1.4}
+            panOnDrag
+            zoomOnScroll
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            noPanClassName="nopan"
+            proOptions={{ hideAttribution: true }}
+            onNodeClick={(_, node) => {
+              if (node.type !== "skill") return;
+              onSelect(node.id.slice("skill:".length));
+            }}
+            onPaneClick={() => onSelect(null)}
+            onInit={(instance) => {
+              flowRef.current = instance;
+              instance.fitView(FIT);
+            }}
+          >
+            <Background color="var(--grid)" gap={24} />
+            <Controls />
+          </ReactFlow>
+        </ReactFlowProvider>
 
-      {selected ? (
-        <div className="skill-popup" data-testid="skill-panel-slot">
-          <SkillNodePanel
-            node={selected}
-            context={relationContext(selected, data)}
-            planId={data.planId}
-            onClose={() => onSelect(null)}
-          />
-        </div>
-      ) : null}
+        {selected ? (
+          <div className="skill-popup" data-testid="skill-panel-slot" ref={popupRef}>
+            <SkillNodePanel
+              node={selected}
+              context={relationContext(selected, data)}
+              planId={data.planId}
+              prerequisite={prerequisiteOf.get(selected.id) ?? null}
+              onOpenPrerequisite={onSelect}
+              onClose={() => onSelect(null)}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-/** Дерево навыков: профессиональные и личные компетенции раздельно, вне профиля — своим разделом. */
-export function SkillTree({ data }: { data: SkillTreeData }) {
+/**
+ * Дерево навыков: профессиональные и личные компетенции раздельно, вне профиля — своим разделом.
+ * Слева — легенда, статистика и девиз; справа от холста выезжает панель навыка.
+ */
+export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [legend, setLegend] = useState<LegendKey | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -392,10 +486,54 @@ export function SkillTree({ data }: { data: SkillTreeData }) {
     return counts;
   }, [shown]);
 
+  /** Счётчики колонки: считаются по тому же отбору, что и холсты. */
+  const stats = useMemo(() => skillTreeStats(shown), [shown]);
+
+  /**
+   * Тема навыка — группа справочника, цвет бейджа берётся по её месту в списке.
+   * Список строится по всему дереву, поэтому цвет не меняется от отбора и одинаков на всех холстах.
+   */
+  const topicOf = useMemo(() => {
+    const ids = [...new Set(data.nodes.map((node) => node.groupId))].filter((id): id is string => id !== null).sort();
+    return new Map(ids.map((id, index) => [id, index % TOPIC_COUNT]));
+  }, [data.nodes]);
+
+  /** Предпосылка каждого показанного навыка: панель ведёт по ней на соседний узел. */
+  const prerequisiteOf = useMemo(() => {
+    const names = new Map(shown.map((node) => [node.id, node.name]));
+    const map = new Map<string, { id: string; name: string }>();
+    for (const node of shown) {
+      const parentId = tree.parentOf.get(node.id);
+      if (parentId === undefined) continue;
+      const name = names.get(parentId);
+      if (name === undefined) continue;
+      map.set(node.id, { id: parentId, name });
+    }
+    return map;
+  }, [shown, tree]);
+
   // Выбранный навык мог уйти из отбора: карточку тогда закрываем.
   useEffect(() => {
     if (selectedId && !shown.some((node) => node.id === selectedId)) setSelectedId(null);
   }, [selectedId, shown]);
+
+  /**
+   * Якорь #skill-node-<id>: ссылку на предпосылку можно открыть в новой вкладке
+   * и по среднему клику — тогда панель открывается сразу при загрузке.
+   */
+  useEffect(() => {
+    const openFromHash = () => {
+      const id = window.location.hash.match(/^#skill-node-(.+)$/)?.[1];
+      if (id === undefined) return;
+      const target = decodeURIComponent(id);
+      if (!data.nodes.some((node) => node.id === target)) return;
+      setLegend(null);
+      setSelectedId(target);
+    };
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [data.nodes]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -438,127 +576,166 @@ export function SkillTree({ data }: { data: SkillTreeData }) {
     setSelectedId(id);
   };
 
+  /** Отбор стоит в шапке первого холста: отдельной полосы текста над деревом нет. */
+  const filter = (
+    <label className="skill-tree-filter">
+      <input
+        type="checkbox"
+        checked={showAll}
+        onChange={(event) => {
+          setShowAll(event.target.checked);
+          setLegend(null);
+        }}
+      />
+      Показывать всё дерево
+    </label>
+  );
+
+  /** Первый показанный раздел заводит отбор в своей шапке, остальные холсты идут без повтора. */
+  const firstBoard = professional.length > 0 ? "professional" : personal.length > 0 ? "personal" : "outside";
+
   return (
-    <div className="skill-tree-layout">
-      <div className="skill-tree-jobs">
-        {data.currentJob ? (
-          <span>
-            Сейчас:{" "}
-            <a className="link-accent" href={data.currentJob.href}>
-              {data.currentJob.name}
-            </a>
-          </span>
-        ) : (
-          <span className="muted">Должность без профиля</span>
-        )}
-        <span className="muted" aria-hidden="true">
-          →
-        </span>
-        {data.targetJob ? (
-          <span>
-            Цель ИПР:{" "}
-            <a className="link-accent" href={data.targetJob.href}>
-              {data.targetJob.name}
-            </a>
-          </span>
-        ) : (
-          <span className="muted">активного ИПР нет</span>
-        )}
-      </div>
-
-      <ul className="skill-legend" aria-label="Обозначения дерева: выберите запись, чтобы выделить её узлы">
-        {legendButton("has", "есть", "skill-legend__swatch--has")}
-        {legendButton("in_progress", "в процессе", "skill-legend__swatch--progress")}
-        {legendButton("lacks", "нет", "skill-legend__swatch--lacks")}
-        {legendButton("none", "без пометки", "skill-legend__swatch--none")}
-        {legendButton("confirmed", "подтверждено приёмкой", "skill-legend__swatch--star")}
-        {legendButton("plan", "шаг ИПР", "skill-legend__swatch--plan")}
-        <li>
-          <span className="skill-legend__note">
-            <span className="skill-legend__arrow" aria-hidden="true">
-              →
-            </span>
-            предпосылка: навык открывает следующий
-          </span>
-        </li>
-      </ul>
-
-      <label className="skill-tree-filter">
-        <input
-          type="checkbox"
-          checked={showAll}
-          onChange={(event) => {
-            setShowAll(event.target.checked);
-            setLegend(null);
-          }}
-        />
-        Показывать всё дерево
-      </label>
-
-      <p className="skill-hint" data-testid="skill-panel-hint">
-        Нажмите на навык: критерий, материалы, пометка и строки плана откроются поверх холста.{" "}
-        <span className="skill-hint__note">Уровень на узле — требование должности, личного уровня в дереве нет.</span>
-      </p>
-
-      {professional.length > 0 ? (
-        <section className="skill-group-block" aria-labelledby="skill-group-professional">
-          <h2 className="skill-group-title" id="skill-group-professional">
-            Профессиональные компетенции
-            <span className="skill-group-count">{professional.length}</span>
-          </h2>
-          <p className="skill-group-note">Платформа 1С, СУБД, интеграции, DevOps, тестирование, безопасность.</p>
+    <div className="skill-tree-layout" data-testid="skill-tree-layout">
+      <div className="skill-tree-main">
+        {professional.length > 0 ? (
           <SkillBoard
             nodes={professional}
             data={data}
             highlight={highlight}
             selectedId={selectedId}
             onSelect={select}
+            title="Профессиональные компетенции"
+            headingId="skill-group-professional"
+            actions={firstBoard === "professional" ? filter : null}
             label="Профессиональные компетенции"
             testId="skill-board-professional"
+            topicOf={topicOf}
+            prerequisiteOf={prerequisiteOf}
           />
-        </section>
-      ) : null}
+        ) : null}
 
-      {personal.length > 0 ? (
-        <section className="skill-group-block" aria-labelledby="skill-group-personal">
-          <h2 className="skill-group-title" id="skill-group-personal">
-            Личные компетенции
-            <span className="skill-group-count">{personal.length}</span>
-          </h2>
-          <p className="skill-group-note">Коммуникация, менторинг, лидерство.</p>
+        {personal.length > 0 ? (
           <SkillBoard
             nodes={personal}
             data={data}
             highlight={highlight}
             selectedId={selectedId}
             onSelect={select}
+            title="Личные компетенции"
+            headingId="skill-group-personal"
+            actions={firstBoard === "personal" ? filter : null}
             label="Личные компетенции"
             testId="skill-board-personal"
+            topicOf={topicOf}
+            prerequisiteOf={prerequisiteOf}
           />
-        </section>
-      ) : null}
+        ) : null}
 
-      {outside.length > 0 ? (
-        <section className="skill-group-block" aria-labelledby="skill-group-outside" data-testid="skill-outside">
-          <h2 className="skill-group-title" id="skill-group-outside">
-            Вне профиля
-            <span className="skill-group-count">{outside.length}</span>
-          </h2>
-          <p className="skill-group-note">
-            Навыков нет ни в должности, ни в цели ИПР — они остаются здесь, пока стоит пометка. «Не отмечено» убирает
-            навык из раздела.
-          </p>
-          <SkillBoard
-            nodes={outside}
-            data={data}
-            highlight={highlight}
-            selectedId={selectedId}
-            onSelect={select}
-            label="Вне профиля"
-            testId="skill-board-outside"
-          />
+        {outside.length > 0 ? (
+          <section className="skill-group-block" data-testid="skill-outside">
+            <SkillBoard
+              nodes={outside}
+              data={data}
+              highlight={highlight}
+              selectedId={selectedId}
+              onSelect={select}
+              title="Вне профиля"
+              headingId="skill-group-outside"
+              actions={firstBoard === "outside" ? filter : null}
+              label="Вне профиля"
+              testId="skill-board-outside"
+              topicOf={topicOf}
+              prerequisiteOf={prerequisiteOf}
+            />
+            <p className="skill-group-note">Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка.</p>
+          </section>
+        ) : null}
+      </div>
+
+      {/* Колонка идёт в разметке после холста: на узком экране она и стоит под ним,
+          и порядок фокуса совпадает с картинкой. На широком экране её место задаёт сетка. */}
+      <aside className="skill-sidebar" aria-label="Легенда и статистика дерева">
+        <section className="skill-sidebar__block">
+          <h2 className="skill-sidebar__title">Легенда</h2>
+          <ul className="skill-legend" aria-label="Обозначения дерева: выберите запись, чтобы выделить её узлы">
+            {legendButton("has", "есть", "skill-legend__swatch--has")}
+            {legendButton("in_progress", "в процессе", "skill-legend__swatch--progress")}
+            {legendButton("lacks", "нет", "skill-legend__swatch--lacks")}
+            {legendButton("none", "без пометки", "skill-legend__swatch--none")}
+            {legendButton("confirmed", "подтверждено приёмкой", "skill-legend__swatch--star")}
+            {legendButton("plan", "шаг ИПР", "skill-legend__swatch--plan")}
+            <li>
+              <span className="skill-legend__note">
+                <span className="skill-legend__arrow" aria-hidden="true">
+                  →
+                </span>
+                предпосылка: навык открывает следующий
+              </span>
+            </li>
+            <li>
+              <span className="skill-legend__note">Уровень на узле — требование должности, личного уровня в дереве нет.</span>
+            </li>
+            <li>
+              <span className="skill-legend__note">
+                Нажмите на навык — панель справа покажет критерий, материалы, пометку и строки плана.
+              </span>
+            </li>
+          </ul>
         </section>
-      ) : null}
+
+        <section
+          className="skill-sidebar__block skill-stats"
+          data-testid="skill-stats"
+          aria-labelledby="skill-stats-title"
+        >
+          <h2 className="skill-sidebar__title" id="skill-stats-title">
+            Статистика
+          </h2>
+          <dl className="skill-stats__grid">
+            <dt>Всего навыков</dt>
+            <dd data-testid="skill-stat-total">{stats.total}</dd>
+            <dt>Освоено</dt>
+            <dd data-testid="skill-stat-mastered">{stats.mastered}</dd>
+            <dt>В плане</dt>
+            <dd data-testid="skill-stat-plan">{stats.inPlan}</dd>
+            <dt>Прогресс</dt>
+            <dd data-testid="skill-stat-progress">{stats.progress}%</dd>
+          </dl>
+        </section>
+
+        <p className="skill-sidebar__motto" data-testid="skill-motto">
+          {motto}
+        </p>
+
+        {/* Должности стоят в колонке, а не над деревом: холст начинается с верхнего края страницы. */}
+        <section className="skill-sidebar__block" aria-labelledby="skill-jobs-title">
+          <h2 className="skill-sidebar__title" id="skill-jobs-title">
+            Должность
+          </h2>
+          <div className="skill-tree-jobs">
+            {data.currentJob ? (
+              <span>
+                Сейчас:{" "}
+                <a className="link-accent" href={data.currentJob.href}>
+                  {data.currentJob.name}
+                </a>
+              </span>
+            ) : (
+              <span className="muted">Сейчас: должность без профиля</span>
+            )}
+            {data.targetJob ? (
+              <span>
+                Цель ИПР:{" "}
+                <a className="link-accent" href={data.targetJob.href}>
+                  {data.targetJob.name}
+                </a>
+              </span>
+            ) : (
+              <span className="muted">Цель ИПР: активного ИПР нет</span>
+            )}
+          </div>
+        </section>
+      </aside>
     </div>
   );
 }

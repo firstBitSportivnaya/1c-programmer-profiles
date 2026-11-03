@@ -22,6 +22,9 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Девиз страницы: статический текст, один для всех, от данных и отбора не зависит. */
+const MOTTO = "Навык не появляется сразу — он вырастает из предпосылки.";
+
 type ProfileRow = { level: number | null; criteria: string | null };
 
 /** Строки профиля по компетенциям: планка и критерий. У обязанностей уровня нет. */
@@ -59,8 +62,7 @@ function criteriaMap(current: Map<string, ProfileRow>, target: Map<string, Profi
   return map;
 }
 
-/** Все навыки справочника: группы без родителя и обязанности в дерево не входят. */
-function treeSkills(): TreeSkillRow[] {
+/** Все навыки справочника: группы без родителя и обязанности в дерево не входят. */function treeSkills(): TreeSkillRow[] {
   const all = listCompetencies();
   const names = new Map(all.map((row) => [row.id, row.name]));
   return all
@@ -68,6 +70,7 @@ function treeSkills(): TreeSkillRow[] {
     .map((row) => ({
       id: row.id,
       name: row.name,
+      groupId: row.parentId,
       groupName: row.parentId ? (names.get(row.parentId) ?? null) : null,
       kind: row.type === "universal" ? "universal" : "professional",
     }));
@@ -143,26 +146,8 @@ export default async function SkillTreePage() {
         </a>
         <h1 className="page-title">Дерево навыков</h1>
       </div>
-      <p className="muted">
-        Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Пиктограмма — тема навыка, заливка узла
-        — ваша пометка, значок шага — активный ИПР, свечение — подтверждение приёмкой. Видите только вы. Подтверждения
-        собираются на странице{" "}
-        <a href="/me/achievements" className="link-accent">
-          Достижения
-        </a>
-        .
-      </p>
-      {!data.planId ? (
-        <p className="muted" data-testid="skill-tree-no-plan">
-          Активного ИПР нет — дерево покажет только вашу текущую должность. План открывает руководитель в разделе{" "}
-          <a href="/idps" className="link-accent">
-            ИПР
-          </a>
-          .
-        </p>
-      ) : null}
       {hasProfile || hasMarks ? (
-        <SkillTree data={data} />
+        <SkillTree data={data} motto={MOTTO} />
       ) : (
         <p className="muted" data-testid="skill-tree-no-profile">
           У должности нет профиля с навыками — дерево появится, когда профиль заполнят. Личные пометки можно вести в
@@ -173,6 +158,27 @@ export default async function SkillTreePage() {
           .
         </p>
       )}
+      {/* Пояснения стоят под деревом: при открытии страницы на экране сразу холст, а не текст. */}
+      <div className="skill-notes" data-testid="skill-notes">
+        {!data.planId ? (
+          <p className="muted" data-testid="skill-tree-no-plan">
+            Активного ИПР нет — дерево покажет только текущую должность. План открывает руководитель в разделе{" "}
+            <a href="/idps" className="link-accent">
+              ИПР
+            </a>
+            .
+          </p>
+        ) : null}
+        <p className="muted">
+          Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Плашка — тема навыка, заливка —
+          ваша пометка, звезда — подтверждение приёмкой. Пометки и подтверждения видит только их автор; подтверждения
+          собираются на странице{" "}
+          <a href="/me/achievements" className="link-accent">
+            Достижения
+          </a>
+          .
+        </p>
+      </div>
     </article>
   );
 }
