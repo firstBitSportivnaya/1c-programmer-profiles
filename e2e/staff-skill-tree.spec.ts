@@ -753,6 +753,30 @@ test("левая колонка: легенда, статистика по от�
   await expectCountersMatchBoard(page);
 });
 
+test("над холстом нет абзацев: пояснения стоят под деревом, холст начинается в верхней половине экрана", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto("/me/skills");
+  const board = page.getByTestId("skill-board-professional");
+  await expect(board).toBeVisible();
+
+  const metrics = await page.evaluate(() => {
+    const board = document.querySelector<HTMLElement>('[data-testid="skill-board-professional"]')!;
+    const notes = document.querySelector<HTMLElement>('[data-testid="skill-notes"]')!;
+    return {
+      viewport: window.innerHeight,
+      boardTop: board.getBoundingClientRect().top,
+      notesTop: notes.getBoundingClientRect().top,
+    };
+  });
+  // Текст не съедает верх экрана: первый холст начинается в верхней половине окна.
+  expect(metrics.boardTop).toBeLessThan(metrics.viewport / 2);
+  // Пояснение «как читать дерево» — под холстами, а не над ними.
+  expect(metrics.notesTop).toBeGreaterThan(metrics.boardTop);
+  await expect(page.getByTestId("skill-notes")).toContainText("Стрелка — предпосылка");
+});
+
 test("пометка «есть» увеличивает «Освоено» и «Прогресс», снятие возвращает числа", async ({ page }) => {
   await login(page, STUDENT);
   await page.goto("/me/skills");

@@ -1228,11 +1228,6 @@ details[open] > .skill-summary::before {
   color: var(--text-muted);
 }
 
-.skill-hint__note {
-  font-size: var(--fs-sm);
-  font-style: italic;
-}
-
 .skill-legend {
   display: grid;
   gap: 0.15rem;
@@ -1453,6 +1448,19 @@ details[open] > .skill-summary::before {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--text-muted);
+}
+
+/* Пояснения под деревом: при открытии страницы на экране сразу холст, а не текст. */
+.skill-notes {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--panel-border);
+  font-size: var(--fs-sm);
+}
+
+.skill-notes p {
+  margin: 0;
 }
 
 .skill-group-block .graph-shell {

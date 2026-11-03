@@ -591,10 +591,7 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
           </label>
 
           <p className="skill-hint" data-testid="skill-panel-hint">
-            Нажмите на навык: критерий, материалы, пометка и строки плана откроются в панели справа.{" "}
-            <span className="skill-hint__note">
-              Уровень на узле — требование должности, личного уровня в дереве нет.
-            </span>
+            Нажмите на навык — панель справа покажет критерий, материалы, пометку и строки плана.
           </p>
         </div>
 
@@ -604,7 +601,6 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
               Профессиональные компетенции
               <span className="skill-group-count">{professional.length}</span>
             </h2>
-            <p className="skill-group-note">Платформа 1С, СУБД, интеграции, DevOps, тестирование, безопасность.</p>
             <SkillBoard
               nodes={professional}
               data={data}
@@ -625,7 +621,6 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
               Личные компетенции
               <span className="skill-group-count">{personal.length}</span>
             </h2>
-            <p className="skill-group-note">Коммуникация, менторинг, лидерство.</p>
             <SkillBoard
               nodes={personal}
               data={data}
@@ -646,10 +641,7 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
               Вне профиля
               <span className="skill-group-count">{outside.length}</span>
             </h2>
-            <p className="skill-group-note">
-              Навыков нет ни в должности, ни в цели ИПР — они остаются здесь, пока стоит пометка. «Не отмечено» убирает
-              навык из раздела.
-            </p>
+            <p className="skill-group-note">Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка.</p>
             <SkillBoard
               nodes={outside}
               data={data}
@@ -684,6 +676,9 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
                 </span>
                 предпосылка: навык открывает следующий
               </span>
+            </li>
+            <li>
+              <span className="skill-legend__note">Уровень на узле — требование должности, личного уровня в дереве нет.</span>
             </li>
           </ul>
         </section>

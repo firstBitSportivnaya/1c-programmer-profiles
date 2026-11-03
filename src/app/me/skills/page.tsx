@@ -146,24 +146,6 @@ export default async function SkillTreePage() {
         </a>
         <h1 className="page-title">Дерево навыков</h1>
       </div>
-      <p className="muted">
-        Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Пиктограмма — тема навыка, заливка узла
-        — ваша пометка, значок шага — активный ИПР, свечение — подтверждение приёмкой. Видите только вы. Подтверждения
-        собираются на странице{" "}
-        <a href="/me/achievements" className="link-accent">
-          Достижения
-        </a>
-        .
-      </p>
-      {!data.planId ? (
-        <p className="muted" data-testid="skill-tree-no-plan">
-          Активного ИПР нет — дерево покажет только вашу текущую должность. План открывает руководитель в разделе{" "}
-          <a href="/idps" className="link-accent">
-            ИПР
-          </a>
-          .
-        </p>
-      ) : null}
       {hasProfile || hasMarks ? (
         <SkillTree data={data} motto={MOTTO} />
       ) : (
@@ -176,6 +158,27 @@ export default async function SkillTreePage() {
           .
         </p>
       )}
+      {/* Пояснения стоят под деревом: при открытии страницы на экране сразу холст, а не текст. */}
+      <div className="skill-notes" data-testid="skill-notes">
+        {!data.planId ? (
+          <p className="muted" data-testid="skill-tree-no-plan">
+            Активного ИПР нет — дерево покажет только текущую должность. План открывает руководитель в разделе{" "}
+            <a href="/idps" className="link-accent">
+              ИПР
+            </a>
+            .
+          </p>
+        ) : null}
+        <p className="muted">
+          Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Плашка — тема навыка, заливка —
+          ваша пометка, звезда — подтверждение приёмкой. Пометки и подтверждения видит только их автор; подтверждения
+          собираются на странице{" "}
+          <a href="/me/achievements" className="link-accent">
+            Достижения
+          </a>
+          .
+        </p>
+      </div>
     </article>
   );
 }
