@@ -64,6 +64,23 @@ export default async function MePage() {
       </header>
 
       <div className="cabinet">
+        {/* Действия идут в разметке первыми: на узком экране они и стоят сразу после шапки,
+            и порядок Tab совпадает с тем, что видно. На широком экране их место задаёт сетка. */}
+        <nav className="cabinet-actions" aria-label="Разделы кабинета">
+          <a className="cabinet-action" href="/me/marks">
+            Мои пометки
+          </a>
+          <a className="cabinet-action" href="/me/skills">
+            Дерево навыков
+          </a>
+          <a className="cabinet-action" href="/me/achievements">
+            Достижения ({achievementsCount})
+          </a>
+          <a className="cabinet-action" href={active ? `/idps/${active.id}` : "/idps"}>
+            Мой ИПР
+          </a>
+        </nav>
+
         <div className="cabinet-main">
           {job ? (
             <section className="cabinet-card">
@@ -89,21 +106,6 @@ export default async function MePage() {
             <EmployeeIdpSummary employeeId={employee.id} />
           </div>
         </div>
-
-        <nav className="cabinet-actions" aria-label="Разделы кабинета">
-          <a className="cabinet-action" href="/me/marks">
-            Мои пометки
-          </a>
-          <a className="cabinet-action" href="/me/skills">
-            Дерево навыков
-          </a>
-          <a className="cabinet-action" href="/me/achievements">
-            Достижения ({achievementsCount})
-          </a>
-          <a className="cabinet-action" href={active ? `/idps/${active.id}` : "/idps"}>
-            Мой ИПР
-          </a>
-        </nav>
       </div>
     </article>
   );

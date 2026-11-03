@@ -114,6 +114,16 @@ test("раскладка: от 1024px действия справа, на узк
   // Одна колонка: действия идут выше основной колонки во всю её ширину.
   expect(narrow.actions!.y).toBeLessThan(narrow.main!.y);
   expect(narrow.actions!.width).toBeGreaterThan(narrow.main!.width - 1);
+
+  // Порядок фокуса идёт по разметке: действия стоят в DOM раньше карточек, как и на экране.
+  // Так `order: -1` в стилях вернуть нельзя — он снова развёл бы картинку и Tab.
+  const domOrder = await page.evaluate(() => {
+    const nav = document.querySelector(".cabinet-actions");
+    const content = document.querySelector(".cabinet-main");
+    if (!nav || !content) return "нет блоков";
+    return nav.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING ? "навигация" : "карточки";
+  });
+  expect(domOrder, "в DOM действия идут первыми").toBe("навигация");
 });
 
 test.describe("гость", () => {
