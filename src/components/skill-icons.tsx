@@ -264,9 +264,16 @@ function renderGlyph(name: string): ReactNode {
   });
 }
 
-/** Значок навыка: по id компетенции, иначе по виду. Декоративный, поэтому aria-hidden. */
-export function SkillIcon({ id, kind, className }: { id: string; kind: string; className?: string }) {
-  const name = SKILL_ICONS[id] ?? KIND_ICONS[kind] ?? "code";
+/** Значок типа достижения: часть ключа до `:` — `first-row`, `competency`, `pool`, `idp`. */
+const ACHIEVEMENT_ICONS: Record<string, string> = {
+  "first-row": "flag",
+  competency: "award",
+  pool: "checklist",
+  idp: "target",
+};
+
+/** Разметка глифа: общая для значков навыков и достижений. Декоративная, поэтому aria-hidden. */
+function GlyphSvg({ name, className }: { name: string; className?: string }) {
   return (
     <svg
       className={className}
@@ -283,4 +290,16 @@ export function SkillIcon({ id, kind, className }: { id: string; kind: string; c
       {renderGlyph(name)}
     </svg>
   );
+}
+
+/** Значок навыка: по id компетенции, иначе по виду. */
+export function SkillIcon({ id, kind, className }: { id: string; kind: string; className?: string }) {
+  const name = SKILL_ICONS[id] ?? KIND_ICONS[kind] ?? "code";
+  return <GlyphSvg name={name} className={className} />;
+}
+
+/** Значок достижения: по типу ключа. Неизвестный тип не оставляет строку без картинки — берём `award`. */
+export function AchievementIcon({ achievementKey, className }: { achievementKey: string; className?: string }) {
+  const type = achievementKey.split(":")[0];
+  return <GlyphSvg name={ACHIEVEMENT_ICONS[type] ?? "award"} className={className} />;
 }

@@ -452,6 +452,20 @@ details[open] > .skill-summary::before {
   border-bottom: 0;
 }
 
+/* Достижение: тип показывает декоративная пиктограмма, название и компетенция остаются текстом. */
+.achievement-row__main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.achievement-row__glyph {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
 .mark-row {
   align-items: stretch;
   flex-direction: column;
