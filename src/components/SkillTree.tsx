@@ -16,6 +16,7 @@ import {
   type Node,
   type NodeProps,
   type ReactFlowInstance,
+  type Viewport,
 } from "@xyflow/react";
 import { useThemeMode } from "@/components/useThemeMode";
 import { SkillIcon } from "@/components/skill-icons";
@@ -67,11 +68,11 @@ const LEGEND_MATCH: Record<LegendKey, (node: SkillTreeNode) => boolean> = {
 /** Сколько тем навыков получают свой цвет бейджа: столько же пар stroke/fill в палитре. */
 const TOPIC_COUNT = 6;
 
-type SkillNodeData = { skill: SkillTreeNode; depth: number; topic: number };
+type SkillNodeData = { skill: SkillTreeNode; depth: number; topic: number; selected: boolean };
 
 /** Узел дерева: бейдж темы, название, требование должности и шаг плана. */
 function SkillNodeView({ data }: NodeProps) {
-  const { skill, depth, topic } = data as unknown as SkillNodeData;
+  const { skill, depth, topic, selected } = data as unknown as SkillNodeData;
   const mark = skill.mark || "none";
   const planNote =
     skill.plan.total === 0
@@ -85,7 +86,11 @@ function SkillNodeView({ data }: NodeProps) {
   return (
     <div
       className={`skill-node skill-node--${mark}${skill.confirmed ? " skill-node--confirmed" : ""}`}
+      // Ссылка на предпосылку ведёт на этот якорь: её можно открыть в новой вкладке.
+      id={`skill-node-${skill.id}`}
       data-testid={`skill-node-${skill.id}`}
+      data-skill={skill.id}
+      data-selected={selected ? "true" : "false"}
       data-depth={depth}
       data-kind={skill.kind}
       data-relation={skill.relation}
@@ -185,7 +190,11 @@ type BoardProps = {
 function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testId, topicOf, prerequisiteOf }: BoardProps) {
   const theme = useThemeMode();
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const flowRef = useRef<ReactFlowInstance | null>(null);
+  /** Камера до автосдвига: к ней возвращаемся при закрытии, если человек не двигал холст сам. */
+  const baseViewportRef = useRef<Viewport | null>(null);
+  const shiftedRef = useRef<{ x: number; y: number; zoom: number; at: number } | null>(null);
 
   // Дерево строится по навыкам своего раздела: слои не зависят от соседнего холста.
   const tree = useMemo(() => buildPrerequisiteTree(nodes.map((node) => node.id)), [nodes]);
@@ -207,7 +216,12 @@ function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testI
         id: `skill:${node.id}`,
         type: "skill",
         position: { x: (spot?.x ?? 0) + PAD, y: (spot?.y ?? 0) + PAD },
-        data: { skill: node, depth: spot?.depth ?? 0, topic: node.groupId ? (topicOf.get(node.groupId) ?? -1) : -1 },
+        data: {
+          skill: node,
+          depth: spot?.depth ?? 0,
+          topic: node.groupId ? (topicOf.get(node.groupId) ?? -1) : -1,
+          selected: node.id === selectedId,
+        },
         style: { width: NODE_W, height: NODE_H },
         className: dimmed ? "skill-dim" : highlight !== null ? "skill-lit" : undefined,
         // Выделение ведёт состояние панели, а не внутренний выбор React Flow:
@@ -246,6 +260,57 @@ function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testI
 
     return { nodes: flowNodes, edges };
   }, [highlight, nodes, selectedId, topicOf, tree]);
+
+  /**
+   * Панель перекрывает правый край холста. Если выбранный узел оказался под ней,
+   * сдвигаем камеру влево, а при закрытии возвращаем её на место — и только если
+   * человек не двигал холст сам, иначе возврат отменил бы его панораму.
+   */
+  useEffect(() => {
+    const instance = flowRef.current;
+    if (!instance) return;
+    const inBoard = selectedId !== null && nodes.some((node) => node.id === selectedId);
+    if (!inBoard) {
+      const base = baseViewportRef.current;
+      const shifted = shiftedRef.current;
+      baseViewportRef.current = null;
+      shiftedRef.current = null;
+      if (!base || !shifted) return;
+      const current = instance.getViewport();
+      // Сразу после сдвига идёт анимация: тогда это точно наш сдвиг, а не панорама.
+      const settling = Date.now() - shifted.at < 600;
+      const same = Math.abs(current.x - shifted.x) < 0.5 && Math.abs(current.y - shifted.y) < 0.5;
+      if (settling || same) instance.setViewport(base, { duration: 0 });
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const shell = shellRef.current;
+      const popup = popupRef.current;
+      const node = shell?.querySelector<HTMLElement>(`[data-id="skill:${selectedId}"]`);
+      if (!popup || !node) return;
+      const pop = popup.getBoundingClientRect();
+      const box = node.getBoundingClientRect();
+      const overlaps = box.right > pop.left && box.left < pop.right && box.bottom > pop.top && box.top < pop.bottom;
+      if (!overlaps) return;
+      const viewport = instance.getViewport();
+      if (baseViewportRef.current === null) baseViewportRef.current = viewport;
+      const shift = box.right + 24 - pop.left;
+      const next = { ...viewport, x: viewport.x - shift };
+      shiftedRef.current = { ...next, at: Date.now() };
+      instance.setViewport(next, { duration: 260 });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [nodes, selectedId]);
+
+  /** Панель в другом холсте (переход по предпосылке) может оказаться вне экрана. */
+  useEffect(() => {
+    if (selectedId === null || !nodes.some((node) => node.id === selectedId)) return;
+    const popup = popupRef.current;
+    if (!popup) return;
+    const box = popup.getBoundingClientRect();
+    const visible = box.bottom > 0 && box.top < window.innerHeight;
+    if (!visible) popup.scrollIntoView({ block: "nearest" });
+  }, [nodes, selectedId]);
 
   /** Открытие панели с клавиатуры: Enter и Space на узле, как клик мышью. */
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -301,7 +366,7 @@ function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testI
       </ReactFlowProvider>
 
       {selected ? (
-        <div className="skill-popup" data-testid="skill-panel-slot">
+        <div className="skill-popup" data-testid="skill-panel-slot" ref={popupRef}>
           <SkillNodePanel
             node={selected}
             context={relationContext(selected, data)}
@@ -423,6 +488,24 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
   useEffect(() => {
     if (selectedId && !shown.some((node) => node.id === selectedId)) setSelectedId(null);
   }, [selectedId, shown]);
+
+  /**
+   * Якорь #skill-node-<id>: ссылку на предпосылку можно открыть в новой вкладке
+   * и по среднему клику — тогда панель открывается сразу при загрузке.
+   */
+  useEffect(() => {
+    const openFromHash = () => {
+      const id = window.location.hash.match(/^#skill-node-(.+)$/)?.[1];
+      if (id === undefined) return;
+      const target = decodeURIComponent(id);
+      if (!data.nodes.some((node) => node.id === target)) return;
+      setLegend(null);
+      setSelectedId(target);
+    };
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [data.nodes]);
 
   useEffect(() => {
     if (!selectedId) return;

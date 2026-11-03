@@ -671,10 +671,13 @@ test("гость уходит на вход, чужой сотрудник де�
   await expect(page).toHaveURL(/\/login$/);
 });
 
+/** Узлы холста: их ищут по `data-testid` и `data-skill`, а не по классам оформления. */
+const SKILL_NODES = '[data-testid^="skill-node-"][data-skill]';
+
 /** Всё, что нужно для сверки счётчиков: узлы холста и подписи колонки. */
 function treeCounters(page: Page) {
-  return page.evaluate(() => {
-    const nodes = [...document.querySelectorAll<HTMLElement>(".react-flow__node-skill .skill-node")];
+  return page.evaluate((selector) => {
+    const nodes = [...document.querySelectorAll<HTMLElement>(selector)];
     const text = (testId: string) => document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)?.textContent?.trim() ?? null;
     return {
       total: nodes.length,
@@ -688,10 +691,13 @@ function treeCounters(page: Page) {
       },
       motto: text("skill-motto"),
     };
-  });
+  }, SKILL_NODES);
 }
 
-/** Счётчики колонки совпадают с узлами холста; сумма «освоено» и «в плане» не больше «всего». */
+/**
+ * Счётчики колонки совпадают с узлами холста. Сумма «освоено» и «в плане» может быть больше «всего»:
+ * навык бывает помечен «есть» и одновременно иметь шаг плана, поэтому каждый счётчик сверяется отдельно.
+ */
 async function expectCountersMatchBoard(page: Page) {
   const counters = await treeCounters(page);
   expect(counters.total).toBeGreaterThan(0);
@@ -699,14 +705,15 @@ async function expectCountersMatchBoard(page: Page) {
   expect(counters.shown.mastered).toBe(String(counters.mastered));
   expect(counters.shown.plan).toBe(String(counters.inPlan));
   expect(counters.shown.progress).toBe(`${Math.round((counters.mastered / counters.total) * 100)}%`);
-  expect(counters.mastered + counters.inPlan).toBeLessThanOrEqual(counters.total);
+  expect(counters.mastered).toBeLessThanOrEqual(counters.total);
+  expect(counters.inPlan).toBeLessThanOrEqual(counters.total);
   return counters;
 }
 
 test("левая колонка: легенда, статистика по отбору и девиз", async ({ page }) => {
   await login(page, STUDENT);
   await page.goto("/me/skills");
-  await expect(page.locator(".react-flow__node-skill").first()).toBeVisible();
+  await expect(page.locator(SKILL_NODES).first()).toBeVisible();
 
   const sidebar = page.getByRole("complementary", { name: "Легенда и статистика дерева" });
   await expect(sidebar).toBeVisible();
@@ -735,14 +742,14 @@ test("левая колонка: легенда, статистика по от�
 
   // Чекбокс меняет набор узлов, счётчики и процент пересчитываются по нему.
   await page.getByLabel("Показывать всё дерево").check();
-  await expect(page.locator(".react-flow__node-skill .skill-node")).toHaveCount(SKILL_COUNT);
+  await expect(page.locator(SKILL_NODES)).toHaveCount(SKILL_COUNT);
   const all = await expectCountersMatchBoard(page);
   expect(all.total).toBe(SKILL_COUNT);
   expect(all.total).toBeGreaterThan(filtered.total);
   expect(all.motto).toBe(filtered.motto);
 
   await page.getByLabel("Показывать всё дерево").uncheck();
-  await expect(page.locator(".react-flow__node-skill .skill-node")).toHaveCount(filtered.total);
+  await expect(page.locator(SKILL_NODES)).toHaveCount(filtered.total);
   await expectCountersMatchBoard(page);
 });
 
@@ -785,7 +792,7 @@ test("панель навыка: справа от холста, не шире �
   await skillNode(page, PROGRAMMING.id).click();
   const panel = page.getByTestId("skill-node-panel");
   await expect(panel).toBeVisible();
-  await expect(page.locator(`[data-id="skill:${PROGRAMMING.id}"]`)).toHaveClass(/selected/);
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-selected", "true");
 
   // Панель стоит у правого края холста и перекрывает меньше половины его ширины.
   const geometry = await page.evaluate(() => {
@@ -799,7 +806,7 @@ test("панель навыка: справа от холста, не шире �
   // Крестик закрывает панель, снимает выделение узла и не двигает холст.
   await panel.getByRole("button", { name: "Закрыть" }).click();
   await expect(panel).toHaveCount(0);
-  await expect(page.locator(".react-flow__node-skill.selected")).toHaveCount(0);
+  await expect(page.locator(`${SKILL_NODES}[data-selected="true"]`)).toHaveCount(0);
   await expect.poll(viewportTransform).toBe(transformBefore);
 
   // Escape и клик в пустое место холста делают то же самое.
@@ -807,13 +814,13 @@ test("панель навыка: справа от холста, не шире �
   await expect(panel).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
-  await expect(page.locator(".react-flow__node-skill.selected")).toHaveCount(0);
+  await expect(page.locator(`${SKILL_NODES}[data-selected="true"]`)).toHaveCount(0);
 
   await skillNode(page, PROGRAMMING.id).click();
   await expect(panel).toBeVisible();
   await board.locator(".react-flow__pane").click({ position: { x: 12, y: 12 } });
   await expect(panel).toHaveCount(0);
-  await expect(page.locator(".react-flow__node-skill.selected")).toHaveCount(0);
+  await expect(page.locator(`${SKILL_NODES}[data-selected="true"]`)).toHaveCount(0);
   await expect.poll(viewportTransform).toBe(transformBefore);
 });
 
@@ -827,11 +834,13 @@ test("панель: предпосылка ведёт на свой узел, б
   const prerequisite = page.getByTestId("skill-panel-prerequisite-link");
   await expect(prerequisite).toHaveText("Высокоуровневый язык программирования (кроме 1С)");
   await expect(prerequisite).toHaveAttribute("href", "#skill-node-comp-vysokourovnevyi-yazyk-programmirovaniya");
+  // Якорь ссылки существует в разметке: иначе средний клик и новая вкладка дают страницу без панели.
+  await expect(page.locator("#skill-node-comp-vysokourovnevyi-yazyk-programmirovaniya")).toHaveCount(1);
   await prerequisite.click();
   await expect(
     panel.getByRole("heading", { name: "Высокоуровневый язык программирования (кроме 1С)" }),
   ).toBeVisible();
-  await expect(page.locator('[data-id="skill:comp-vysokourovnevyi-yazyk-programmirovaniya"]')).toHaveClass(/selected/);
+  await expect(skillNode(page, "comp-vysokourovnevyi-yazyk-programmirovaniya")).toHaveAttribute("data-selected", "true");
   // Цепочка ведёт дальше вверх, а у корня ветви предпосылки уже нет.
   await expect(page.getByTestId("skill-panel-prerequisite-link")).toHaveText("ООП и алгоритмы");
   await page.getByTestId("skill-panel-prerequisite-link").click();
@@ -859,5 +868,26 @@ test("панель: предпосылка ведёт на свой узел, б
   expect(topics[0]?.background).not.toBe(topics[1]?.background);
   // Цвет плашки не заменяет канал пометки: текст один и тот же в обеих темах.
   expect(topics[0]?.color).toBe(topics[1]?.color);
+});
+
+test("якорь узла открывает панель без клика: средний клик и новая вкладка работают", async ({ page }) => {
+  await login(page, STUDENT);
+
+  // Так выглядит переход по ссылке предпосылки в новой вкладке: адрес с хэшем, панели ещё нет.
+  await page.goto(`/me/skills#skill-node-${PROGRAMMING.id}`);
+  const panel = page.getByTestId("skill-node-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("heading", { name: PROGRAMMING.name })).toBeVisible();
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-selected", "true");
+
+  // Escape закрывает панель и снимает выделение, хэш повторно её не открывает.
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-selected", "false");
+
+  // Неизвестный якорь ничего не открывает: панели нет, страница жива.
+  await page.goto("/me/skills#skill-node-comp-takogo-nav-yka-net");
+  await expect(page.getByRole("heading", { level: 1, name: "Дерево навыков" })).toBeVisible();
+  await expect(page.getByTestId("skill-node-panel")).toHaveCount(0);
 });
 
