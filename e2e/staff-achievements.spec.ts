@@ -110,6 +110,78 @@ async function expectOnlyLink(page: Page) {
   await expect(page.getByText("ИПР выполнен", { exact: true })).toHaveCount(0);
 }
 
+type GlyphColor = {
+  /** Вычисленный `stroke` пиктограммы: `currentColor` уже развёрнут браузером. */
+  stroke: string;
+  /** `color` самой строки — от него пиктограмма наследует штрих. */
+  rowColor: string;
+  /** Контраст штриха к фону строки. */
+  iconRatio: number;
+  /** Контраст названия к тому же фону: штрих не должен читаться хуже текста. */
+  titleRatio: number;
+};
+
+/** Цвета пиктограмм и контраст штриха: фон строки собирается из полупрозрачных предков. */
+async function glyphColors(page: Page): Promise<GlyphColor[]> {
+  return page.evaluate(() => {
+    type Rgba = [number, number, number, number];
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+
+    function parse(value: string): Rgba {
+      const rgb = value.match(/^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)$/);
+      if (rgb) return [+rgb[1], +rgb[2], +rgb[3], rgb[4] === undefined ? 1 : +rgb[4]];
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = value;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      return [r, g, b, a / 255];
+    }
+
+    function over(top: Rgba, bottom: Rgba): Rgba {
+      const a = top[3];
+      return [top[0] * a + bottom[0] * (1 - a), top[1] * a + bottom[1] * (1 - a), top[2] * a + bottom[2] * (1 - a), 1];
+    }
+
+    function luminance([r, g, b]: Rgba) {
+      const [lr, lg, lb] = [r, g, b].map((c) => {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+    }
+
+    function ratio(x: Rgba, y: Rgba) {
+      const [hi, lo] = [luminance(x), luminance(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    function background(element: Element): Rgba {
+      const chain: Element[] = [];
+      for (let node: Element | null = element; node && node !== document.body; node = node.parentElement) {
+        chain.unshift(node);
+      }
+      const pageBg = parse(getComputedStyle(document.body).backgroundColor);
+      return chain.reduce((acc, node) => over(parse(getComputedStyle(node).backgroundColor), acc), pageBg);
+    }
+
+    return [...document.querySelectorAll<HTMLElement>('[data-testid="achievements-list"] > li')].map((row) => {
+      const svg = row.querySelector("svg")!;
+      const title = row.querySelector(".achievement-row__main > :not(svg)")!;
+      const bg = background(row);
+      const stroke = getComputedStyle(svg).stroke;
+      return {
+        stroke,
+        rowColor: getComputedStyle(row).color,
+        iconRatio: ratio(over(parse(stroke), bg), bg),
+        titleRatio: ratio(over(parse(getComputedStyle(title).color), bg), bg),
+      };
+    });
+  });
+}
+
 test("принятая строка даёт ачивки первой строки и компетенции — только на странице достижений", async ({ page }) => {
   await createStaff(page, A, "junior");
   aPlanPath = await createPlan(page, A, "programmer");
@@ -161,6 +233,11 @@ test("принятая строка даёт ачивки первой стро�
   await expect(competencyRow).toContainText(aGoalCompetency);
   const competencyLink = competencyRow.getByRole("link", { name: /^Компетенция подтверждена/ });
   await expect(competencyLink).toHaveAttribute("href", `/competencies/${aGoalCompetencyId}`);
+  // Пиктограмма декоративная: доступное имя ссылки прежнее, из названия и компетенции, без значка.
+  await expect(competencyLink).toHaveAccessibleName(`Компетенция подтверждена: ${aGoalCompetency}`);
+  await expect(competencyRow.locator("svg")).toHaveCount(1);
+  await expect(competencyRow.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.getByTestId("achievements-list").locator('[role="img"]')).toHaveCount(0);
   await competencyLink.click();
   await expect(page.getByRole("heading", { level: 1, name: aGoalCompetency })).toBeVisible();
 
@@ -185,6 +262,8 @@ test("снятая приёмка убирает ачивки: пустое со
   await expect(page.getByTestId("achievements-empty")).toBeVisible();
   await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
   await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
+  // Пустое состояние без пиктограмм: ни в списке, ни рядом с ним значка нет.
+  await expect(page.getByRole("article").locator("svg")).toHaveCount(0);
   // Ссылки на пропавшую компетенцию не остаётся — битых адресов нет.
   await expect(page.locator('a[href^="/competencies/"]')).toHaveCount(0);
 
@@ -215,6 +294,31 @@ test("все четыре ачивки: каждая строка ведёт к 
     await expect(list.getByRole("link", { name: new RegExp(`^${title}`) })).toBeVisible();
   }
 
+  // У каждого типа свой декоративный глиф: ровно одна svg перед названием.
+  const rowGlyphs = [
+    ["Первая принятая строка", "flag"],
+    ["Компетенция подтверждена", "award"],
+    ["Все компетенции пула подтверждены", "checklist"],
+    ["ИПР выполнен", "target"],
+  ] as const;
+  for (const [title, icon] of rowGlyphs) {
+    const row = list.getByRole("listitem").filter({ hasText: title });
+    await expect(row, `строка «${title}» одна`).toHaveCount(1);
+    await expect(row.locator("svg"), `в строке «${title}» ровно одна пиктограмма`).toHaveCount(1);
+    await expect(row.locator("svg")).toHaveAttribute("data-icon", icon);
+    await expect(row.locator("svg")).toHaveAttribute("aria-hidden", "true");
+    await expect(row.locator("svg")).toHaveAttribute("focusable", "false");
+    const beforeTitle = await row.evaluate((li) => {
+      const svg = li.querySelector("svg");
+      const titleNode = li.querySelector(".achievement-row__main > :not(svg)");
+      return !!svg && !!titleNode && Boolean(svg.compareDocumentPosition(titleNode) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(beforeTitle, `в строке «${title}» пиктограмма стоит перед названием`).toBe(true);
+  }
+  // Пиктограмма не объявляется картинкой и не попадает в доступное имя ссылки.
+  await expect(list.locator('[role="img"]')).toHaveCount(0);
+  await expect(list.getByRole("link", { name: /^Компетенция подтверждена: .+/ })).toHaveCount(1);
+
   await expect(list.getByRole("link", { name: "Первая принятая строка" })).toHaveAttribute(
     "href",
     new RegExp(`^${cPlanPath}#item-\\d+$`),
@@ -224,6 +328,25 @@ test("все четыре ачивки: каждая строка ведёт к 
     cPlanPath,
   );
   await expect(list.getByRole("link", { name: "ИПР выполнен" })).toHaveAttribute("href", cPlanPath);
+
+  // Тёмная и светлая темы: штрих наследует цвет текста строки и читается не хуже текста.
+  for (const theme of ["dark", "light"] as const) {
+    if (theme === "light") {
+      await page.addInitScript((value) => localStorage.setItem("pp-theme", value), theme);
+      await page.reload();
+      await expect(page.getByTestId("achievements-list")).toBeVisible();
+    }
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const colors = await glyphColors(page);
+    expect(colors, `в теме ${theme} у четырёх ачивок есть пиктограммы`).toHaveLength(4);
+    for (const color of colors) {
+      expect(color.stroke, `в теме ${theme} пиктограмма рисуется цветом текста строки`).toBe(color.rowColor);
+      expect(color.iconRatio, `в теме ${theme} контраст штриха ниже 4.5:1`).toBeGreaterThanOrEqual(4.5);
+      expect(color.iconRatio, `в теме ${theme} контраст штриха ниже контраста текста`).toBeGreaterThanOrEqual(
+        color.titleRatio,
+      );
+    }
+  }
 
   const competencyLink = list.getByRole("link", { name: /^Компетенция подтверждена/ });
   cCompetencyPath = (await competencyLink.getAttribute("href")) ?? "";
@@ -321,6 +444,9 @@ test.describe("гость", () => {
     await page.goto("/me/achievements");
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
+    // Ни названий ачивок, ни пиктограмм: страница закрыта целиком.
+    await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
+    await expect(page.locator("[data-icon]")).toHaveCount(0);
 
     // Цели кросс-ссылок тоже закрыты: содержимое плана и карточки компетенции не показывается.
     await page.goto(cCompetencyPath);
