@@ -753,9 +753,7 @@ test("левая колонка: легенда, статистика по от�
   await expectCountersMatchBoard(page);
 });
 
-test("над холстом нет абзацев: пояснения стоят под деревом, холст начинается в верхней половине экрана", async ({
-  page,
-}) => {
+test("дерево стоит на уровне легенды: над холстом нет абзацев, пояснения — под деревом", async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto("/me/skills");
   const board = page.getByTestId("skill-board-professional");
@@ -764,12 +762,24 @@ test("над холстом нет абзацев: пояснения стоят
   const metrics = await page.evaluate(() => {
     const board = document.querySelector<HTMLElement>('[data-testid="skill-board-professional"]')!;
     const notes = document.querySelector<HTMLElement>('[data-testid="skill-notes"]')!;
+    const sidebar = document.querySelector<HTMLElement>(".skill-sidebar")!;
+    const jobs = document.querySelector<HTMLElement>(".skill-tree-jobs")!;
+    const canvas = document.querySelector<HTMLElement>(".skill-board-canvas")!;
     return {
       viewport: window.innerHeight,
       boardTop: board.getBoundingClientRect().top,
+      sidebarTop: sidebar.getBoundingClientRect().top,
+      canvasTop: canvas.getBoundingClientRect().top,
+      jobsInSidebar: sidebar.contains(jobs),
       notesTop: notes.getBoundingClientRect().top,
     };
   });
+  // Верх карточки дерева совпадает с верхом колонки легенды: между ними нет ни строки текста.
+  expect(Math.abs(metrics.boardTop - metrics.sidebarTop)).toBeLessThanOrEqual(2);
+  // Должности и отбор живут в колонке, а не полосой над холстом.
+  expect(metrics.jobsInSidebar).toBe(true);
+  // Заголовок раздела — шапка панели, холст начинается сразу под ней.
+  expect(metrics.canvasTop - metrics.boardTop).toBeLessThan(60);
   // Текст не съедает верх экрана: первый холст начинается в верхней половине окна.
   expect(metrics.boardTop).toBeLessThan(metrics.viewport / 2);
   // Пояснение «как читать дерево» — под холстами, а не над ними.

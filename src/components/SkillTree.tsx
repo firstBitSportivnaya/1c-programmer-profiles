@@ -178,6 +178,11 @@ type BoardProps = {
   highlight: Set<string> | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Заголовок карточки холста: он же шапка панели, чтобы холст начинался с верхнего края колонки. */
+  title: string;
+  headingId: string;
+  /** Управление отбором стоит в шапке первого холста: над деревом нет отдельной полосы. */
+  actions?: React.ReactNode;
   label: string;
   testId: string;
   /** Цвет бейджа темы по группе справочника: один и тот же на всех холстах. */
@@ -187,7 +192,20 @@ type BoardProps = {
 };
 
 /** Один холст раздела: своя раскладка, свой зум и своя панель узла. */
-function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testId, topicOf, prerequisiteOf }: BoardProps) {
+function SkillBoard({
+  nodes,
+  data,
+  highlight,
+  selectedId,
+  onSelect,
+  title,
+  headingId,
+  actions,
+  label,
+  testId,
+  topicOf,
+  prerequisiteOf,
+}: BoardProps) {
   const theme = useThemeMode();
   const shellRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -332,51 +350,61 @@ function SkillBoard({ nodes, data, highlight, selectedId, onSelect, label, testI
       aria-label={label}
       data-testid={testId}
     >
-      <ReactFlowProvider>
-        <ReactFlow
-          colorMode={theme}
-          nodes={graph.nodes}
-          edges={graph.edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={FIT}
-          minZoom={0.4}
-          maxZoom={1.4}
-          panOnDrag
-          zoomOnScroll
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          noPanClassName="nopan"
-          proOptions={{ hideAttribution: true }}
-          onNodeClick={(_, node) => {
-            if (node.type !== "skill") return;
-            onSelect(node.id.slice("skill:".length));
-          }}
-          onPaneClick={() => onSelect(null)}
-          onInit={(instance) => {
-            flowRef.current = instance;
-            instance.fitView(FIT);
-          }}
-        >
-          <Background color="var(--grid)" gap={24} />
-          <Controls />
-        </ReactFlow>
-      </ReactFlowProvider>
+      {/* Заголовок — шапка самой панели: верх карточки дерева совпадает с верхом колонки легенды. */}
+      <div className="skill-board-head">
+        <h2 className="skill-board-title" id={headingId}>
+          {title}
+          <span className="skill-group-count">{nodes.length}</span>
+        </h2>
+        {actions}
+      </div>
+      <div className="skill-board-canvas">
+        <ReactFlowProvider>
+          <ReactFlow
+            colorMode={theme}
+            nodes={graph.nodes}
+            edges={graph.edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={FIT}
+            minZoom={0.4}
+            maxZoom={1.4}
+            panOnDrag
+            zoomOnScroll
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            noPanClassName="nopan"
+            proOptions={{ hideAttribution: true }}
+            onNodeClick={(_, node) => {
+              if (node.type !== "skill") return;
+              onSelect(node.id.slice("skill:".length));
+            }}
+            onPaneClick={() => onSelect(null)}
+            onInit={(instance) => {
+              flowRef.current = instance;
+              instance.fitView(FIT);
+            }}
+          >
+            <Background color="var(--grid)" gap={24} />
+            <Controls />
+          </ReactFlow>
+        </ReactFlowProvider>
 
-      {selected ? (
-        <div className="skill-popup" data-testid="skill-panel-slot" ref={popupRef}>
-          <SkillNodePanel
-            node={selected}
-            context={relationContext(selected, data)}
-            planId={data.planId}
-            prerequisite={prerequisiteOf.get(selected.id) ?? null}
-            onOpenPrerequisite={onSelect}
-            onClose={() => onSelect(null)}
-          />
-        </div>
-      ) : null}
+        {selected ? (
+          <div className="skill-popup" data-testid="skill-panel-slot" ref={popupRef}>
+            <SkillNodePanel
+              node={selected}
+              context={relationContext(selected, data)}
+              planId={data.planId}
+              prerequisite={prerequisiteOf.get(selected.id) ?? null}
+              onOpenPrerequisite={onSelect}
+              onClose={() => onSelect(null)}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -548,111 +576,78 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
     setSelectedId(id);
   };
 
+  /** Отбор стоит в шапке первого холста: отдельной полосы текста над деревом нет. */
+  const filter = (
+    <label className="skill-tree-filter">
+      <input
+        type="checkbox"
+        checked={showAll}
+        onChange={(event) => {
+          setShowAll(event.target.checked);
+          setLegend(null);
+        }}
+      />
+      Показывать всё дерево
+    </label>
+  );
+
+  /** Первый показанный раздел заводит отбор в своей шапке, остальные холсты идут без повтора. */
+  const firstBoard = professional.length > 0 ? "professional" : personal.length > 0 ? "personal" : "outside";
+
   return (
     <div className="skill-tree-layout" data-testid="skill-tree-layout">
-      <div className="skill-tree-jobs">
-        {data.currentJob ? (
-          <span>
-            Сейчас:{" "}
-            <a className="link-accent" href={data.currentJob.href}>
-              {data.currentJob.name}
-            </a>
-          </span>
-        ) : (
-          <span className="muted">Должность без профиля</span>
-        )}
-        <span className="muted" aria-hidden="true">
-          →
-        </span>
-        {data.targetJob ? (
-          <span>
-            Цель ИПР:{" "}
-            <a className="link-accent" href={data.targetJob.href}>
-              {data.targetJob.name}
-            </a>
-          </span>
-        ) : (
-          <span className="muted">активного ИПР нет</span>
-        )}
-      </div>
-
       <div className="skill-tree-main">
-        <div className="skill-tree-toolbar">
-          <label className="skill-tree-filter">
-            <input
-              type="checkbox"
-              checked={showAll}
-              onChange={(event) => {
-                setShowAll(event.target.checked);
-                setLegend(null);
-              }}
-            />
-            Показывать всё дерево
-          </label>
-
-          <p className="skill-hint" data-testid="skill-panel-hint">
-            Нажмите на навык — панель справа покажет критерий, материалы, пометку и строки плана.
-          </p>
-        </div>
-
         {professional.length > 0 ? (
-          <section className="skill-group-block" aria-labelledby="skill-group-professional">
-            <h2 className="skill-group-title" id="skill-group-professional">
-              Профессиональные компетенции
-              <span className="skill-group-count">{professional.length}</span>
-            </h2>
-            <SkillBoard
-              nodes={professional}
-              data={data}
-              highlight={highlight}
-              selectedId={selectedId}
-              onSelect={select}
-              label="Профессиональные компетенции"
-              testId="skill-board-professional"
-              topicOf={topicOf}
-              prerequisiteOf={prerequisiteOf}
-            />
-          </section>
+          <SkillBoard
+            nodes={professional}
+            data={data}
+            highlight={highlight}
+            selectedId={selectedId}
+            onSelect={select}
+            title="Профессиональные компетенции"
+            headingId="skill-group-professional"
+            actions={firstBoard === "professional" ? filter : null}
+            label="Профессиональные компетенции"
+            testId="skill-board-professional"
+            topicOf={topicOf}
+            prerequisiteOf={prerequisiteOf}
+          />
         ) : null}
 
         {personal.length > 0 ? (
-          <section className="skill-group-block" aria-labelledby="skill-group-personal">
-            <h2 className="skill-group-title" id="skill-group-personal">
-              Личные компетенции
-              <span className="skill-group-count">{personal.length}</span>
-            </h2>
-            <SkillBoard
-              nodes={personal}
-              data={data}
-              highlight={highlight}
-              selectedId={selectedId}
-              onSelect={select}
-              label="Личные компетенции"
-              testId="skill-board-personal"
-              topicOf={topicOf}
-              prerequisiteOf={prerequisiteOf}
-            />
-          </section>
+          <SkillBoard
+            nodes={personal}
+            data={data}
+            highlight={highlight}
+            selectedId={selectedId}
+            onSelect={select}
+            title="Личные компетенции"
+            headingId="skill-group-personal"
+            actions={firstBoard === "personal" ? filter : null}
+            label="Личные компетенции"
+            testId="skill-board-personal"
+            topicOf={topicOf}
+            prerequisiteOf={prerequisiteOf}
+          />
         ) : null}
 
         {outside.length > 0 ? (
-          <section className="skill-group-block" aria-labelledby="skill-group-outside" data-testid="skill-outside">
-            <h2 className="skill-group-title" id="skill-group-outside">
-              Вне профиля
-              <span className="skill-group-count">{outside.length}</span>
-            </h2>
-            <p className="skill-group-note">Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка.</p>
+          <section className="skill-group-block" data-testid="skill-outside">
             <SkillBoard
               nodes={outside}
               data={data}
               highlight={highlight}
               selectedId={selectedId}
               onSelect={select}
+              title="Вне профиля"
+              headingId="skill-group-outside"
+              actions={firstBoard === "outside" ? filter : null}
               label="Вне профиля"
               testId="skill-board-outside"
               topicOf={topicOf}
               prerequisiteOf={prerequisiteOf}
             />
+            <p className="skill-group-note">Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка.</p>
           </section>
         ) : null}
       </div>
@@ -680,6 +675,11 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
             <li>
               <span className="skill-legend__note">Уровень на узле — требование должности, личного уровня в дереве нет.</span>
             </li>
+            <li>
+              <span className="skill-legend__note">
+                Нажмите на навык — панель справа покажет критерий, материалы, пометку и строки плана.
+              </span>
+            </li>
           </ul>
         </section>
 
@@ -706,6 +706,35 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
         <p className="skill-sidebar__motto" data-testid="skill-motto">
           {motto}
         </p>
+
+        {/* Должности стоят в колонке, а не над деревом: холст начинается с верхнего края страницы. */}
+        <section className="skill-sidebar__block" aria-labelledby="skill-jobs-title">
+          <h2 className="skill-sidebar__title" id="skill-jobs-title">
+            Должность
+          </h2>
+          <div className="skill-tree-jobs">
+            {data.currentJob ? (
+              <span>
+                Сейчас:{" "}
+                <a className="link-accent" href={data.currentJob.href}>
+                  {data.currentJob.name}
+                </a>
+              </span>
+            ) : (
+              <span className="muted">Сейчас: должность без профиля</span>
+            )}
+            {data.targetJob ? (
+              <span>
+                Цель ИПР:{" "}
+                <a className="link-accent" href={data.targetJob.href}>
+                  {data.targetJob.name}
+                </a>
+              </span>
+            ) : (
+              <span className="muted">Цель ИПР: активного ИПР нет</span>
+            )}
+          </div>
+        </section>
       </aside>
     </div>
   );

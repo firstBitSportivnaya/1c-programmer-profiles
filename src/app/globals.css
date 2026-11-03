@@ -983,11 +983,6 @@ details[open] > .skill-summary::before {
   min-width: 0;
 }
 
-.skill-tree-toolbar {
-  display: grid;
-  gap: 0.3rem;
-}
-
 /* Колонка легенды и статистики. В разметке она идёт после холста, на широком экране её место задаёт сетка. */
 .skill-sidebar {
   display: grid;
@@ -1042,24 +1037,19 @@ details[open] > .skill-summary::before {
 @media (min-width: 1280px) {
   .skill-tree-layout {
     grid-template-columns: 16rem minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
     align-items: start;
     column-gap: 1.25rem;
   }
 
-  .skill-tree-jobs {
+  /* Холст и колонка легенды начинаются с одной строки: дерево стоит на уровне легенды. */
+  .skill-tree-main {
     grid-column: 2;
     grid-row: 1;
   }
 
-  .skill-tree-main {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
   .skill-sidebar {
     grid-column: 1;
-    grid-row: 1 / span 2;
+    grid-row: 1;
     position: sticky;
     top: 1rem;
   }
@@ -1067,7 +1057,37 @@ details[open] > .skill-summary::before {
 
 .skill-tree-shell {
   position: relative;
-  height: clamp(560px, 78vh, 900px);
+  display: flex;
+  flex-direction: column;
+  height: clamp(560px, 68vh, 820px);
+}
+
+/* Шапка холста — часть самой панели: верх карточки дерева совпадает с верхом колонки легенды. */
+.skill-board-head {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.skill-board-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.skill-board-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Панель навыка выезжает справа: ширина меньше половины холста, прокрутка внутри панели. */
@@ -1222,12 +1242,6 @@ details[open] > .skill-summary::before {
   resize: vertical;
 }
 
-.skill-hint {
-  margin: 0;
-  font-size: var(--fs-md);
-  color: var(--text-muted);
-}
-
 .skill-legend {
   display: grid;
   gap: 0.15rem;
@@ -1354,10 +1368,8 @@ details[open] > .skill-summary::before {
 }
 
 .skill-tree-jobs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.6rem;
+  display: grid;
+  gap: 0.3rem;
   font-size: var(--fs-md);
 }
 
@@ -1425,16 +1437,6 @@ details[open] > .skill-summary::before {
   gap: 0.5rem;
 }
 
-.skill-group-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
 .skill-group-count {
   padding: 0 0.4rem;
   border: 1px solid var(--panel-border);
@@ -1461,10 +1463,6 @@ details[open] > .skill-summary::before {
 
 .skill-notes p {
   margin: 0;
-}
-
-.skill-group-block .graph-shell {
-  height: clamp(560px, 68vh, 820px);
 }
 
 .skill-node {
