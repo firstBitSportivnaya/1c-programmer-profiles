@@ -22,6 +22,9 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Девиз страницы: статический текст, один для всех, от данных и отбора не зависит. */
+const MOTTO = "Навык не появляется сразу — он вырастает из предпосылки.";
+
 type ProfileRow = { level: number | null; criteria: string | null };
 
 /** Строки профиля по компетенциям: планка и критерий. У обязанностей уровня нет. */
@@ -59,8 +62,7 @@ function criteriaMap(current: Map<string, ProfileRow>, target: Map<string, Profi
   return map;
 }
 
-/** Все навыки справочника: группы без родителя и обязанности в дерево не входят. */
-function treeSkills(): TreeSkillRow[] {
+/** Все навыки справочника: группы без родителя и обязанности в дерево не входят. */function treeSkills(): TreeSkillRow[] {
   const all = listCompetencies();
   const names = new Map(all.map((row) => [row.id, row.name]));
   return all
@@ -68,6 +70,7 @@ function treeSkills(): TreeSkillRow[] {
     .map((row) => ({
       id: row.id,
       name: row.name,
+      groupId: row.parentId,
       groupName: row.parentId ? (names.get(row.parentId) ?? null) : null,
       kind: row.type === "universal" ? "universal" : "professional",
     }));
@@ -162,7 +165,7 @@ export default async function SkillTreePage() {
         </p>
       ) : null}
       {hasProfile || hasMarks ? (
-        <SkillTree data={data} />
+        <SkillTree data={data} motto={MOTTO} />
       ) : (
         <p className="muted" data-testid="skill-tree-no-profile">
           У должности нет профиля с навыками — дерево появится, когда профиль заполнят. Личные пометки можно вести в

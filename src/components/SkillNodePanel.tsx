@@ -50,18 +50,23 @@ export function levelShort(node: Pick<SkillTreeNode, "currentLevel" | "targetLev
 }
 
 /**
- * Карточка узла поверх холста: критерий профиля, материалы, личная пометка и строки активного плана.
+ * Карточка узла в панели справа: критерий профиля, предпосылка, материалы, личная пометка и строки плана.
  * Размеров шрифта три: заголовок, текст и подпись; иерархия — весом и регистром.
  */
 export function SkillNodePanel({
   node,
   context,
   planId,
+  prerequisite,
+  onOpenPrerequisite,
   onClose,
 }: {
   node: SkillTreeNode;
   context: string;
   planId: string | null;
+  /** Ближайшая предпосылка: соседний навык, который открывает этот. */
+  prerequisite: { id: string; name: string } | null;
+  onOpenPrerequisite: (id: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -71,7 +76,7 @@ export function SkillNodePanel({
           <p className="skill-card__label">{context}</p>
           <h2 className="skill-card__title">{node.name}</h2>
         </div>
-        <button type="button" className="skill-card__close" onClick={onClose}>
+        <button type="button" className="skill-card__close" onClick={onClose} aria-label="Закрыть">
           Закрыть
         </button>
       </div>
@@ -79,6 +84,28 @@ export function SkillNodePanel({
       <p className="skill-card__text" data-testid="skill-panel-level">
         {levelLabel(node)}
       </p>
+
+      <section>
+        <h3 className="skill-card__label">Требуется</h3>
+        {prerequisite ? (
+          <p className="skill-card__text" data-testid="skill-panel-prerequisite">
+            {/* Ссылка ведёт на узел предпосылки: адрес остаётся обычным <a href>, переход перехватывает панель. */}
+            <a
+              className="link-accent"
+              href={`#skill-node-${prerequisite.id}`}
+              data-testid="skill-panel-prerequisite-link"
+              onClick={(event) => {
+                event.preventDefault();
+                onOpenPrerequisite(prerequisite.id);
+              }}
+            >
+              {prerequisite.name}
+            </a>
+          </p>
+        ) : (
+          <p className="skill-card__note">Предпосылки нет: это начало ветви.</p>
+        )}
+      </section>
 
       <section>
         <h3 className="skill-card__label">Критерий</h3>

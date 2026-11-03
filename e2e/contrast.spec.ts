@@ -164,4 +164,15 @@ for (const theme of THEMES) {
     expect(texts.length).toBeGreaterThan(0);
     expect(lowContrast(texts), "/me").toEqual([]);
   });
+
+  test(`дерево навыков (${theme}): легенда, счётчики и узлы читаются не ниже ${TEXT_MIN}:1`, async ({ page }) => {
+    await openInTheme(page, "/me/skills", theme);
+    await expect(page.locator(".react-flow__node-skill").first()).toBeVisible();
+    const { texts } = await measureColors(page, ".skill-tree-layout");
+    expect(texts.length).toBeGreaterThan(0);
+    // Бейджи тем проверяются отдельно: цветная плашка не должна топить подпись.
+    const topicTexts = texts.filter((row) => row.text.length > 0 && ["Платформа 1С", "Тестирование"].includes(row.text));
+    expect(topicTexts.length, "бейджи тем на холсте").toBeGreaterThan(0);
+    expect(lowContrast(texts), "/me/skills").toEqual([]);
+  });
 }

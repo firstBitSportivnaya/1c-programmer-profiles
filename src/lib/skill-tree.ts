@@ -18,6 +18,8 @@ export type SkillKind = "professional" | "universal";
 export type TreeSkillRow = {
   id: string;
   name: string;
+  /** Группа справочника: она же тема навыка и цвет бейджа в узле. */
+  groupId: string | null;
   groupName: string | null;
   kind: SkillKind;
 };
@@ -56,6 +58,8 @@ export type SkillPlan = { state: PlanState; total: number; accepted: number };
 export type SkillTreeNode = {
   id: string;
   name: string;
+  /** Группа справочника: тема навыка, её цвет идёт в бейдж узла. */
+  groupId: string | null;
   groupName: string | null;
   kind: SkillKind;
   /** Планка текущей должности: требование, не оценка сотрудника. */
@@ -87,6 +91,21 @@ export function planState(rows: { status: IdpItemStatus; accepted: boolean }[]):
     return { state: "in_progress", total: rows.length, accepted };
   }
   return { state: "not_started", total: rows.length, accepted };
+}
+
+/**
+ * Счётчики дерева: только счётчики и процент, без очков, опыта и уровней (ADR 0001).
+ * «Всего» — узлы текущего отбора, «освоено» — пометка «есть», «в плане» — шаг активного ИПР
+ * в любом состоянии, кроме «не начат». При пустом отборе процент равен нулю: деления на ноль нет.
+ */
+export type SkillTreeStats = { total: number; mastered: number; inPlan: number; progress: number };
+
+export function skillTreeStats(nodes: Pick<SkillTreeNode, "mark" | "plan">[]): SkillTreeStats {
+  const total = nodes.length;
+  const mastered = nodes.filter((node) => node.mark === "has").length;
+  const inPlan = nodes.filter((node) => node.plan.state !== "not_started").length;
+  const progress = total === 0 ? 0 : Math.round((mastered / total) * 100);
+  return { total, mastered, inPlan, progress };
 }
 
 export type BuildSkillTreeInput = {
@@ -131,6 +150,7 @@ export function buildSkillTree(input: BuildSkillTreeInput): SkillTreeData {
     return {
       id: skill.id,
       name: skill.name,
+      groupId: skill.groupId,
       groupName: skill.groupName,
       kind: skill.kind,
       currentLevel: input.currentLevels.get(skill.id) ?? null,
