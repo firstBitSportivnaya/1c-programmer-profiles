@@ -1,10 +1,14 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 type Theme = "dark" | "light";
 
 const THEMES: Theme[] = ["dark", "light"];
 const TEXT_MIN = 4.5;
 const BORDER_MIN = 3;
+
+// Кабинет открывается только вошедшему: берём cookie админа из фикстуры (см. e2e/fixtures.ts).
+test.use({ asAdmin: true });
 
 type TextColor = { text: string; ratio: number; color: string; background: string };
 type RowColor = { onPage: string; onGrid: string; border: number };
@@ -152,5 +156,12 @@ for (const theme of THEMES) {
     const screenshot = testInfo.outputPath(`profile-${theme}.png`);
     await page.locator(".lane-tech").locator("xpath=..").screenshot({ path: screenshot });
     await testInfo.attach(`profile-${theme}`, { path: screenshot, contentType: "image/png" });
+  });
+
+  test(`кабинет (${theme}): контраст текста не ниже ${TEXT_MIN}:1`, async ({ page }) => {
+    await openInTheme(page, "/me", theme);
+    const { texts } = await measureColors(page, "main > article");
+    expect(texts.length).toBeGreaterThan(0);
+    expect(lowContrast(texts), "/me").toEqual([]);
   });
 }

@@ -102,7 +102,8 @@ async function openAchievements(page: Page) {
 
 /** На `/me` и в дереве навыков списка нет: только ссылка на страницу достижений, ни одной строки ачивки. */
 async function expectOnlyLink(page: Page) {
-  await expect(page.getByRole("link", { name: "Достижения", exact: true })).toBeVisible();
+  // В кабинете у действия есть счётчик «Достижения (N)», в дереве навыков — просто «Достижения».
+  await expect(page.getByRole("link", { name: /^Достижения/ })).toBeVisible();
   await expect(page.getByText("Первая принятая строка", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Компетенция подтверждена", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Все компетенции пула подтверждены", { exact: true })).toHaveCount(0);
@@ -166,7 +167,7 @@ test("принятая строка даёт ачивки первой стро�
   // В кабинете и в дереве списка нет — только ссылка со счётчиком.
   await page.goto("/me");
   await expectOnlyLink(page);
-  await expect(page.getByText(/открыто: 2/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Достижения (2)" })).toBeVisible();
   await page.goto("/me/skills");
   await expectOnlyLink(page);
 });
@@ -188,8 +189,7 @@ test("снятая приёмка убирает ачивки: пустое со
   await expect(page.locator('a[href^="/competencies/"]')).toHaveCount(0);
 
   await page.goto("/me");
-  await expect(page.getByRole("link", { name: "Достижения", exact: true })).toBeVisible();
-  await expect(page.getByText(/пока ни одной/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Достижения (0)" })).toBeVisible();
   await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
 });
 
@@ -292,7 +292,7 @@ test("план без компетенций в пуле ачивку пула �
   await expect(page.getByText("Все компетенции пула подтверждены")).toHaveCount(0);
 
   await page.goto("/me");
-  await expect(page.getByText(/пока ни одной/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Достижения (0)" })).toBeVisible();
 });
 
 test("приёмка в первом плане видна, когда появился второй план", async ({ page }) => {
@@ -310,7 +310,7 @@ test("приёмка в первом плане видна, когда появ�
 
   await page.goto("/me");
   await expectOnlyLink(page);
-  await expect(page.getByText(/открыто: \d+/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Достижения \(\d+\)$/ })).toBeVisible();
 });
 
 test.describe("гость", () => {

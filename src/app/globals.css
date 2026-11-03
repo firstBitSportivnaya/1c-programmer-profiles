@@ -12,15 +12,17 @@
 
 :root,
 [data-theme="dark"] {
-  --bg: #020617;
-  --grid: #1e293b;
+  --bg: #010f21;
+  --grid: #0f3050;
   --text: #ffffff;
   --text-muted: #94a3b8;
   --text-dim: #475569;
   --text-faint: #7d8da1;
-  --panel: rgba(15, 23, 42, 0.72);
-  --panel-solid: #0f172a;
-  --panel-border: #1e293b;
+  --panel: rgba(4, 30, 57, 0.72);
+  --panel-solid: #041e39;
+  --panel-border: #0d3654;
+  --accent: #0d74b0;
+  --accent-text: #4cb2ea;
   --lane-fill: rgba(15, 23, 42, 0.22);
   --lane-stroke: #334155;
   --arrow: #64748b;
@@ -38,11 +40,11 @@
   --security-stroke: #fb7185;
   --external-fill: rgba(30, 41, 59, 0.7);
   --external-stroke: #94a3b8;
-  --toolbar-bg: rgba(15, 23, 42, 0.88);
-  --toolbar-border: #334155;
+  --toolbar-bg: rgba(4, 30, 57, 0.88);
+  --toolbar-border: #0d3654;
   --toolbar-text: #e2e8f0;
-  --toolbar-hover: rgba(15, 23, 42, 0.95);
-  --field-bg: rgba(2, 6, 23, 0.65);
+  --toolbar-hover: rgba(4, 30, 57, 0.95);
+  --field-bg: rgba(1, 15, 33, 0.65);
   --row-alt: #1e293b;
   --change-added: #34d399;
   --change-removed: #fb7185;
@@ -60,6 +62,10 @@
   --panel: #ffffff;
   --panel-solid: #ffffff;
   --panel-border: #e2e8f0;
+  /* В светлой теме акцент один: #0d74b0 даёт 5.1:1 и как заливка с белым текстом, и как цвет ссылки.
+     Текст ссылок затемнён до #0a5f91: на линии фоновой сетки #e2e8f0 исходный синий даёт только 4.11:1. */
+  --accent: #0d74b0;
+  --accent-text: #0a5f91;
   --lane-fill: rgba(248, 250, 252, 0.65);
   --lane-stroke: #cbd5e1;
   --arrow: #94a3b8;
@@ -126,7 +132,7 @@ a {
   height: 10px;
   flex: none;
   border-radius: 50%;
-  background: var(--frontend-stroke);
+  background: var(--accent);
 }
 
 .page-title {
@@ -233,9 +239,16 @@ a {
 }
 
 .btn-primary {
-  border-color: var(--frontend-stroke);
-  color: var(--frontend-stroke);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
   text-decoration: none;
+}
+
+/* Наведение затемняет заливку, чтобы белый текст не терял контраст. */
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 86%, #000000);
+  color: #ffffff;
 }
 
 .btn-archive {
@@ -483,12 +496,121 @@ details[open] > .skill-summary::before {
 }
 
 .link-accent {
-  color: var(--frontend-stroke);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
 .link-accent:hover {
   text-decoration: underline;
+}
+
+/* Кабинет: шапка с должностью и статусом, основная колонка карточек и колонка действий.
+   На узком экране действия идут сразу после шапки; панели внутри карточек не рисуют вторую рамку. */
+.cabinet-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+}
+
+.cabinet-head__who {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.cabinet-head__job {
+  margin: 0;
+}
+
+.cabinet-meta {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  text-align: right;
+}
+
+.cabinet-meta dd {
+  margin: 0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.status-badge--active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.cabinet {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.cabinet-main {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.cabinet-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.cabinet-card .panel {
+  border: 0;
+  background: none;
+}
+
+.cabinet-card .panel-pad {
+  padding: 0;
+}
+
+.cabinet-actions {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  order: -1;
+}
+
+.cabinet-action {
+  display: block;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--accent-text);
+  text-decoration: none;
+  font-size: var(--fs-md);
+}
+
+.cabinet-action:hover {
+  border-color: var(--accent-text);
+  text-decoration: underline;
+}
+
+@media (min-width: 1024px) {
+  .cabinet {
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    align-items: start;
+  }
+
+  .cabinet-actions {
+    order: 0;
+  }
 }
 
 .graph-shell {

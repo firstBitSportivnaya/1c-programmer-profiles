@@ -25,13 +25,30 @@ export function JobFacts({ job }: { job: Job }) {
   );
 }
 
-/** Исходящие рёбра должности; админ может убрать ребро. */
-export function NextJobs({ jobId, admin }: { jobId: string; admin: boolean }) {
+/**
+ * Исходящие рёбра должности; админ может убрать ребро.
+ * Заголовок, текст пустого списка и вид типа ребра переопределяются в кабинете, чтобы не заводить вторую разметку.
+ * Чип типа на странице должности красит `--frontend-stroke`; в кабинете тип идёт обычным текстом, иначе
+ * контраст в светлой теме ниже 4.5:1.
+ */
+export function NextJobs({
+  jobId,
+  admin,
+  title = "Следующие должности",
+  emptyText = "Нет исходящих рёбер",
+  kindAsText = false,
+}: {
+  jobId: string;
+  admin: boolean;
+  title?: string;
+  emptyText?: string;
+  kindAsText?: boolean;
+}) {
   const outs = outgoingTransitions(jobId);
   const nameById = Object.fromEntries(listJobs().map((j) => [j.id, j.name]));
   return (
     <section>
-      <h2 className="section-title">Следующие должности</h2>
+      <h2 className="section-title">{title}</h2>
       <ul className="panel">
         {outs.map((tr) => (
           <li key={`${tr.fromJobId}-${tr.toJobId}`} className="list-row">
@@ -39,9 +56,13 @@ export function NextJobs({ jobId, admin }: { jobId: string; admin: boolean }) {
               <a className="link-accent" href={jobHref(tr.toJobId)}>
                 {nameById[tr.toJobId] ?? tr.toJobId}
               </a>
-              <span className={tr.kind === "linear" ? "chip chip-frontend" : "chip chip-cloud"}>
-                {tr.kind === "linear" ? "линейный" : "смена уровня"}
-              </span>
+              {kindAsText ? (
+                <span className="muted">{tr.kind === "linear" ? "линейный" : "смена уровня"}</span>
+              ) : (
+                <span className={tr.kind === "linear" ? "chip chip-frontend" : "chip chip-cloud"}>
+                  {tr.kind === "linear" ? "линейный" : "смена уровня"}
+                </span>
+              )}
             </div>
             {admin ? (
               <ActionForm action={deleteTransitionAction}>
@@ -54,7 +75,7 @@ export function NextJobs({ jobId, admin }: { jobId: string; admin: boolean }) {
             ) : null}
           </li>
         ))}
-        {outs.length === 0 ? <li className="list-row muted">Нет исходящих рёбер</li> : null}
+        {outs.length === 0 ? <li className="list-row muted">{emptyText}</li> : null}
       </ul>
     </section>
   );
