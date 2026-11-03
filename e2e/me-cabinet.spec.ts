@@ -94,6 +94,28 @@ test("должность без профиля и переходов: пусты
   await expect(page.getByText("У должности нет профиля с навыками", { exact: false })).toBeVisible();
 });
 
+test("раскладка: от 1024px действия справа, на узком экране сразу после шапки", async ({ page }) => {
+  await login(page, JUNIOR);
+  const actions = () => page.getByRole("navigation", { name: "Разделы кабинета" });
+  const main = () => page.locator(".cabinet-main");
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/me");
+  const wide = { actions: await actions().boundingBox(), main: await main().boundingBox() };
+  expect(wide.actions, "колонка действий на месте").not.toBeNull();
+  expect(wide.main, "основная колонка на месте").not.toBeNull();
+  // Две колонки: действия правее основной колонки и начинаются с той же строки.
+  expect(wide.actions!.x).toBeGreaterThan(wide.main!.x + wide.main!.width - 1);
+  expect(Math.abs(wide.actions!.y - wide.main!.y)).toBeLessThan(40);
+
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await page.reload();
+  const narrow = { actions: await actions().boundingBox(), main: await main().boundingBox() };
+  // Одна колонка: действия идут выше основной колонки во всю её ширину.
+  expect(narrow.actions!.y).toBeLessThan(narrow.main!.y);
+  expect(narrow.actions!.width).toBeGreaterThan(narrow.main!.width - 1);
+});
+
 test.describe("гость", () => {
   // Гостевые проверки идут без cookie админа (см. e2e/fixtures.ts).
   test.use({ asAdmin: false });
