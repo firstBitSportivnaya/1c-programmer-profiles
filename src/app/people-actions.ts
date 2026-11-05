@@ -262,7 +262,7 @@ export async function deactivateEmployeeAction(
       .set({ managerId: null, updatedAt: t })
       .where(eq(employees.managerId, employeeId))
       .run();
-    syncPeopleAchievements(previousManagerId);
+    syncPeopleAchievements(employeeId, previousManagerId);
     revalidatePeople(employeeId);
     return null;
   } catch (error) {

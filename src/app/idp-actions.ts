@@ -104,6 +104,16 @@ function revalidateIdp(employeeId: string, idpId?: string) {
   if (idpId) revalidatePath(`/idps/${idpId}`);
 }
 
+/**
+ * Сверка достижений владельца плана и его руководителя (ADR 0010): правила наставничества зависят
+ * от приёмок подчинённого, поэтому действие по плану меняет выдачи обоих, а не только владельца.
+ */
+function syncIdpAchievements(employeeId: string) {
+  syncEmployeeAchievements(employeeId);
+  const managerId = getEmployee(employeeId)?.managerId;
+  if (managerId) syncEmployeeAchievements(managerId);
+}
+
 function readAssignmentTexts(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const learnText = String(formData.get("learnText") ?? "").trim();
@@ -197,7 +207,7 @@ export async function cancelIdpAction(_prev: ActionResult, formData: FormData, r
     const actor = await requireEmployee();
     const idp = requireActiveManagedIdp(actor, String(formData.get("idpId") ?? ""));
     getDb().update(idps).set({ status: "cancelled", updatedAt: now() }).where(eq(idps.id, idp.id)).run();
-    syncEmployeeAchievements(idp.employeeId);
+    syncIdpAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
@@ -292,7 +302,7 @@ export async function addIdpItemAction(_prev: ActionResult, formData: FormData, 
           return true;
         })
         .deferred(null);
-      syncEmployeeAchievements(idp.employeeId);
+      syncIdpAchievements(idp.employeeId);
       revalidateIdp(idp.employeeId, idp.id);
       return null;
     } catch (error) {
@@ -352,7 +362,7 @@ export async function deleteIdpItemAction(_prev: ActionResult, formData: FormDat
       })
       .deferred(null);
     maybeCompleteIdp(idp.id);
-    syncEmployeeAchievements(idp.employeeId);
+    syncIdpAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
@@ -405,7 +415,7 @@ export async function acceptIdpItemAction(_prev: ActionResult, formData: FormDat
       .where(eq(idpItems.id, item.id))
       .run();
     maybeCompleteIdp(idp.id);
-    syncEmployeeAchievements(idp.employeeId);
+    syncIdpAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
@@ -435,7 +445,7 @@ export async function unacceptIdpItemAction(_prev: ActionResult, formData: FormD
     if (idp.status === "completed") {
       getDb().update(idps).set({ status: "active", updatedAt: now() }).where(eq(idps.id, idp.id)).run();
     }
-    syncEmployeeAchievements(idp.employeeId);
+    syncIdpAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {

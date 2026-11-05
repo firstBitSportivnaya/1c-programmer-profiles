@@ -27,12 +27,19 @@ const D = ACCOUNT("d", "Ачивки D");
 const E = ACCOUNT("e", "Ачивки E");
 const F = ACCOUNT("f", "Ачивки F");
 const G = ACCOUNT("g", "Ачивки G");
+const H = ACCOUNT("h", "Ачивки H");
+const I = ACCOUNT("i", "Ачивки I");
+const J = ACCOUNT("j", "Ачивки J");
 const A_GOAL = `Цель A ${STAMP}`;
 const A_SECOND = `Цель A2 ${STAMP}`;
 const C_GOAL = `Цель C ${STAMP}`;
 const C_SECOND = `Цель C2 ${STAMP}`;
 const D_GOAL = `Цель D ${STAMP}`;
 const D_SECOND = `Цель D2 ${STAMP}`;
+const I_GOAL = `Цель I ${STAMP}`;
+const I_SECOND = `Цель I2 ${STAMP}`;
+const J_GOAL = `Цель J ${STAMP}`;
+const J_SECOND = `Цель J2 ${STAMP}`;
 let aPlanPath = "";
 let cCompetency = "";
 let cSecondCompetency = "";
@@ -101,6 +108,26 @@ function grantManually(testInfo: TestInfo, login: string, achievementId: string)
        VALUES (?, ?, 'manual', NULL, NULL, ?, ?)`,
     ).run(employee.id, achievementId, t, admin.id);
     return t;
+  } finally {
+    db.close();
+  }
+}
+
+/** Ручной отзыв выдачи прямо в базу: админской формы в этом этапе ещё нет, правило проверки от неё не зависит. */
+function revokeManually(testInfo: TestInfo, login: string, achievementId: string): { revokedAt: number; adminId: string } {
+  const db = new DatabaseSync(dbFile(testInfo));
+  try {
+    const admin = db.prepare("SELECT id FROM employees WHERE is_admin = 1 ORDER BY login LIMIT 1").get() as
+      | { id: string }
+      | undefined;
+    const employee = db.prepare("SELECT id FROM employees WHERE login = ?").get(login) as { id: string } | undefined;
+    if (!admin || !employee) throw new Error(`ручной отзыв: не найден сотрудник ${login} или админ`);
+    const revokedAt = Math.floor(Date.now() / 1000);
+    db.prepare(
+      `UPDATE employee_achievements SET revoked_at = ?, revoked_by_id = ?
+       WHERE employee_id = ? AND achievement_id = ?`,
+    ).run(revokedAt, admin.id, employee.id, achievementId);
+    return { revokedAt, adminId: admin.id };
   } finally {
     db.close();
   }
@@ -332,6 +359,65 @@ test("смена должности и оргсвязи выдаёт дости�
   await login(page, E);
   await openAchievements(page);
   await expect(page.getByTestId("achievements-list").getByRole("listitem").filter({ hasText: "Программист" })).toBeVisible();
+});
+
+test("достижение руководителя выдаётся при приёмке у подчинённого, без открытия его страницы", async ({ page }, testInfo) => {
+  await createStaff(page, H, "junior");
+  await createStaff(page, J, "junior");
+  await saveStaff(page, employeeId(testInfo, J.login), { manager: H.name });
+  expect(
+    grants(testInfo, H.login).map((row) => row.achievement_id),
+    "одна оргсвязь правило о компетенции подчинённого не выполняет",
+  ).not.toContain("mentor-competency");
+
+  await createPlan(page, J, "programmer");
+  await addItem(page, J_GOAL);
+  // Вторая строка остаётся непринятой: план не завершается, проверяется только приёмка.
+  await addItem(page, J_SECOND, 1);
+  await acceptItem(page, J_GOAL);
+
+  // Отдельного открытия `/me/achievements` у H нет: выдачу должна дать приёмка подчинённого.
+  await expect
+    .poll(() => grants(testInfo, H.login).map((row) => row.achievement_id))
+    .toContain("mentor-competency");
+
+  await login(page, H);
+  await openAchievements(page);
+  await expect(
+    page.getByTestId("achievements-list").getByRole("listitem").filter({ hasText: "Ученик подтвердил" }),
+  ).toBeVisible();
+});
+
+test("ручная выдача поверх сработавшего правила остаётся ручной, отзыв человека не оживляется", async ({
+  page,
+}, testInfo) => {
+  await createStaff(page, I, "junior");
+  await createPlan(page, I, "programmer");
+  await addItem(page, I_GOAL);
+  await addItem(page, I_SECOND, 1);
+  // Ручная строка появляется до приёмки: дальше условие выполнится, и сверка обязана её не тронуть.
+  const grantedAt = grantManually(testInfo, I.login, "idp-first-step");
+  await acceptItem(page, I_GOAL);
+
+  const afterAccept = grants(testInfo, I.login).filter((row) => row.achievement_id === "idp-first-step");
+  expect(afterAccept, "второй строки выдачи нет").toHaveLength(1);
+  expect(afterAccept[0].source, "выдача осталась ручной").toBe("manual");
+  expect(afterAccept[0].granted_at, "дата ручной выдачи не переписана").toBe(grantedAt);
+
+  // Отзыв человека поверх выполненного условия: сверка не оживляет такую выдачу.
+  const revoked = revokeManually(testInfo, I.login, "idp-first-step");
+
+  await login(page, I);
+  await openAchievements(page);
+  const list = page.getByTestId("achievements-list");
+  await expect(list.getByRole("link", { name: "Первый шаг" }), "отозванная выдача не показана").toHaveCount(0);
+  await expect(list.getByRole("listitem").filter({ hasText: "Компетенция подтверждена" })).toBeVisible();
+  await expect(page.getByTestId("confirmed-competencies").getByRole("listitem")).toHaveCount(1);
+
+  const afterRevoke = grants(testInfo, I.login).filter((row) => row.achievement_id === "idp-first-step");
+  expect(afterRevoke, "строка отзыва одна").toHaveLength(1);
+  expect(afterRevoke[0].revoked_at, "дата отзыва сохранена").toBe(revoked.revokedAt);
+  expect(afterRevoke[0].revoked_by_id, "отзыв остался за человеком").toBe(revoked.adminId);
 });
 
 test("отменённый план отзывает автоматические достижения", async ({ page }, testInfo) => {
