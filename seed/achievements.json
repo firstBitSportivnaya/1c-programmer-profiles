@@ -1,0 +1,274 @@
+{
+  "achievements": [
+    {
+      "id": "idp-first-step",
+      "title": "Первый шаг",
+      "description": "Первая строка ИПР принята руководителем.",
+      "category": "idp",
+      "rule": "idp.first-accepted-item",
+      "ruleParam": null,
+      "icon": "flag"
+    },
+    {
+      "id": "idp-three-items",
+      "title": "Три шага",
+      "description": "Принято три строки ИПР за всё время, в любых планах.",
+      "category": "idp",
+      "rule": "idp.items-3",
+      "ruleParam": null,
+      "icon": "checklist"
+    },
+    {
+      "id": "idp-ten-items",
+      "title": "Десять шагов",
+      "description": "Принято десять строк ИПР за всё время, в любых планах.",
+      "category": "idp",
+      "rule": "idp.items-10",
+      "ruleParam": null,
+      "icon": "kanban"
+    },
+    {
+      "id": "idp-competency-confirmed",
+      "title": "Компетенция подтверждена",
+      "description": "Все строки хотя бы одной компетенции плана приняты.",
+      "category": "idp",
+      "rule": "idp.competency-confirmed",
+      "ruleParam": null,
+      "icon": "award"
+    },
+    {
+      "id": "idp-pool-closed",
+      "title": "Пул закрыт",
+      "description": "Все компетенции пула одного ИПР подтверждены.",
+      "category": "idp",
+      "rule": "idp.pool-confirmed",
+      "ruleParam": null,
+      "icon": "target"
+    },
+    {
+      "id": "idp-completed",
+      "title": "ИПР выполнен",
+      "description": "Приняты все строки плана: цель периода достигнута.",
+      "category": "idp",
+      "rule": "idp.completed",
+      "ruleParam": null,
+      "icon": "file-check"
+    },
+    {
+      "id": "idp-completed-twice",
+      "title": "Два плана",
+      "description": "Выполнено два ИПР.",
+      "category": "idp",
+      "rule": "idp.completed-2",
+      "ruleParam": null,
+      "icon": "branch"
+    },
+    {
+      "id": "idp-on-time",
+      "title": "В срок",
+      "description": "Выполненный ИПР, где все строки со сроком приняты не позже срока.",
+      "category": "idp",
+      "rule": "idp.on-time",
+      "ruleParam": null,
+      "icon": "clock"
+    },
+    {
+      "id": "competency-3",
+      "title": "Три компетенции",
+      "description": "Подтверждены три разные компетенции по приёмкам строк ИПР.",
+      "category": "competency",
+      "rule": "competency.confirmed-3",
+      "ruleParam": null,
+      "icon": "award"
+    },
+    {
+      "id": "competency-5",
+      "title": "Пять компетенций",
+      "description": "Подтверждены пять разных компетенций по приёмкам строк ИПР.",
+      "category": "competency",
+      "rule": "competency.confirmed-5",
+      "ruleParam": null,
+      "icon": "grid"
+    },
+    {
+      "id": "competency-10",
+      "title": "Десять компетенций",
+      "description": "Подтверждены десять разных компетенций по приёмкам строк ИПР.",
+      "category": "competency",
+      "rule": "competency.confirmed-10",
+      "ruleParam": null,
+      "icon": "layers"
+    },
+    {
+      "id": "competency-20",
+      "title": "Двадцать компетенций",
+      "description": "Подтверждены двадцать разных компетенций по приёмкам строк ИПР.",
+      "category": "competency",
+      "rule": "competency.confirmed-20",
+      "ruleParam": null,
+      "icon": "scale"
+    },
+    {
+      "id": "competency-half-profile",
+      "title": "Половина профиля",
+      "description": "Подтверждена половина навыков профиля текущей должности.",
+      "category": "competency",
+      "rule": "competency.half-profile",
+      "ruleParam": null,
+      "icon": "gauge"
+    },
+    {
+      "id": "competency-full-profile",
+      "title": "Профиль закрыт",
+      "description": "Подтверждены все навыки профиля текущей должности.",
+      "category": "competency",
+      "rule": "competency.full-profile",
+      "ruleParam": null,
+      "icon": "shield-check"
+    },
+    {
+      "id": "competency-outside-profile",
+      "title": "Шире должности",
+      "description": "Подтверждена компетенция, которой нет в профиле текущей должности.",
+      "category": "competency",
+      "rule": "competency.outside-profile",
+      "ruleParam": null,
+      "icon": "compass"
+    },
+    {
+      "id": "career-programmer",
+      "title": "Программист",
+      "description": "Назначена должность программиста.",
+      "category": "career",
+      "rule": "job.assigned",
+      "ruleParam": "programmer",
+      "icon": "code"
+    },
+    {
+      "id": "career-senior",
+      "title": "Старший программист",
+      "description": "Назначена должность старшего программиста.",
+      "category": "career",
+      "rule": "job.assigned",
+      "ruleParam": "senior",
+      "icon": "layers"
+    },
+    {
+      "id": "career-lead",
+      "title": "Ведущий программист",
+      "description": "Назначена должность ведущего программиста.",
+      "category": "career",
+      "rule": "job.assigned",
+      "ruleParam": "lead",
+      "icon": "flag"
+    },
+    {
+      "id": "career-architect",
+      "title": "Архитектор",
+      "description": "Назначена должность архитектора.",
+      "category": "career",
+      "rule": "job.assigned",
+      "ruleParam": "architect",
+      "icon": "blocks"
+    },
+    {
+      "id": "mentor-first-report",
+      "title": "Первый подчинённый",
+      "description": "Есть хотя бы один прямой подчинённый.",
+      "category": "mentoring",
+      "rule": "manager.direct-1",
+      "ruleParam": null,
+      "icon": "users"
+    },
+    {
+      "id": "mentor-team",
+      "title": "Команда",
+      "description": "Трое прямых подчинённых и больше.",
+      "category": "mentoring",
+      "rule": "manager.direct-3",
+      "ruleParam": null,
+      "icon": "chat"
+    },
+    {
+      "id": "mentor-idp-completed",
+      "title": "План доведён",
+      "description": "У прямого подчинённого выполнен ИПР.",
+      "category": "mentoring",
+      "rule": "manager.report-idp-completed",
+      "ruleParam": null,
+      "icon": "file-check"
+    },
+    {
+      "id": "mentor-competency",
+      "title": "Ученик подтвердил",
+      "description": "У прямого подчинённого подтверждена компетенция.",
+      "category": "mentoring",
+      "rule": "manager.report-competency",
+      "ruleParam": null,
+      "icon": "award"
+    },
+    {
+      "id": "contribution-mentoring",
+      "title": "Наставник",
+      "description": "Сопровождал нового сотрудника в первые месяцы: разбор задач, проверка кода, ввод в стандарты.",
+      "category": "contribution",
+      "rule": "manual",
+      "ruleParam": null,
+      "icon": "book"
+    },
+    {
+      "id": "contribution-knowledge",
+      "title": "Передача знаний",
+      "description": "Сделал доклад, статью или разбор, которым пользуется команда.",
+      "category": "contribution",
+      "rule": "manual",
+      "ruleParam": null,
+      "icon": "send"
+    },
+    {
+      "id": "contribution-incident",
+      "title": "Разбор инцидента",
+      "description": "Нашёл и устранил причину инцидента, а не только его следствие.",
+      "category": "contribution",
+      "rule": "manual",
+      "ruleParam": null,
+      "icon": "bug"
+    },
+    {
+      "id": "contribution-legacy",
+      "title": "Наследие",
+      "description": "Разобрал и описал чужой участок кода, по которому не было документации.",
+      "category": "contribution",
+      "rule": "manual",
+      "ruleParam": null,
+      "icon": "search"
+    },
+    {
+      "id": "contribution-standard",
+      "title": "Стандарт",
+      "description": "Подготовил или обновил стандарт разработки отдела.",
+      "category": "contribution",
+      "rule": "manual",
+      "ruleParam": null,
+      "icon": "ruler"
+    },
+    {
+      "id": "contribution-security",
+      "title": "Безопасность",
+      "description": "Закрыл уязвимость или заметно снизил риск в рабочем контуре.",
+      "category": "contribution",
+      "rule": "manual",
+      "ruleParam": null,
+      "icon": "shield-check"
+    },
+    {
+      "id": "contribution-process",
+      "title": "Улучшение",
+      "description": "Упростил процесс, которым пользуется больше одной команды.",
+      "category": "contribution",
+      "rule": "manual",
+      "ruleParam": null,
+      "icon": "wrench"
+    }
+  ]
+}
