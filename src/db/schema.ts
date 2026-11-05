@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+  type AnySQLiteColumn,
+} from "drizzle-orm/sqlite-core";
+import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_ICONS, ACHIEVEMENT_RULES } from "../lib/achievement-catalog";
 
 export const jobs = sqliteTable("jobs", {
   id: text("id").primaryKey(),
@@ -219,6 +228,47 @@ export const competencyLinks = sqliteTable("competency_links", {
   sortOrder: integer("sort_order").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
+
+/** Каталог достижений (ADR 0010): ключ — slug, на него ссылается выдача. Запись скрывают `archived`, не удаляют. */
+export const achievements = sqliteTable("achievements", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category", { enum: ACHIEVEMENT_CATEGORIES }).notNull(),
+  rule: text("rule", { enum: ACHIEVEMENT_RULES }).notNull(),
+  ruleParam: text("rule_param"),
+  icon: text("icon", { enum: ACHIEVEMENT_ICONS }).notNull(),
+  archived: integer("archived").notNull().default(0),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/**
+ * Выдача достижения сотруднику: пара «сотрудник × достижение», поэтому повторная выдача обновляет строку.
+ * Отзыв ставит `revoked_at` и не удаляет строку: история остаётся, `granted_by_id` заполнен только у ручной.
+ */
+export const employeeAchievements = sqliteTable(
+  "employee_achievements",
+  {
+    employeeId: text("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    achievementId: text("achievement_id")
+      .notNull()
+      .references(() => achievements.id),
+    source: text("source", { enum: ["auto", "manual"] }).notNull(),
+    ruleKey: text("rule_key"),
+    sourceRef: text("source_ref"),
+    grantedAt: integer("granted_at").notNull(),
+    grantedById: text("granted_by_id").references(() => employees.id),
+    revokedAt: integer("revoked_at"),
+    revokedById: text("revoked_by_id").references(() => employees.id),
+    revokeReason: text("revoke_reason"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.employeeId, t.achievementId] }),
+    index("employee_achievements_achievement").on(t.achievementId),
+  ],
+);
 
 export type JobLane = "executor" | "manager" | "other";
 export type TransitionKind = "linear" | "level_change";
