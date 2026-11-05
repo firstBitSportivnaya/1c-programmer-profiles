@@ -52,6 +52,9 @@ export function openSqlite(filePath: string): { raw: DatabaseSync; client: Sqlit
   const raw = new DatabaseSync(filePath, { enableForeignKeyConstraints: true });
   raw.exec("PRAGMA journal_mode = WAL");
   raw.exec("PRAGMA foreign_keys = ON");
+  // Второй процесс на той же базе (обновление на живом сервере, скрипт рядом с приложением) ждёт
+  // до 5 секунд, а не получает `SQLITE_BUSY` на первой же записи.
+  raw.exec("PRAGMA busy_timeout = 5000");
   let txDepth = 0;
   const client: SqliteClient = {
     prepare(sql: string) {
@@ -61,11 +64,13 @@ export function openSqlite(filePath: string): { raw: DatabaseSync; client: Sqlit
       raw.exec(sql);
     },
     transaction(fn) {
-      const run = (tx: unknown) => {
+      const run = (kind: "deferred" | "immediate" | "exclusive") => (tx: unknown) => {
         const nested = txDepth > 0;
         const sp = `sp_${txDepth}`;
+        // `BEGIN` берёт блокировку на первой записи, `IMMEDIATE` — сразу: чтение внутри такой
+        // транзакции видит уже зафиксированное состояние соседнего процесса.
         if (nested) raw.exec(`SAVEPOINT ${sp}`);
-        else raw.exec("BEGIN");
+        else raw.exec(kind === "deferred" ? "BEGIN" : `BEGIN ${kind.toUpperCase()}`);
         txDepth += 1;
         try {
           const result = fn(tx);
@@ -84,7 +89,7 @@ export function openSqlite(filePath: string): { raw: DatabaseSync; client: Sqlit
           throw error;
         }
       };
-      return { deferred: run, immediate: run, exclusive: run };
+      return { deferred: run("deferred"), immediate: run("immediate"), exclusive: run("exclusive") };
     },
   };
   return { raw, client };

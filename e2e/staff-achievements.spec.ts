@@ -30,6 +30,7 @@ const G = ACCOUNT("g", "Ачивки G");
 const H = ACCOUNT("h", "Ачивки H");
 const I = ACCOUNT("i", "Ачивки I");
 const J = ACCOUNT("j", "Ачивки J");
+const K = ACCOUNT("k", "Ачивки K");
 const A_GOAL = `Цель A ${STAMP}`;
 const A_SECOND = `Цель A2 ${STAMP}`;
 const C_GOAL = `Цель C ${STAMP}`;
@@ -40,6 +41,8 @@ const I_GOAL = `Цель I ${STAMP}`;
 const I_SECOND = `Цель I2 ${STAMP}`;
 const J_GOAL = `Цель J ${STAMP}`;
 const J_SECOND = `Цель J2 ${STAMP}`;
+const K_GOAL = `Цель K ${STAMP}`;
+const K_SECOND = `Цель K2 ${STAMP}`;
 let aPlanPath = "";
 let cCompetency = "";
 let cSecondCompetency = "";
@@ -133,6 +136,37 @@ function revokeManually(testInfo: TestInfo, login: string, achievementId: string
   }
 }
 
+/** Убирает строку профиля прямо в базе: профиль младшего — данные seed, e2e должна вернуть его как был. */
+function removeProfileSkill(testInfo: TestInfo, jobId: string, name: string) {
+  const db = new DatabaseSync(dbFile(testInfo));
+  try {
+    db.prepare(
+      `DELETE FROM profile_skills
+       WHERE profile_id = (SELECT id FROM profiles WHERE job_id = ?)
+         AND competency_id = (SELECT id FROM competencies WHERE name = ?)`,
+    ).run(jobId, name);
+  } finally {
+    db.close();
+  }
+}
+
+/** Сколько раз компетенция стоит в профиле должности: проверка уборки после теста. */
+function profileSkillCount(testInfo: TestInfo, jobId: string, name: string): number {
+  const db = new DatabaseSync(dbFile(testInfo), { readOnly: true });
+  try {
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM profile_skills
+         WHERE profile_id = (SELECT id FROM profiles WHERE job_id = ?)
+           AND competency_id = (SELECT id FROM competencies WHERE name = ?)`,
+      )
+      .get(jobId, name) as { n: number };
+    return row.n;
+  } finally {
+    db.close();
+  }
+}
+
 /** Вход учёткой; на первом прогоне сначала создаёт админа и переключается на нужного сотрудника. */
 async function createStaff(page: Page, staff: { login: string; name: string; password: string }, jobId: string) {
   await page.goto("/people");
@@ -171,6 +205,7 @@ async function createPlan(
   return new URL(page.url()).pathname;
 }
 
+/** Форма добавления строки: узнаётся по заголовку, а не по порядку на странице. */
 function addItemForm(page: Page) {
   return page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
 }
@@ -194,12 +229,14 @@ async function competencyName(page: Page, index: number) {
   return (await option.innerText()).replace(/\s·\sур\.\s\d+$/, "");
 }
 
+/** Приёмка строки плана: ждёт отметку «принято» в той же строке таблицы. */
 async function acceptItem(page: Page, name: string) {
   const row = page.getByRole("row", { name: new RegExp(name) });
   await row.getByRole("button", { name: "Подтвердить" }).click();
   await expect(row.getByText("принято", { exact: true })).toBeVisible();
 }
 
+/** Снятие приёмки: отметка «принято» из строки уходит. */
 async function unacceptItem(page: Page, name: string) {
   const row = page.getByRole("row", { name: new RegExp(name) });
   await row.getByRole("button", { name: "Снять подтверждение" }).click();
@@ -215,10 +252,12 @@ async function openAchievements(page: Page) {
 }
 
 /** Правка сотрудника админом: должность или руководитель. Форма узнаётся по скрытому `id`. */
+/** Правка сотрудника админом: должность или руководитель. Форма узнаётся по скрытому `id`. */
 function editForm(page: Page) {
   return page.locator("form").filter({ has: page.locator('input[name="id"]') });
 }
 
+/** Сохраняет карточку сотрудника и ждёт ответ на POST: проверка базы сразу после должна видеть запись. */
 async function saveStaff(page: Page, employee: string, patch: { job?: string; manager?: string }) {
   await page.goto(`/people/${employee}`);
   const form = editForm(page);
@@ -418,6 +457,38 @@ test("ручная выдача поверх сработавшего прави
   expect(afterRevoke, "строка отзыва одна").toHaveLength(1);
   expect(afterRevoke[0].revoked_at, "дата отзыва сохранена").toBe(revoked.revokedAt);
   expect(afterRevoke[0].revoked_by_id, "отзыв остался за человеком").toBe(revoked.adminId);
+});
+
+test("правка профиля должности меняет достижения без открытия страницы сотрудника", async ({ page }, testInfo) => {
+  await createStaff(page, K, "junior");
+  await createPlan(page, K, "programmer");
+  await addItem(page, K_GOAL);
+  // Компетенция целевого профиля, которой нет у младшего: она подтверждает правило «вне профиля».
+  const outside = await competencyName(page, 0);
+  await addItem(page, K_SECOND, 1);
+  await acceptItem(page, K_GOAL);
+  await expect
+    .poll(() => grants(testInfo, K.login).map((row) => row.achievement_id))
+    .toContain("competency-outside-profile");
+
+  // Админ дописывает эту компетенцию в профиль текущей должности сотрудника.
+  await page.goto("/jobs/junior/profile");
+  const addForm = page
+    .locator("form", { has: page.getByRole("button", { name: "Добавить", exact: true }) })
+    .filter({ has: page.locator("option", { hasText: outside }) });
+  await addForm.locator('select[name="competencyId"]').selectOption({ label: outside });
+  const posted = page.waitForResponse((response) => response.request().method() === "POST");
+  await addForm.getByRole("button", { name: "Добавить" }).click();
+  await posted;
+
+  // Отдельного открытия `/me/achievements` у K нет: отзыв дала правка профиля.
+  await expect
+    .poll(() => grants(testInfo, K.login).find((row) => row.achievement_id === "competency-outside-profile")?.revoked_at)
+    .not.toBeNull();
+
+  // Профиль младшего — данные seed: строку убираем, чтобы она не меняла соседние спецификации.
+  removeProfileSkill(testInfo, "junior", outside);
+  expect(profileSkillCount(testInfo, "junior", outside), "добавленная строка профиля убрана").toBe(0);
 });
 
 test("отменённый план отзывает автоматические достижения", async ({ page }, testInfo) => {

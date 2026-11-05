@@ -207,20 +207,22 @@ export function syncEmployeeAchievements(employeeId: string): void {
   const db = getDb();
   const facts = buildFacts(employee);
   const catalog = db.select().from(achievements).all();
-  const current = new Map(
-    db
-      .select()
-      .from(employeeAchievements)
-      .where(eq(employeeAchievements.employeeId, employeeId))
-      .all()
-      .map((row) => [row.achievementId, row]),
-  );
   const t = now();
   const key = (achievementId: string) =>
     and(eq(employeeAchievements.employeeId, employeeId), eq(employeeAchievements.achievementId, achievementId));
 
   getSqlite()
     .transaction(() => {
+      // Чтение внутри `BEGIN IMMEDIATE`: соседний процесс к этому моменту уже зафиксировал свою выдачу,
+      // поэтому вторая строка не упрётся в первичный ключ `(employee_id, achievement_id)`.
+      const current = new Map(
+        db
+          .select()
+          .from(employeeAchievements)
+          .where(eq(employeeAchievements.employeeId, employeeId))
+          .all()
+          .map((row) => [row.achievementId, row]),
+      );
       for (const row of catalog) {
         if (row.rule === "manual") continue;
         const existing = current.get(row.id);
