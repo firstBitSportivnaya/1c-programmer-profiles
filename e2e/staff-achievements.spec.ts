@@ -1,9 +1,17 @@
-import type { Page } from "@playwright/test";
+/**
+ * Достижения: хранимые выдачи по автоматическим правилам (ADR 0010, issue #117).
+ *
+ * Файл работает от админа: сессия одна на воркер (см. `e2e/fixtures.ts`). Сотрудников заводят эти же
+ * тесты, поэтому база воркера не зависит от seed. Проверки критериев 1–3 смотрят и экран, и строку
+ * выдачи в базе воркера: видно, что записалось, а не только что показано.
+ */
+import type { Page, TestInfo } from "@playwright/test";
+import { DatabaseSync } from "node:sqlite";
 import { expect, login, test } from "./fixtures";
+import { workerDbPath } from "./env";
 
 test.describe.configure({ mode: "serial" });
 
-// Файл работает от админа: сессия одна на воркер (см. e2e/fixtures.ts).
 test.use({ asAdmin: true });
 
 const STAMP = Date.now();
@@ -18,19 +26,85 @@ const C = ACCOUNT("c", "Ачивки C");
 const D = ACCOUNT("d", "Ачивки D");
 const E = ACCOUNT("e", "Ачивки E");
 const F = ACCOUNT("f", "Ачивки F");
+const G = ACCOUNT("g", "Ачивки G");
 const A_GOAL = `Цель A ${STAMP}`;
 const A_SECOND = `Цель A2 ${STAMP}`;
 const C_GOAL = `Цель C ${STAMP}`;
-const D_FIRST = `Цель D1 ${STAMP}`;
+const C_SECOND = `Цель C2 ${STAMP}`;
+const D_GOAL = `Цель D ${STAMP}`;
 const D_SECOND = `Цель D2 ${STAMP}`;
-const F_GOAL = `Цель F ${STAMP}`;
 let aPlanPath = "";
-let cPlanPath = "";
-let cCompetencyPath = "";
+let cCompetency = "";
+let cSecondCompetency = "";
 let dPlanPath = "";
-let aGoalCompetency = "";
-let aGoalCompetencyId = "";
-let aOtherCompetency = "";
+
+/** Строка выдачи сотрудника: проверки критериев смотрят базу, а не только экран. */
+type Grant = {
+  achievement_id: string;
+  source: string;
+  rule_key: string | null;
+  source_ref: string | null;
+  granted_at: number;
+  granted_by_id: string | null;
+  revoked_at: number | null;
+  revoked_by_id: string | null;
+};
+
+/** База воркера этого теста: у каждого воркера своя, см. `e2e/env.ts`. */
+function dbFile(testInfo: TestInfo) {
+  return workerDbPath(testInfo.parallelIndex);
+}
+
+/** Выдачи сотрудника по логину. Отозванные тоже возвращаются: критерий 3 проверяет, что строка осталась. */
+function grants(testInfo: TestInfo, login: string): Grant[] {
+  const db = new DatabaseSync(dbFile(testInfo), { readOnly: true });
+  try {
+    return db
+      .prepare(
+        `SELECT ea.achievement_id, ea.source, ea.rule_key, ea.source_ref, ea.granted_at, ea.granted_by_id,
+                ea.revoked_at, ea.revoked_by_id
+         FROM employee_achievements ea
+         JOIN employees e ON e.id = ea.employee_id
+         WHERE e.login = ?
+         ORDER BY ea.achievement_id`,
+      )
+      .all(login) as Grant[];
+  } finally {
+    db.close();
+  }
+}
+
+/** id сотрудника: админская карточка и оргсвязь задаются по нему. */
+function employeeId(testInfo: TestInfo, login: string): string {
+  const db = new DatabaseSync(dbFile(testInfo), { readOnly: true });
+  try {
+    const row = db.prepare("SELECT id FROM employees WHERE login = ?").get(login) as { id: string } | undefined;
+    return row?.id ?? "";
+  } finally {
+    db.close();
+  }
+}
+
+/** Ручная выдача прямо в базу: админской формы в этом этапе ещё нет, а правило проверки не зависит от неё. */
+function grantManually(testInfo: TestInfo, login: string, achievementId: string): number {
+  const db = new DatabaseSync(dbFile(testInfo));
+  try {
+    const admin = db.prepare("SELECT id FROM employees WHERE is_admin = 1 ORDER BY login LIMIT 1").get() as
+      | { id: string }
+      | undefined;
+    const employee = db.prepare("SELECT id FROM employees WHERE login = ?").get(login) as { id: string } | undefined;
+    if (!admin || !employee) throw new Error(`ручная выдача: не найден сотрудник ${login} или админ`);
+    const t = Math.floor(Date.now() / 1000);
+    db.prepare(
+      `INSERT INTO employee_achievements
+         (employee_id, achievement_id, source, rule_key, source_ref, granted_at, granted_by_id)
+       VALUES (?, ?, 'manual', NULL, NULL, ?, ?)`,
+    ).run(employee.id, achievementId, t, admin.id);
+    return t;
+  } finally {
+    db.close();
+  }
+}
 
 /** Вход учёткой; на первом прогоне сначала создаёт админа и переключается на нужного сотрудника. */
 async function createStaff(page: Page, staff: { login: string; name: string; password: string }, jobId: string) {
@@ -87,353 +161,211 @@ async function addItem(page: Page, name: string, competencyIndex = 0) {
   await expect(page.getByRole("row", { name: new RegExp(name) })).toBeVisible();
 }
 
+/** Название компетенции из списка формы добавления: из подписи убирается планка уровня. */
+async function competencyName(page: Page, index: number) {
+  const option = addItemForm(page).getByLabel(/^Компетенция/).locator("option").nth(index);
+  return (await option.innerText()).replace(/\s·\sур\.\s\d+$/, "");
+}
+
 async function acceptItem(page: Page, name: string) {
   const row = page.getByRole("row", { name: new RegExp(name) });
   await row.getByRole("button", { name: "Подтвердить" }).click();
   await expect(row.getByText("принято", { exact: true })).toBeVisible();
 }
 
-/** Страница достижений: заголовок и пояснение на месте и при пустом списке. */
+async function unacceptItem(page: Page, name: string) {
+  const row = page.getByRole("row", { name: new RegExp(name) });
+  await row.getByRole("button", { name: "Снять подтверждение" }).click();
+  await expect(row.getByText("принято", { exact: true })).toHaveCount(0);
+}
+
+/** Страница достижений: заголовок, пояснение и оба блока на месте. */
 async function openAchievements(page: Page) {
   await page.goto("/me/achievements");
   await expect(page.getByRole("heading", { level: 1, name: "Достижения" })).toBeVisible();
   await expect(page.getByText("очков нет", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Подтверждённые компетенции" })).toBeVisible();
 }
 
-/** На `/me` и в дереве навыков списка нет: только ссылка на страницу достижений, ни одной строки ачивки. */
-async function expectOnlyLink(page: Page) {
-  // В кабинете у действия есть счётчик «Достижения (N)», в дереве навыков — просто «Достижения».
-  await expect(page.getByRole("link", { name: /^Достижения/ })).toBeVisible();
-  await expect(page.getByText("Первая принятая строка", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Компетенция подтверждена", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Все компетенции пула подтверждены", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("ИПР выполнен", { exact: true })).toHaveCount(0);
+/** Правка сотрудника админом: должность или руководитель. Форма узнаётся по скрытому `id`. */
+function editForm(page: Page) {
+  return page.locator("form").filter({ has: page.locator('input[name="id"]') });
 }
 
-type GlyphColor = {
-  /** Вычисленный `stroke` пиктограммы: `currentColor` уже развёрнут браузером. */
-  stroke: string;
-  /** `color` самой строки — от него пиктограмма наследует штрих. */
-  rowColor: string;
-  /** Контраст штриха к фону строки. */
-  iconRatio: number;
-  /** Контраст названия к тому же фону: штрих не должен читаться хуже текста. */
-  titleRatio: number;
-};
-
-/** Цвета пиктограмм и контраст штриха: фон строки собирается из полупрозрачных предков. */
-async function glyphColors(page: Page): Promise<GlyphColor[]> {
-  return page.evaluate(() => {
-    type Rgba = [number, number, number, number];
-    const canvas = document.createElement("canvas");
-    canvas.width = 1;
-    canvas.height = 1;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-
-    function parse(value: string): Rgba {
-      const rgb = value.match(/^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)$/);
-      if (rgb) return [+rgb[1], +rgb[2], +rgb[3], rgb[4] === undefined ? 1 : +rgb[4]];
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = value;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-      return [r, g, b, a / 255];
-    }
-
-    function over(top: Rgba, bottom: Rgba): Rgba {
-      const a = top[3];
-      return [top[0] * a + bottom[0] * (1 - a), top[1] * a + bottom[1] * (1 - a), top[2] * a + bottom[2] * (1 - a), 1];
-    }
-
-    function luminance([r, g, b]: Rgba) {
-      const [lr, lg, lb] = [r, g, b].map((c) => {
-        const s = c / 255;
-        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      });
-      return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
-    }
-
-    function ratio(x: Rgba, y: Rgba) {
-      const [hi, lo] = [luminance(x), luminance(y)].sort((p, q) => q - p);
-      return (hi + 0.05) / (lo + 0.05);
-    }
-
-    function background(element: Element): Rgba {
-      const chain: Element[] = [];
-      for (let node: Element | null = element; node && node !== document.body; node = node.parentElement) {
-        chain.unshift(node);
-      }
-      const pageBg = parse(getComputedStyle(document.body).backgroundColor);
-      return chain.reduce((acc, node) => over(parse(getComputedStyle(node).backgroundColor), acc), pageBg);
-    }
-
-    return [...document.querySelectorAll<HTMLElement>('[data-testid="achievements-list"] > li')].map((row) => {
-      const svg = row.querySelector("svg")!;
-      const title = row.querySelector(".achievement-row__main > :not(svg)")!;
-      const bg = background(row);
-      const stroke = getComputedStyle(svg).stroke;
-      return {
-        stroke,
-        rowColor: getComputedStyle(row).color,
-        iconRatio: ratio(over(parse(stroke), bg), bg),
-        titleRatio: ratio(over(parse(getComputedStyle(title).color), bg), bg),
-      };
-    });
-  });
+async function saveStaff(page: Page, employee: string, patch: { job?: string; manager?: string }) {
+  await page.goto(`/people/${employee}`);
+  const form = editForm(page);
+  if (patch.job) await form.getByLabel(/^Должность/).selectOption(patch.job);
+  if (patch.manager) await form.getByLabel(/^Руководитель/).selectOption({ label: patch.manager });
+  const posted = page.waitForResponse((response) => response.request().method() === "POST");
+  await form.getByRole("button", { name: "Сохранить" }).click();
+  await posted;
 }
 
-test("принятая строка даёт ачивки первой строки и компетенции — только на странице достижений", async ({ page }) => {
+test("критерий 1: первая принятая строка даёт «Первый шаг» и запись с правилом", async ({ page }, testInfo) => {
   await createStaff(page, A, "junior");
   aPlanPath = await createPlan(page, A, "programmer");
-
-  await login(page, A);
-  await openAchievements(page);
-  await expect(page.getByTestId("achievements-empty")).toBeVisible();
-  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
-
-  // Строки плана заводит админ.
-  await login(page);
-  await page.goto(aPlanPath);
   await addItem(page, A_GOAL);
-
-  const options = addItemForm(page).getByLabel(/^Компетенция/).locator("option");
-  aGoalCompetencyId = (await options.nth(0).getAttribute("value")) ?? "";
-  aGoalCompetency = (await options.nth(0).innerText()).replace(/\s·\sур\.\s\d+$/, "");
-  aOtherCompetency = (await options.nth(1).innerText()).replace(/\s·\sур\.\s\d+$/, "");
-  expect(aGoalCompetencyId, "id компетенции первой строки найден в форме").not.toBe("");
   await addItem(page, A_SECOND, 1);
   await acceptItem(page, A_GOAL);
 
   await login(page, A);
   await openAchievements(page);
-  await expect(page.getByTestId("achievements-empty")).toHaveCount(0);
-  await expect(page.getByText("Первая принятая строка", { exact: true })).toBeVisible();
-  await expect(page.getByText("Компетенция подтверждена", { exact: true })).toBeVisible();
-  await expect(page.getByText(aOtherCompetency, { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Все компетенции пула подтверждены", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("ИПР выполнен", { exact: true })).toHaveCount(0);
+  const list = page.getByTestId("achievements-list");
+  await expect(list.getByRole("link", { name: "Первый шаг" })).toHaveAttribute("href", aPlanPath);
+  await expect(list.getByRole("listitem").filter({ hasText: "Компетенция подтверждена" })).toHaveCount(1);
 
-  // Первая строка ведёт к той самой принятой строке плана и прокручивает к ней страницу.
-  const firstRow = page.getByRole("link", { name: "Первая принятая строка" });
-  await expect(firstRow).toHaveAttribute("href", new RegExp(`^${aPlanPath}#item-\\d+$`));
-  await firstRow.click();
-  await expect(page).toHaveURL(new RegExp(`${aPlanPath}#item-\\d+$`));
-  const anchor = page.locator(new URL(page.url()).hash);
-  await expect(anchor).toBeVisible();
-  await expect(anchor).toBeInViewport();
-
-  // Компетенция ведёт в карточку той компетенции, чью строку приняли: сверяем и адрес, и заголовок с ней,
-  // а не с текстом самой ачивки — иначе подмена компетенции «и в тексте, и в href» прошла бы незамеченной.
-  await openAchievements(page);
-  const competencyRow = page
-    .getByTestId("achievements-list")
-    .getByRole("listitem")
-    .filter({ hasText: "Компетенция подтверждена" });
-  await expect(competencyRow).toHaveCount(1);
-  await expect(competencyRow).toContainText(aGoalCompetency);
-  const competencyLink = competencyRow.getByRole("link", { name: /^Компетенция подтверждена/ });
-  await expect(competencyLink).toHaveAttribute("href", `/competencies/${aGoalCompetencyId}`);
-  // Пиктограмма декоративная: доступное имя ссылки прежнее, из названия и компетенции, без значка.
-  await expect(competencyLink).toHaveAccessibleName(`Компетенция подтверждена: ${aGoalCompetency}`);
-  await expect(competencyRow.locator("svg")).toHaveCount(1);
-  await expect(competencyRow.locator("svg")).toHaveAttribute("aria-hidden", "true");
-  await expect(page.getByTestId("achievements-list").locator('[role="img"]')).toHaveCount(0);
-  await competencyLink.click();
-  await expect(page.getByRole("heading", { level: 1, name: aGoalCompetency })).toBeVisible();
-
-  // В кабинете и в дереве списка нет — только ссылка со счётчиком.
-  await page.goto("/me");
-  await expectOnlyLink(page);
-  await expect(page.getByRole("link", { name: "Достижения (2)" })).toBeVisible();
-  await page.goto("/me/skills");
-  await expectOnlyLink(page);
+  const first = grants(testInfo, A.login).filter((row) => row.achievement_id === "idp-first-step");
+  expect(first, "выдача «Первый шаг» одна").toHaveLength(1);
+  expect(first[0].source, "источник автоматический").toBe("auto");
+  expect(first[0].rule_key, "правило записано в выдачу").toBe("idp.first-accepted-item");
+  expect(first[0].source_ref, "в выдаче записан план").toBe(aPlanPath.split("/").pop());
+  expect(first[0].granted_at, "дата выдачи записана").toBeGreaterThan(0);
+  expect(first[0].granted_by_id, "у автоматической выдачи нет автора-человека").toBeNull();
+  expect(first[0].revoked_at, "выдача не отозвана").toBeNull();
 });
 
-test("снятая приёмка убирает ачивки: пустое состояние и ссылка в кабинете без счёта", async ({ page }) => {
+test("критерий 2: повторное выполнение условия не дублирует строку и снимает отзыв", async ({ page }, testInfo) => {
+  const initial = grants(testInfo, A.login).find((row) => row.achievement_id === "idp-first-step");
+  expect(initial, "выдача из критерия 1 на месте").toBeDefined();
+
   await page.goto(aPlanPath);
-  const row = page.getByRole("row", { name: new RegExp(A_GOAL) });
-  await row.getByRole("button", { name: "Снять подтверждение" }).click();
-  await expect(row.getByText("принято", { exact: true })).toHaveCount(0);
+  await unacceptItem(page, A_GOAL);
+  const revoked = grants(testInfo, A.login).find((row) => row.achievement_id === "idp-first-step");
+  expect(revoked?.revoked_at, "снятие приёмки отзывает автоматическую выдачу").not.toBeNull();
+
+  // Секунда нужна, чтобы новая дата выдачи отличалась от прежней: `granted_at` хранится в секундах.
+  await page.waitForTimeout(1100);
+  await acceptItem(page, A_GOAL);
+
+  const again = grants(testInfo, A.login).filter((row) => row.achievement_id === "idp-first-step");
+  expect(again, "строка выдачи по-прежнему одна").toHaveLength(1);
+  expect(again[0].revoked_at, "отзыв снят").toBeNull();
+  expect(again[0].granted_at, "дата выдачи обновлена").toBeGreaterThan(initial!.granted_at);
+  expect(again[0].source_ref, "план в выдаче прежний").toBe(initial!.source_ref);
 
   await login(page, A);
-  const response = await page.goto("/me/achievements");
-  expect(response?.status(), "страница достижений без ачивок отвечает 200").toBe(200);
-  await expect(page.getByRole("heading", { level: 1, name: "Достижения" })).toBeVisible();
-  await expect(page.getByTestId("achievements-empty")).toBeVisible();
-  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
-  await expect(page.getByText("Компетенция подтверждена")).toHaveCount(0);
-  // Пустое состояние без пиктограмм: ни в списке, ни рядом с ним значка нет.
-  await expect(page.getByRole("article").locator("svg")).toHaveCount(0);
-  // Ссылки на пропавшую компетенцию не остаётся — битых адресов нет.
-  await expect(page.locator('a[href^="/competencies/"]')).toHaveCount(0);
-
-  await page.goto("/me");
-  await expect(page.getByRole("link", { name: "Достижения (0)" })).toBeVisible();
-  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-list").getByRole("link", { name: "Первый шаг" })).toBeVisible();
 });
 
-test("все четыре ачивки: каждая строка ведёт к своему плану или компетенции", async ({ page }) => {
-  await createStaff(page, C, "lead");
-  cPlanPath = await createPlan(page, C, "programmer");
-  await addItem(page, C_GOAL);
-  await acceptItem(page, C_GOAL);
+test("критерий 3: снятая приёмка убирает достижение из списка, строка остаётся с отзывом", async ({ page }, testInfo) => {
+  await page.goto(aPlanPath);
+  await unacceptItem(page, A_GOAL);
 
-  await login(page, C);
-  await page.goto(cPlanPath);
-  await expect(page.getByText("выполнен", { exact: true })).toBeVisible();
+  const rows = grants(testInfo, A.login);
+  const first = rows.filter((row) => row.achievement_id === "idp-first-step");
+  expect(first, "отозванная строка в базе осталась").toHaveLength(1);
+  expect(first[0].revoked_at, "дата отзыва записана").not.toBeNull();
 
-  await openAchievements(page);
-  const list = page.getByTestId("achievements-list");
-  for (const title of [
-    "Первая принятая строка",
-    "Компетенция подтверждена",
-    "Все компетенции пула подтверждены",
-    "ИПР выполнен",
-  ]) {
-    // У ссылки на компетенцию доступное имя включает название: «Компетенция подтверждена: <название>».
-    await expect(list.getByRole("link", { name: new RegExp(`^${title}`) })).toBeVisible();
-  }
-
-  // У каждого типа свой декоративный глиф: ровно одна svg перед названием.
-  const rowGlyphs = [
-    ["Первая принятая строка", "flag"],
-    ["Компетенция подтверждена", "award"],
-    ["Все компетенции пула подтверждены", "checklist"],
-    ["ИПР выполнен", "target"],
-  ] as const;
-  for (const [title, icon] of rowGlyphs) {
-    const row = list.getByRole("listitem").filter({ hasText: title });
-    await expect(row, `строка «${title}» одна`).toHaveCount(1);
-    await expect(row.locator("svg"), `в строке «${title}» ровно одна пиктограмма`).toHaveCount(1);
-    await expect(row.locator("svg")).toHaveAttribute("data-icon", icon);
-    await expect(row.locator("svg")).toHaveAttribute("aria-hidden", "true");
-    await expect(row.locator("svg")).toHaveAttribute("focusable", "false");
-    const beforeTitle = await row.evaluate((li) => {
-      const svg = li.querySelector("svg");
-      const titleNode = li.querySelector(".achievement-row__main > :not(svg)");
-      return !!svg && !!titleNode && Boolean(svg.compareDocumentPosition(titleNode) & Node.DOCUMENT_POSITION_FOLLOWING);
-    });
-    expect(beforeTitle, `в строке «${title}» пиктограмма стоит перед названием`).toBe(true);
-  }
-  // Пиктограмма не объявляется картинкой и не попадает в доступное имя ссылки.
-  await expect(list.locator('[role="img"]')).toHaveCount(0);
-  await expect(list.getByRole("link", { name: /^Компетенция подтверждена: .+/ })).toHaveCount(1);
-
-  await expect(list.getByRole("link", { name: "Первая принятая строка" })).toHaveAttribute(
-    "href",
-    new RegExp(`^${cPlanPath}#item-\\d+$`),
-  );
-  await expect(list.getByRole("link", { name: "Все компетенции пула подтверждены" })).toHaveAttribute(
-    "href",
-    cPlanPath,
-  );
-  await expect(list.getByRole("link", { name: "ИПР выполнен" })).toHaveAttribute("href", cPlanPath);
-
-  // Тёмная и светлая темы: штрих наследует цвет текста строки и читается не хуже текста.
-  for (const theme of ["dark", "light"] as const) {
-    if (theme === "light") {
-      await page.addInitScript((value) => localStorage.setItem("pp-theme", value), theme);
-      await page.reload();
-      await expect(page.getByTestId("achievements-list")).toBeVisible();
-    }
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    const colors = await glyphColors(page);
-    expect(colors, `в теме ${theme} у четырёх ачивок есть пиктограммы`).toHaveLength(4);
-    for (const color of colors) {
-      expect(color.stroke, `в теме ${theme} пиктограмма рисуется цветом текста строки`).toBe(color.rowColor);
-      expect(color.iconRatio, `в теме ${theme} контраст штриха ниже 4.5:1`).toBeGreaterThanOrEqual(4.5);
-      expect(color.iconRatio, `в теме ${theme} контраст штриха ниже контраста текста`).toBeGreaterThanOrEqual(
-        color.titleRatio,
-      );
-    }
-  }
-
-  const competencyLink = list.getByRole("link", { name: /^Компетенция подтверждена/ });
-  cCompetencyPath = (await competencyLink.getAttribute("href")) ?? "";
-  expect(cCompetencyPath, "компетенция ведёт в свою карточку").toMatch(/^\/competencies\//);
-  await competencyLink.click();
-  await expect(page).toHaveURL(new RegExp(`${cCompetencyPath}$`));
-  await expect(page.getByRole("heading", { level: 2, name: "Материалы" })).toBeVisible();
-
-  await openAchievements(page);
-  await list.getByRole("link", { name: "Все компетенции пула подтверждены" }).click();
-  await expect(page).toHaveURL(new RegExp(`${cPlanPath}$`));
-  await expect(page.getByRole("heading", { level: 1, name: /^ИПР:/ })).toBeVisible();
-});
-
-test("приёмки отменённого плана в ачивках не видны", async ({ page }) => {
-  await createStaff(page, D, "junior");
-  dPlanPath = await createPlan(page, D, "programmer");
-  await addItem(page, D_FIRST);
-  await addItem(page, D_SECOND);
-  await acceptItem(page, D_FIRST);
-
-  await login(page, D);
-  await openAchievements(page);
-  await expect(page.getByRole("link", { name: "Первая принятая строка" })).toBeVisible();
-
-  // Отменяет план админ.
-  await login(page);
-  await page.goto(dPlanPath);
-  await page.getByRole("button", { name: "Отменить" }).click();
-  await expect(page.getByText("отменён", { exact: true })).toBeVisible();
-
-  await login(page, D);
+  await login(page, A);
   await openAchievements(page);
   await expect(page.getByTestId("achievements-empty")).toBeVisible();
-  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
+  await expect(page.getByTestId("achievements-list")).toHaveCount(0);
+  await expect(page.getByTestId("confirmed-empty")).toBeVisible();
+  // Подтверждённых компетенций нет: вторая строка плана так и не принята.
+  await expect(page.getByTestId("confirmed-competencies").getByRole("listitem")).toHaveCount(0);
 });
 
-test("страница только своя: чужой сотрудник и его id в адресе ачивок не дают", async ({ page }) => {
+test("критерий 4 (негативный): ручную выдачу проверка не отзывает и не переписывает", async ({ page }, testInfo) => {
   await createStaff(page, B, "junior");
-
-  // Ачивки есть у C. Его id берём из каталога, пока в контексте админ: сотруднику чужие карточки не ссылками.
-  await page.goto("/people");
-  const cHref = await page.getByRole("link", { name: C.name, exact: true }).getAttribute("href");
-  const cEmployeeId = cHref?.split("/").pop() ?? "";
-  expect(cEmployeeId, "id сотрудника C не найден в каталоге").not.toBe("");
+  const grantedAt = grantManually(testInfo, B.login, "contribution-mentoring");
 
   await login(page, B);
   await openAchievements(page);
-  await expect(page.getByTestId("achievements-empty")).toBeVisible();
-  await expect(page.getByText("Все компетенции пула подтверждены")).toHaveCount(0);
+  await expect(page.getByTestId("achievements-list").getByRole("listitem").filter({ hasText: "Наставник" })).toBeVisible();
 
-  // Чужой id в строке запроса страницу не переключает: она всегда своя.
-  await page.goto(`/me/achievements?employeeId=${encodeURIComponent(cEmployeeId)}`);
-  await expect(page.getByTestId("achievements-empty")).toBeVisible();
-  await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
-});
-
-test("план без компетенций в пуле ачивку пула не даёт", async ({ page }) => {
-  await createStaff(page, E, "senior");
-  // Профиль senior полностью покрывает профиль programmer: разрыв пуст, строк пула не появляется.
-  await createPlan(page, E, "programmer", { emptyPool: true });
-
-  await login(page, E);
+  // Открытие страницы прогоняет проверку всех правил: ручная строка ей не подчиняется.
   await openAchievements(page);
-  await expect(page.getByTestId("achievements-empty")).toBeVisible();
-  await expect(page.getByText("Все компетенции пула подтверждены")).toHaveCount(0);
-
-  await page.goto("/me");
-  await expect(page.getByRole("link", { name: "Достижения (0)" })).toBeVisible();
+  const rows = grants(testInfo, B.login);
+  expect(rows, "других выдач у сотрудника нет").toHaveLength(1);
+  expect(rows[0].source, "источник остался ручным").toBe("manual");
+  expect(rows[0].granted_at, "дата ручной выдачи не переписана").toBe(grantedAt);
+  expect(rows[0].revoked_at, "ручная выдача не отозвана").toBeNull();
 });
 
-test("приёмка в первом плане видна, когда появился второй план", async ({ page }) => {
-  await createStaff(page, F, "junior");
-  await createPlan(page, F, "programmer");
-  await addItem(page, F_GOAL);
-  await acceptItem(page, F_GOAL);
-  await expect(page.getByText("выполнен", { exact: true })).toBeVisible();
+test("критерий 5: компетенции остаются текстом в блоке и не дают строку на каждую", async ({ page }) => {
+  await createStaff(page, C, "junior");
+  await createPlan(page, C, "programmer");
+  await addItem(page, C_GOAL);
+  cCompetency = await competencyName(page, 0);
+  cSecondCompetency = await competencyName(page, 1);
+  await addItem(page, C_SECOND, 1);
+  await acceptItem(page, C_GOAL);
+  await acceptItem(page, C_SECOND);
 
-  await createPlan(page, F, "programmer", { rowText: "активен" });
+  await login(page, C);
+  await openAchievements(page);
+  const block = page.getByTestId("confirmed-competencies");
+  await expect(block.getByRole("listitem").filter({ hasText: cCompetency })).toHaveCount(1);
+  await expect(block.getByRole("listitem").filter({ hasText: cSecondCompetency })).toHaveCount(1);
+  await expect(block.locator("a"), "компетенции в блоке — текст, а не ссылки").toHaveCount(0);
+
+  const list = page.getByTestId("achievements-list");
+  await expect(list.getByRole("listitem").filter({ hasText: "Компетенция подтверждена" })).toHaveCount(1);
+  await expect(list.getByRole("listitem").filter({ hasText: cCompetency }), "компетенция строкой выдачи не стала").toHaveCount(0);
+  await expect(list.getByRole("listitem").filter({ hasText: cSecondCompetency })).toHaveCount(0);
+});
+
+test("смена должности и оргсвязи выдаёт достижения без открытия страницы", async ({ page }, testInfo) => {
+  await createStaff(page, E, "junior");
+  await createStaff(page, F, "junior");
+  await createStaff(page, G, "junior");
+  const gid = employeeId(testInfo, G.login);
+  expect(gid, "id сотрудника G найден").not.toBe("");
+
+  // Подчинённый у F: правило наставничества проверяется в действии админки.
+  await saveStaff(page, gid, { manager: F.name });
+  await expect
+    .poll(() => grants(testInfo, F.login).map((row) => row.achievement_id))
+    .toContain("mentor-first-report");
+
+  // Должность E: правило каталога ссылается на id должности.
+  await saveStaff(page, employeeId(testInfo, E.login), { job: "programmer" });
+  await expect
+    .poll(() => grants(testInfo, E.login).map((row) => row.achievement_id))
+    .toContain("career-programmer");
 
   await login(page, F);
   await openAchievements(page);
-  await expect(page.getByRole("link", { name: "Первая принятая строка" })).toBeVisible();
+  await expect(page.getByTestId("achievements-list").getByRole("listitem").filter({ hasText: "Первый подчинённый" })).toBeVisible();
+  await login(page, E);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-list").getByRole("listitem").filter({ hasText: "Программист" })).toBeVisible();
+});
 
-  await page.goto("/me");
-  await expectOnlyLink(page);
-  await expect(page.getByRole("link", { name: /^Достижения \(\d+\)$/ })).toBeVisible();
+test("отменённый план отзывает автоматические достижения", async ({ page }, testInfo) => {
+  await createStaff(page, D, "junior");
+  dPlanPath = await createPlan(page, D, "programmer");
+  await addItem(page, D_GOAL);
+  // Вторая строка остаётся непринятой: иначе план сразу выполнен и отменять нечего.
+  await addItem(page, D_SECOND, 1);
+  await acceptItem(page, D_GOAL);
+  expect(grants(testInfo, D.login).map((row) => row.achievement_id)).toContain("idp-first-step");
+
+  await page.goto(dPlanPath);
+  await page.getByRole("button", { name: "Отменить" }).click();
+  await expect(page.getByText("отменён", { exact: true })).toBeVisible();
+  const first = grants(testInfo, D.login).find((row) => row.achievement_id === "idp-first-step");
+  expect(first?.revoked_at, "отмена плана отзывает выдачу").not.toBeNull();
+
+  await login(page, D);
+  await openAchievements(page);
+  await expect(page.getByTestId("achievements-empty")).toBeVisible();
+});
+
+test("страница только своя: чужой сотрудник и его id в адресе не дают", async ({ page }, testInfo) => {
+  const cid = employeeId(testInfo, C.login);
+  expect(cid, "id сотрудника C найден").not.toBe("");
+
+  await login(page, B);
+  await openAchievements(page);
+  // У B только ручное «Наставник»: чужих достижений C здесь нет.
+  await expect(page.getByTestId("achievements-list").getByRole("listitem").filter({ hasText: "Первый шаг" })).toHaveCount(0);
+
+  await page.goto(`/me/achievements?employeeId=${encodeURIComponent(cid)}`);
+  await expect(page.getByText("Первый шаг", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("achievements-list").getByRole("listitem").filter({ hasText: "Компетенция подтверждена" })).toHaveCount(0);
 });
 
 test.describe("гость", () => {
@@ -444,16 +376,10 @@ test.describe("гость", () => {
     await page.goto("/me/achievements");
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { name: "Достижения" })).toHaveCount(0);
-    // Ни названий ачивок, ни пиктограмм: страница закрыта целиком.
-    await expect(page.getByText("Первая принятая строка")).toHaveCount(0);
+    await expect(page.getByText("Первый шаг")).toHaveCount(0);
     await expect(page.locator("[data-icon]")).toHaveCount(0);
 
-    // Цели кросс-ссылок тоже закрыты: содержимое плана и карточки компетенции не показывается.
-    await page.goto(cCompetencyPath);
-    await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole("heading", { level: 2, name: "Материалы" })).toHaveCount(0);
-
-    await page.goto(cPlanPath);
+    await page.goto(aPlanPath);
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { level: 1, name: /^ИПР:/ })).toHaveCount(0);
   });

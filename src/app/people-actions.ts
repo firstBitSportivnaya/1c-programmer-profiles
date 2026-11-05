@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, now, retryIfClosed } from "@/db";
 import { employeeCompetencyMarks, employees, idps, type CompetencyMarkStatus } from "@/db/schema";
 import { requireAdmin, requireEmployee } from "@/lib/auth";
+import { syncEmployeeAchievements } from "@/lib/achievement-rules";
 import {
   InvariantError,
   assertManagerLink,
@@ -66,6 +67,16 @@ function revalidatePeople(employeeId: string, idpId?: string) {
   if (idpId) revalidatePath(`/idps/${idpId}`);
 }
 
+/**
+ * Сверка автоматических достижений после смены должности или оргсвязи (ADR 0010):
+ * у сотрудника меняются правила должности и профиля, у обоих руководителей — правила наставничества.
+ */
+function syncPeopleAchievements(...ids: (string | null | undefined)[]) {
+  for (const id of new Set(ids.filter((value): value is string => Boolean(value)))) {
+    syncEmployeeAchievements(id);
+  }
+}
+
 export async function saveEmployeeAction(
   _prev: ActionResult,
   formData: FormData,
@@ -102,6 +113,7 @@ export async function saveEmployeeAction(
           updatedAt: t,
         })
         .run();
+      syncPeopleAchievements(id, managerId);
       revalidatePeople(id);
       return null;
     }
@@ -132,6 +144,7 @@ export async function saveEmployeeAction(
       patch.passwordHash = hashPassword(password);
     }
     db.update(employees).set(patch).where(eq(employees.id, idRaw)).run();
+    syncPeopleAchievements(idRaw, existing.managerId, managerId);
     revalidatePeople(idRaw);
     return null;
   } catch (error) {
@@ -156,6 +169,7 @@ export async function assignJobAction(
     if (!getJob(jobId)) throw new InvariantError("Должность не найдена");
     const t = now();
     getDb().update(employees).set({ jobId, updatedAt: t }).where(eq(employees.id, employeeId)).run();
+    syncPeopleAchievements(employeeId);
     revalidatePeople(employeeId);
     return null;
   } catch (error) {
@@ -239,6 +253,7 @@ export async function deactivateEmployeeAction(
     if (active) {
       db.update(idps).set({ status: "cancelled", updatedAt: t }).where(eq(idps.id, active.id)).run();
     }
+    const previousManagerId = existing.managerId;
     db.update(employees)
       .set({ isActive: 0, managerId: null, updatedAt: t })
       .where(eq(employees.id, employeeId))
@@ -247,6 +262,7 @@ export async function deactivateEmployeeAction(
       .set({ managerId: null, updatedAt: t })
       .where(eq(employees.managerId, employeeId))
       .run();
+    syncPeopleAchievements(previousManagerId);
     revalidatePeople(employeeId);
     return null;
   } catch (error) {

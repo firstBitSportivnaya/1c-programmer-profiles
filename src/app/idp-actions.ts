@@ -15,6 +15,7 @@ import {
   idps,
 } from "@/db/schema";
 import { requireEmployee, type SessionEmployee } from "@/lib/auth";
+import { syncEmployeeAchievements } from "@/lib/achievement-rules";
 import {
   expandIdpPool,
   fillIdpPool,
@@ -196,6 +197,7 @@ export async function cancelIdpAction(_prev: ActionResult, formData: FormData, r
     const actor = await requireEmployee();
     const idp = requireActiveManagedIdp(actor, String(formData.get("idpId") ?? ""));
     getDb().update(idps).set({ status: "cancelled", updatedAt: now() }).where(eq(idps.id, idp.id)).run();
+    syncEmployeeAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
@@ -290,6 +292,7 @@ export async function addIdpItemAction(_prev: ActionResult, formData: FormData, 
           return true;
         })
         .deferred(null);
+      syncEmployeeAchievements(idp.employeeId);
       revalidateIdp(idp.employeeId, idp.id);
       return null;
     } catch (error) {
@@ -349,6 +352,7 @@ export async function deleteIdpItemAction(_prev: ActionResult, formData: FormDat
       })
       .deferred(null);
     maybeCompleteIdp(idp.id);
+    syncEmployeeAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
@@ -401,6 +405,7 @@ export async function acceptIdpItemAction(_prev: ActionResult, formData: FormDat
       .where(eq(idpItems.id, item.id))
       .run();
     maybeCompleteIdp(idp.id);
+    syncEmployeeAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
@@ -430,6 +435,7 @@ export async function unacceptIdpItemAction(_prev: ActionResult, formData: FormD
     if (idp.status === "completed") {
       getDb().update(idps).set({ status: "active", updatedAt: now() }).where(eq(idps.id, idp.id)).run();
     }
+    syncEmployeeAchievements(idp.employeeId);
     revalidateIdp(idp.employeeId, idp.id);
     return null;
   } catch (error) {
