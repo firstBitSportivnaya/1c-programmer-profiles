@@ -7,6 +7,7 @@ import {
   competencies,
   competencyLinks,
   employeeCompetencyMarks,
+  employees,
   jobTransitions,
   jobs,
   profileSkills,
@@ -14,6 +15,7 @@ import {
   type CompetencyLinkKind,
 } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { syncEmployeeAchievements } from "@/lib/achievement-rules";
 import {
   InvariantError,
   assertCompetencyDeletable,
@@ -34,6 +36,20 @@ function revalidateCompetencyAdmin(id?: string) {
   if (id) revalidatePath(`/admin/competencies/${id}`);
   revalidatePath("/jobs/[jobId]/profile", "page");
   revalidatePath("/idps/[idpId]", "page");
+}
+
+/**
+ * Сверка достижений после правки профиля должности (ADR 0010): правила `competency.half-profile`,
+ * `competency.full-profile` и `competency.outside-profile` читают набор навыков профиля,
+ * поэтому меняются выдачи всех сотрудников этой должности, а не только открытая страница.
+ */
+function syncProfileAchievements(jobId: string) {
+  const rows = getDb()
+    .select({ id: employees.id })
+    .from(employees)
+    .where(and(eq(employees.jobId, jobId), eq(employees.isActive, 1)))
+    .all();
+  for (const row of rows) syncEmployeeAchievements(row.id);
 }
 
 function isNextControlFlow(error: unknown) {
@@ -411,6 +427,7 @@ export async function upsertSkillAction(
         .values({ profileId: profile.id, competencyId, level, criteria, sortOrder, updatedAt: t })
         .run();
     }
+    syncProfileAchievements(jobId);
     revalidatePath(`/jobs/${jobId}/profile`);
     revalidatePath("/compare");
     return null;
@@ -439,6 +456,7 @@ export async function deleteSkillAction(
       .get();
     if (!row) throw new InvariantError("Строка профиля не найдена");
     db.delete(profileSkills).where(eq(profileSkills.id, skillId)).run();
+    syncProfileAchievements(jobId);
     revalidatePath(`/jobs/${jobId}/profile`);
     revalidatePath("/compare");
     return null;

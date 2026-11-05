@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { SkillTree } from "@/components/SkillTree";
-import { employeeAchievements } from "@/lib/achievements";
+import { confirmedCompetencies } from "@/lib/achievements";
 import { getSessionEmployee } from "@/lib/auth";
 import {
   competencyMarkViews,
@@ -106,11 +106,7 @@ export default async function SkillTreePage() {
 
   const criteria = criteriaMap(currentRows, targetRows);
 
-  const confirmed = new Set(
-    employeeAchievements(employee.id)
-      .filter((row) => row.key.startsWith("competency:"))
-      .map((row) => row.key.slice("competency:".length)),
-  );
+  const confirmed = new Set(confirmedCompetencies(employee.id).map((row) => row.competencyId));
 
   const data = buildSkillTree({
     currentJob: currentJob ? { id: currentJob.id, name: currentJob.name, href: jobHref(currentJob.id) } : null,

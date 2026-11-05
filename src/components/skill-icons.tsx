@@ -264,14 +264,6 @@ function renderGlyph(name: string): ReactNode {
   });
 }
 
-/** Значок типа достижения: часть ключа до `:` — `first-row`, `competency`, `pool`, `idp`. */
-const ACHIEVEMENT_ICONS: Record<string, string> = {
-  "first-row": "flag",
-  competency: "award",
-  pool: "checklist",
-  idp: "target",
-};
-
 /** Разметка глифа: общая для значков навыков и достижений. Декоративная, поэтому aria-hidden. */
 function GlyphSvg({ name, className }: { name: string; className?: string }) {
   return (
@@ -298,8 +290,7 @@ export function SkillIcon({ id, kind, className }: { id: string; kind: string; c
   return <GlyphSvg name={name} className={className} />;
 }
 
-/** Значок достижения: по типу ключа. Неизвестный тип не оставляет строку без картинки — берём `award`. */
-export function AchievementIcon({ achievementKey, className }: { achievementKey: string; className?: string }) {
-  const type = achievementKey.split(":")[0];
-  return <GlyphSvg name={ACHIEVEMENT_ICONS[type] ?? "award"} className={className} />;
+/** Значок достижения: имя глифа из каталога (ADR 0010). Неизвестный глиф не оставляет строку без картинки. */
+export function AchievementIcon({ icon, className }: { icon: string; className?: string }) {
+  return <GlyphSvg name={icon} className={className} />;
 }

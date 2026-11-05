@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getSqlite, now, resetDbConnection } from "../src/db";
 import { migrate } from "../src/db/migrate";
+import { syncEmployeeAchievements } from "../src/lib/achievement-rules";
 import type { SqliteClient } from "../src/db/sqlite";
 
 type Competency = {
@@ -179,6 +180,10 @@ function main() {
         return true;
       })
       .immediate(null);
+    // Профили перезаписаны, а правила достижений читают их набор навыков (ADR 0010):
+    // сверяем выдачи сотрудников сразу, иначе счётчик в кабинете ждёт открытия `/me/achievements`.
+    const staff = getSqlite().prepare("SELECT id FROM employees").all() as { id: string }[];
+    for (const row of staff) syncEmployeeAchievements(row.id);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
