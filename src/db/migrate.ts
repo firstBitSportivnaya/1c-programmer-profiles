@@ -1,4 +1,6 @@
-import { getSqlite } from "./index";
+import catalogSeed from "../../seed/achievements.json";
+import { getSqlite, now } from "./index";
+import type { AchievementRecord } from "../lib/achievement-catalog";
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS jobs (
@@ -424,6 +426,153 @@ function rebuildIdpItems() {
   `);
 }
 
+/**
+ * Схема каталога и выдач (ADR 0010). Таблиц нет в общем `DDL`, потому что сразу после их создания
+ * выполняется однократный перенос прежних вычисляемых достижений, а он должен видеть, были ли таблицы.
+ * Создание и заполнение идут одной транзакцией: иначе сбой между ними оставил бы базу без переноса.
+ */
+function ensureAchievementTables() {
+  // Перенос идёт один раз: в базе main нет таблицы выдач, а создаётся она вместе с каталогом.
+  const fresh = !tableExists("employee_achievements");
+  const sqlite = getSqlite();
+  sqlite
+    .transaction(() => {
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS achievements (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          category TEXT NOT NULL,
+          rule TEXT NOT NULL,
+          rule_param TEXT,
+          icon TEXT NOT NULL,
+          archived INTEGER NOT NULL DEFAULT 0,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS employee_achievements (
+          employee_id TEXT NOT NULL REFERENCES employees(id),
+          achievement_id TEXT NOT NULL REFERENCES achievements(id),
+          source TEXT NOT NULL,
+          rule_key TEXT,
+          source_ref TEXT,
+          granted_at INTEGER NOT NULL,
+          granted_by_id TEXT REFERENCES employees(id),
+          revoked_at INTEGER,
+          revoked_by_id TEXT REFERENCES employees(id),
+          revoke_reason TEXT,
+          PRIMARY KEY (employee_id, achievement_id)
+        );
+        CREATE INDEX IF NOT EXISTS employee_achievements_achievement ON employee_achievements (achievement_id);
+      `);
+      fillAchievementCatalog();
+      if (fresh) backfillLegacyAchievements();
+      return true;
+    })
+    .immediate(null);
+}
+
+/** Дополняет каталог записями seed по ключу. Существующие строки, включая правки админа, не перезаписываются. */
+function fillAchievementCatalog() {
+  const sqlite = getSqlite();
+  const insert = sqlite.prepare(`
+    INSERT OR IGNORE INTO achievements
+      (id, title, description, category, rule, rule_param, icon, archived, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+  `);
+  const t = now();
+  for (const row of catalogSeed.achievements as AchievementRecord[]) {
+    insert.run(row.id, row.title, row.description, row.category, row.rule, row.ruleParam, row.icon, t);
+  }
+}
+
+/** Ачивка, которую до появления таблиц считали по приёмкам, и правило, под которым она выдавалась. */
+const LEGACY_ACHIEVEMENTS = {
+  firstStep: { id: "idp-first-step", rule: "idp.first-accepted-item" },
+  poolClosed: { id: "idp-pool-closed", rule: "idp.pool-confirmed" },
+  completed: { id: "idp-completed", rule: "idp.completed" },
+} as const;
+
+/**
+ * Переносит прежние вычисляемые достижения в выдачи (ADR 0010): по одной строке на сотрудника.
+ * Подтверждение конкретной компетенции не переносится — это блок страницы, а не достижение.
+ * `INSERT OR IGNORE` не трогает уже выданное: отозванная вручную строка не оживает.
+ */
+function backfillLegacyAchievements() {
+  const sqlite = getSqlite();
+  const insert = sqlite.prepare(`
+    INSERT OR IGNORE INTO employee_achievements
+      (employee_id, achievement_id, source, rule_key, source_ref, granted_at)
+    VALUES (?, ?, 'auto', ?, ?, ?)
+  `);
+  /** Выдаёт достижение, но не больше одного раза на сотрудника: строки уже упорядочены, берём первую. */
+  const grant = (rows: { employeeId: string; idpId: string; grantedAt: number }[], achievement: { id: string; rule: string }) => {
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (seen.has(row.employeeId)) continue;
+      seen.add(row.employeeId);
+      insert.run(row.employeeId, achievement.id, achievement.rule, row.idpId, row.grantedAt);
+    }
+  };
+
+  // Первая принятая строка за всё время: самое раннее подтверждение, при равном времени — меньший id строки.
+  grant(
+    sqlite
+      .prepare(
+        `SELECT i.employee_id AS employeeId, it.idp_id AS idpId, it.accepted_at AS grantedAt
+         FROM idp_items AS it
+         JOIN idps AS i ON i.id = it.idp_id
+         WHERE it.accepted_at IS NOT NULL AND i.status <> 'cancelled'
+         ORDER BY i.employee_id, it.accepted_at, it.id`,
+      )
+      .all() as { employeeId: string; idpId: string; grantedAt: number }[],
+    LEGACY_ACHIEVEMENTS.firstStep,
+  );
+
+  // Пул закрыт: в плане есть пул и у каждой его компетенции все строки приняты.
+  // План выбирается по id, дата — последняя приёмка плана: момента «пул закрылся» в базе нет.
+  grant(
+    sqlite
+      .prepare(
+        `SELECT i.employee_id AS employeeId, i.id AS idpId,
+                (SELECT MAX(it.accepted_at) FROM idp_items AS it WHERE it.idp_id = i.id) AS grantedAt
+         FROM idps AS i
+         WHERE i.status <> 'cancelled'
+           AND EXISTS (SELECT 1 FROM idp_pool AS p WHERE p.idp_id = i.id)
+           AND NOT EXISTS (
+             SELECT 1 FROM idp_pool AS p
+             WHERE p.idp_id = i.id
+               AND (
+                 NOT EXISTS (
+                   SELECT 1 FROM idp_items AS it
+                   WHERE it.idp_id = i.id AND it.competency_id = p.competency_id
+                 )
+                 OR EXISTS (
+                   SELECT 1 FROM idp_items AS it
+                   WHERE it.idp_id = i.id AND it.competency_id = p.competency_id AND it.accepted_at IS NULL
+                 )
+               )
+           )
+         ORDER BY i.employee_id, i.id`,
+      )
+      .all() as { employeeId: string; idpId: string; grantedAt: number }[],
+    LEGACY_ACHIEVEMENTS.poolClosed,
+  );
+
+  // ИПР выполнен: достаточно одного выполненного плана. Дату выполнения отдельно не хранят,
+  // поэтому в `granted_at` идёт `updated_at` — последняя правка плана.
+  grant(
+    sqlite
+      .prepare(
+        `SELECT employee_id AS employeeId, id AS idpId, updated_at AS grantedAt
+         FROM idps
+         WHERE status = 'completed'
+         ORDER BY employee_id, id`,
+      )
+      .all() as { employeeId: string; idpId: string; grantedAt: number }[],
+    LEGACY_ACHIEVEMENTS.completed,
+  );
+}
+
 export function migrate() {
   getSqlite().exec(DDL);
   addColumnIfMissing("employee_competency_marks", "note", "note TEXT NOT NULL DEFAULT ''");
@@ -437,4 +586,5 @@ export function migrate() {
   addColumnIfMissing("idp_assignments", "level", "level INTEGER");
   addColumnIfMissing("idp_items", "assignment_level", "assignment_level INTEGER");
   retargetMergedCompetencies();
+  ensureAchievementTables();
 }

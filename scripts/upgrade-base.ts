@@ -11,6 +11,7 @@ import { migrate } from "../src/db/migrate";
 import path from "node:path";
 import {
   competencyLinks,
+  employeeAchievements,
   employeeCompetencyMarks,
   employees,
   idpAssignmentOptions,
@@ -182,12 +183,20 @@ function main() {
           { competencyId: skills[0].competencyId, kind: "video", title: "Разбор", url: "https://example.org/video", sortOrder: 1, updatedAt: t },
         ])
         .run();
+
+      // Каталог заполняет migrate(); здесь — выдачи, чтобы следующая проверка обновления видела их до и после.
+      db.insert(employeeAchievements)
+        .values([
+          { employeeId: "emp-junior", achievementId: "idp-first-step", source: "auto", ruleKey: "idp.first-accepted-item", sourceRef: "idp-active", grantedAt: t },
+          { employeeId: "emp-junior", achievementId: "idp-completed", source: "auto", ruleKey: "idp.completed", sourceRef: "idp-done", grantedAt: t },
+        ])
+        .run();
       return true;
     })
     .deferred(null);
 
   console.log(
-    "upgrade base: employees=4 idps=2 idp_assignments=3 idp_pool=3 idp_items=2 employee_competency_marks=2 competency_links=2 idp_assignment_questions=1 idp_item_questions=1 idp_item_attempts=1",
+    "upgrade base: employees=4 idps=2 idp_assignments=3 idp_pool=3 idp_items=2 employee_competency_marks=2 competency_links=2 idp_assignment_questions=1 idp_item_questions=1 idp_item_attempts=1 achievements=30 employee_achievements=2",
   );
 }
 
