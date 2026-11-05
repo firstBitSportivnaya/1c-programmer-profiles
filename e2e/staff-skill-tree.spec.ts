@@ -155,6 +155,19 @@ function skillNode(page: Page, competencyId: string) {
   return page.getByTestId(`skill-node-${competencyId}`);
 }
 
+/**
+ * Дождаться конца выезда панели навыка перед замером геометрии.
+ * Анимация `skill-popup-in-right` въезжает с `translateX(16px)`, а постоянный отступ от края холста — 12px:
+ * первые 200 мс карточка шире холста на 4px, и замер первого кадра даёт ложное «уехала под край».
+ * На быстрой машине замер попадает в анимацию, на медленной — уже нет, поэтому в CI тест падал, а локально шёл.
+ */
+async function settleSkillPopup(page: Page) {
+  await page.locator(".skill-popup").evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
+    return true;
+  });
+}
+
 /** Все рёбра холста — только предпосылки: от родителя на слой выше к навыку на слой ниже. */
 async function expectPrerequisiteLayers(page: Page) {
   const graph = await page.evaluate(() => {
@@ -529,12 +542,14 @@ test("карточка поверх холста, рёбра ветви свет
   expect(sizes.length).toBeLessThanOrEqual(3);
 
   // Карточка не уезжает под край холста и не растягивает страницу.
+  await settleSkillPopup(page);
   const fits = await page.evaluate(() => {
     const shell = document.querySelector(".skill-tree-shell")!.getBoundingClientRect();
     const card = document.querySelector(".skill-popup")!.getBoundingClientRect();
-    return card.right <= shell.right && document.documentElement.scrollWidth <= window.innerWidth;
+    return { cardRight: card.right, shellRight: shell.right, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth };
   });
-  expect(fits).toBe(true);
+  expect(fits.cardRight).toBeLessThanOrEqual(fits.shellRight);
+  expect(fits.scrollWidth).toBeLessThanOrEqual(fits.innerWidth);
 
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
@@ -827,6 +842,7 @@ test("панель навыка: справа от холста, не шире �
   const panel = page.getByTestId("skill-node-panel");
   await expect(panel).toBeVisible();
   await expect(skillNode(page, PROGRAMMING.id)).toHaveAttribute("data-selected", "true");
+  await settleSkillPopup(page);
 
   // Панель стоит у правого края холста и перекрывает меньше половины его ширины.
   const geometry = await page.evaluate(() => {

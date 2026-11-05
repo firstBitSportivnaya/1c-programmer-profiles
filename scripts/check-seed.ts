@@ -4,6 +4,14 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import {
+  ACHIEVEMENT_CATEGORIES,
+  ACHIEVEMENT_CATALOG_SIZE,
+  ACHIEVEMENT_ICONS,
+  ACHIEVEMENT_RULES,
+  ruleNeedsParam,
+  type AchievementRecord,
+} from "../src/lib/achievement-catalog";
 import { PREREQUISITES, prerequisiteProblems } from "../src/lib/skill-tree-graph";
 
 type Job = {
@@ -152,7 +160,9 @@ function checkPrerequisites(data: Seed, errors: string[]) {
  * И сама по себе целая: ссылки профиля, переходов и родителей ведут внутрь фикстуры.
  */
 function checkFixture(data: Seed, fixture: Seed, errors: string[]) {
+  /** Одинаковые ли записи: сравниваем целые объекты, а не отдельные поля. */
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  /** Сверяет раздел фикстуры с основными данными по ключу записи. */
   const compare = <T>(section: string, items: T[], source: T[], key: (item: T) => string) => {
     const sourceByKey = new Map(source.map((item) => [key(item), item]));
     for (const item of items) {
@@ -186,16 +196,68 @@ function checkFixture(data: Seed, fixture: Seed, errors: string[]) {
   }
 }
 
+/** Читает каталог достижений и проверяет, что файл кончается переводом строки. */
+function readAchievements(errors: string[]): AchievementRecord[] {
+  const rel = path.join("seed", "achievements.json");
+  const text = fs.readFileSync(path.join(process.cwd(), rel), "utf8");
+  if (!text.endsWith("\n")) errors.push(`${rel}: нет перевода строки в конце файла`);
+  return (JSON.parse(text) as { achievements: AchievementRecord[] }).achievements;
+}
+
+/**
+ * Каталог достижений (ADR 0010): ровно 30 записей, ключи и названия уникальны, у каждой записи есть
+ * описание, категория, правило и иконка из закрытых списков. Параметр правила ссылается на должность.
+ */
+function checkAchievements(seed: Seed, achievements: AchievementRecord[], errors: string[]) {
+  if (achievements.length !== ACHIEVEMENT_CATALOG_SIZE) {
+    errors.push(`achievements: записей ${achievements.length}, ожидается ${ACHIEVEMENT_CATALOG_SIZE}`);
+  }
+
+  const categories = new Set<string>(ACHIEVEMENT_CATEGORIES);
+  const rules = new Set<string>(ACHIEVEMENT_RULES);
+  const icons = new Set<string>(ACHIEVEMENT_ICONS);
+  const jobIds = new Set(seed.jobs.map((job) => job.id));
+
+  for (const id of duplicates(achievements.map((row) => row.id))) errors.push(`achievements: повтор ключа ${id}`);
+  for (const title of duplicates(achievements.map((row) => row.title))) {
+    errors.push(`achievements: повтор названия ${title}`);
+  }
+
+  for (const row of achievements) {
+    const where = `achievements.${String(row.id)}`;
+    // Ключ приходит из JSON без схемы: нестроковое значение не должно пройти проверку slug по приведению.
+    if (typeof row.id !== "string" || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(row.id)) {
+      errors.push(`${where}: ключ не slug`);
+    }
+    if (typeof row.title !== "string" || !row.title.trim()) errors.push(`${where}: пустое название`);
+    if (typeof row.description !== "string" || !row.description.trim()) errors.push(`${where}: пустое описание`);
+    if (!categories.has(row.category)) {
+      errors.push(`${where}: category ${row.category} вне ${ACHIEVEMENT_CATEGORIES.join("|")}`);
+    }
+    if (!rules.has(row.rule)) errors.push(`${where}: rule ${row.rule} вне списка правил`);
+    if (!icons.has(row.icon)) errors.push(`${where}: icon ${row.icon} вне набора иконок`);
+    if (ruleNeedsParam(row.rule)) {
+      if (!row.ruleParam) errors.push(`${where}: правилу ${row.rule} нужен ruleParam`);
+      else if (!jobIds.has(row.ruleParam)) errors.push(`${where}: нет должности ${row.ruleParam}`);
+    } else if (row.ruleParam !== null) {
+      errors.push(`${where}: у правила ${row.rule} ruleParam должен быть null`);
+    }
+  }
+}
+
+/** Точка входа: читает seed и каталог, гоняет проверки и печатает отчёт. */
 function main() {
   const errors: string[] = [];
   const data = readSeed(path.join("seed", "data.json"), errors);
   const fixture = readSeed(path.join("seed", "fixtures", "junior.json"), errors);
+  const achievements = readAchievements(errors);
 
   checkJobs(data, errors);
   checkCompetencies(data, errors);
   checkProfiles(data, errors);
   checkPrerequisites(data, errors);
   checkFixture(data, fixture, errors);
+  checkAchievements(data, achievements, errors);
 
   if (errors.length > 0) {
     console.error(`seed: ${errors.length} нарушений`);
@@ -203,7 +265,7 @@ function main() {
     process.exit(1);
   }
   console.log(
-    `seed ok: jobs=${data.jobs.length} transitions=${data.transitions.length} competencies=${data.competencies.length} profiles=${data.profiles.length}`,
+    `seed ok: jobs=${data.jobs.length} transitions=${data.transitions.length} competencies=${data.competencies.length} profiles=${data.profiles.length} achievements=${achievements.length}`,
   );
 }
 
