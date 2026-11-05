@@ -160,7 +160,9 @@ function checkPrerequisites(data: Seed, errors: string[]) {
  * И сама по себе целая: ссылки профиля, переходов и родителей ведут внутрь фикстуры.
  */
 function checkFixture(data: Seed, fixture: Seed, errors: string[]) {
+  /** Одинаковые ли записи: сравниваем целые объекты, а не отдельные поля. */
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  /** Сверяет раздел фикстуры с основными данными по ключу записи. */
   const compare = <T>(section: string, items: T[], source: T[], key: (item: T) => string) => {
     const sourceByKey = new Map(source.map((item) => [key(item), item]));
     for (const item of items) {
@@ -222,10 +224,13 @@ function checkAchievements(seed: Seed, achievements: AchievementRecord[], errors
   }
 
   for (const row of achievements) {
-    const where = `achievements.${row.id}`;
-    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(row.id ?? "")) errors.push(`${where}: ключ не slug`);
-    if (!row.title?.trim()) errors.push(`${where}: пустое название`);
-    if (!row.description?.trim()) errors.push(`${where}: пустое описание`);
+    const where = `achievements.${String(row.id)}`;
+    // Ключ приходит из JSON без схемы: нестроковое значение не должно пройти проверку slug по приведению.
+    if (typeof row.id !== "string" || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(row.id)) {
+      errors.push(`${where}: ключ не slug`);
+    }
+    if (typeof row.title !== "string" || !row.title.trim()) errors.push(`${where}: пустое название`);
+    if (typeof row.description !== "string" || !row.description.trim()) errors.push(`${where}: пустое описание`);
     if (!categories.has(row.category)) {
       errors.push(`${where}: category ${row.category} вне ${ACHIEVEMENT_CATEGORIES.join("|")}`);
     }
@@ -240,6 +245,7 @@ function checkAchievements(seed: Seed, achievements: AchievementRecord[], errors
   }
 }
 
+/** Точка входа: читает seed и каталог, гоняет проверки и печатает отчёт. */
 function main() {
   const errors: string[] = [];
   const data = readSeed(path.join("seed", "data.json"), errors);
