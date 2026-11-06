@@ -26,6 +26,9 @@ const A = account("a", "Расчёт A");
 const B = account("b", "Расчёт B");
 const C = account("c", "Расчёт C");
 const D = account("d", "Расчёт D");
+const E = account("e", "Расчёт E");
+const M = account("m", "Руководитель M");
+const S = account("s", "Подчинённый S");
 
 /** Навыки профиля junior и пула junior→programmer: все три подтверждаются в сценариях. */
 const PROGRAMMING = "comp-navyki-programmirovaniya-na-yazyke-1s";
@@ -38,7 +41,10 @@ const C_NOTE = `Подтверждение C E2E ${STAMP}`;
 const D_PROGRAMMING_NOTE = `Подтверждение D1 E2E ${STAMP}`;
 const D_OBUCHAEMOST_NOTE = `Подтверждение D2 E2E ${STAMP}`;
 const D_QUERY_NOTE = `Подтверждение D3 E2E ${STAMP}`;
+const E_NOTE = `Подтверждение E E2E ${STAMP}`;
+const S_NOTE = `Подтверждение S E2E ${STAMP}`;
 const C_REVOKE_REASON = `Причина отзыва C E2E ${STAMP}`;
+const S_REVOKE_REASON = `Причина отзыва S E2E ${STAMP}`;
 
 const C_ITEM_ACCEPTED = `Расчёт C: запросы 1 ${STAMP}`;
 const C_ITEM_OPEN = `Расчёт C: запросы 2 ${STAMP}`;
@@ -105,6 +111,30 @@ function planItems(testInfo: TestInfo, loginName: string): PlanItem[] {
   }
 }
 
+/** Пул живого плана: по нему видно, что до «Пул закрыт» осталось одно подтверждение. */
+function poolCompetencies(testInfo: TestInfo, planId: string): string[] {
+  const db = new DatabaseSync(dbFile(testInfo), { readOnly: true });
+  try {
+    return (
+      db.prepare("SELECT competency_id FROM idp_pool WHERE idp_id = ? ORDER BY competency_id").all(planId) as {
+        competency_id: string;
+      }[]
+    ).map((row) => row.competency_id);
+  } finally {
+    db.close();
+  }
+}
+
+/** Оставляет в пуле плана одну компетенцию: так правило пула проверяется одним ручным подтверждением. */
+function keepOnlyPoolCompetency(testInfo: TestInfo, planId: string, competencyId: string) {
+  const db = new DatabaseSync(dbFile(testInfo));
+  try {
+    db.prepare("DELETE FROM idp_pool WHERE idp_id = ? AND competency_id <> ?").run(planId, competencyId);
+  } finally {
+    db.close();
+  }
+}
+
 /** id сотрудника: карточка и форма подтверждения открываются по нему. */
 function employeeId(testInfo: TestInfo, loginName: string): string {
   const db = new DatabaseSync(dbFile(testInfo), { readOnly: true });
@@ -140,14 +170,20 @@ function grantManually(testInfo: TestInfo, loginName: string, achievementId: str
   }
 }
 
-/** Заводит сотрудника админской формой `/people`. */
-async function createStaff(page: Page, staff: { login: string; name: string; password: string }, jobId: string) {
+/** Заводит сотрудника админской формой `/people`; руководитель ставится там же, если он нужен. */
+async function createStaff(
+  page: Page,
+  staff: { login: string; name: string; password: string },
+  jobId: string,
+  managerName?: string,
+) {
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await form.getByLabel("Логин").fill(staff.login);
   await form.getByLabel("Имя").fill(staff.name);
   await form.getByLabel("Пароль").fill(staff.password);
   await form.getByLabel(/^Должность/).selectOption(jobId);
+  if (managerName) await form.getByLabel(/^Руководитель/).selectOption({ label: managerName });
   await form.getByRole("button", { name: "Создать" }).click();
   await expect(page.getByRole("link", { name: staff.name, exact: true })).toBeVisible();
 }
@@ -422,4 +458,58 @@ test("критерий 4: два источника считаются одно�
   await login(page, D);
   await openAchievements(page);
   await expect(confirmedBlock(page).getByRole("listitem"), "в блоке три компетенции").toHaveCount(3);
+});
+
+test("критерий 2 (пул): ручное подтверждение закрывает пул живого плана", async ({ page }, testInfo) => {
+  await createStaff(page, E, "junior");
+  const employee = employeeId(testInfo, E.login);
+  expect(employee, "id сотрудника E найден").not.toBe("");
+  const planPath = await createPlan(page, E, "programmer");
+  const planId = planPath.split("/").pop() ?? "";
+  expect(planId, "id плана известен").not.toBe("");
+
+  // Пул живого плана — разрыв junior→programmer; оставляем одну компетенцию, чтобы её закрыло
+  // одно ручное подтверждение. Строки плана при этом остаются пустыми.
+  keepOnlyPoolCompetency(testInfo, planId, QUERY);
+  expect(poolCompetencies(testInfo, planId), "в пуле осталась одна компетенция").toEqual([QUERY]);
+
+  await confirmViaUi(page, employee, QUERY, E_NOTE);
+
+  // Отдельного открытия `/me/achievements` нет: сверку запускает само действие подтверждения.
+  const poolClosed = grants(testInfo, E.login).filter((row) => row.achievement_id === "idp-pool-closed");
+  expect(poolClosed, "выдача «Пул закрыт» одна").toHaveLength(1);
+  expect(poolClosed[0].source, "источник автоматический").toBe("auto");
+  expect(poolClosed[0].source_ref, "в выдаче записан план").toBe(planId);
+  expect(poolClosed[0].revoked_at, "выдача действует").toBeNull();
+});
+
+test("критерий 2 (руководитель): подтверждение подчинённого даёт и снимает «Ученик подтвердил»", async ({
+  page,
+}, testInfo) => {
+  await createStaff(page, M, "junior");
+  await createStaff(page, S, "junior", M.name);
+  const employee = employeeId(testInfo, S.login);
+  expect(employee, "id сотрудника S найден").not.toBe("");
+
+  await confirmViaUi(page, employee, QUERY, S_NOTE);
+
+  // Плана у S нет, поэтому ручная запись подтверждения не даёт ссылки на ИПР.
+  const mentorRow = () => grants(testInfo, M.login).find((row) => row.achievement_id === "mentor-competency");
+  await expect
+    .poll(
+      () => {
+        const row = mentorRow();
+        return row ? { revoked_at: row.revoked_at, source_ref: row.source_ref } : null;
+      },
+      { message: "подтверждение подчинённого выдаёт руководителю «Ученик подтвердил»" },
+    )
+    .toEqual({ revoked_at: null, source_ref: null });
+
+  await revokeViaUi(page, employee, QUERY, S_REVOKE_REASON);
+
+  await expect
+    .poll(() => mentorRow()?.revoked_at ?? null, {
+      message: "снятие подтверждения отзывает достижение руководителя",
+    })
+    .not.toBeNull();
 });

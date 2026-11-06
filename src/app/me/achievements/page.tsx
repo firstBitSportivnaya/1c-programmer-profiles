@@ -45,7 +45,7 @@ export default async function MyAchievementsPage() {
         {confirmed.length === 0 ? (
           <p className="muted" data-testid="confirmed-empty">
             Подтверждённых компетенций нет: компетенция подтверждается, когда все строки плана по ней приняты, или
-            действующей ручной записью руководителя.
+            действующей ручной записью руководителя или админа.
           </p>
         ) : (
           <ul className="panel">

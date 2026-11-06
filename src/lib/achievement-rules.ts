@@ -143,8 +143,9 @@ function evaluateRule(rule: AchievementRule, ruleParam: string | null, facts: Fa
     case "idp.items-10":
       return facts.accepted.length >= 10 ? { holds: true, sourceRef: planAt(facts.accepted, 9) } : NO_CONDITION;
     case "idp.competency-confirmed":
+      // Ручная запись может быть раньше приёмки: ссылку берём у записи с планом, если она есть.
       return facts.confirmed.length >= 1
-        ? { holds: true, sourceRef: planAt(facts.confirmed, 0) }
+        ? { holds: true, sourceRef: facts.confirmed.find((row) => row.planId != null)?.planId ?? null }
         : NO_CONDITION;
     case "idp.pool-confirmed": {
       const confirmedIds = new Set(facts.confirmed.map((row) => row.competencyId));
