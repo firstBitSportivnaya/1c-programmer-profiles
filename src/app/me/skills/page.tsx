@@ -133,6 +133,8 @@ export default async function SkillTreePage() {
 
   const hasProfile = data.nodes.some((node) => node.relation !== "none");
   const hasMarks = data.nodes.some((node) => node.mark !== "");
+  // Ручное подтверждение открывает дерево и без профиля и пометок: звезда видна в «Вне профиля».
+  const hasConfirmed = data.nodes.some((node) => node.confirmed);
 
   return (
     <article className="space-y-6">
@@ -142,7 +144,7 @@ export default async function SkillTreePage() {
         </a>
         <h1 className="page-title">Дерево навыков</h1>
       </div>
-      {hasProfile || hasMarks ? (
+      {hasProfile || hasMarks || hasConfirmed ? (
         <SkillTree data={data} motto={MOTTO} />
       ) : (
         <p className="muted" data-testid="skill-tree-no-profile">
@@ -167,8 +169,8 @@ export default async function SkillTreePage() {
         ) : null}
         <p className="muted">
           Стрелка — предпосылка: навык открывает следующий, а не подтверждает его. Плашка — тема навыка, заливка —
-          ваша пометка, звезда — подтверждение приёмкой. Пометки и подтверждения видит только их автор; подтверждения
-          собираются на странице{" "}
+          ваша пометка, звезда — подтверждение приёмкой или вручную. Пометку видит только её автор; подтверждение
+          видно в карточке сотрудника и собирается на странице{" "}
           <a href="/me/achievements" className="link-accent">
             Достижения
           </a>

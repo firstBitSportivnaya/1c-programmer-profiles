@@ -430,11 +430,13 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
     [data.nodes, tree],
   );
 
-  /** Пометка вне профиля держит навык в дереве (ADR 0008): он уходит в раздел «Вне профиля». */
+  /** Пометка или подтверждение вне профиля держит навык в дереве (ADR 0008, 0011): он уходит в «Вне профиля». */
   const outsideChain = useMemo(
     () =>
       withAncestors(
-        data.nodes.filter((node) => node.mark !== "" && !profileChain.has(node.id)).map((node) => node.id),
+        data.nodes
+          .filter((node) => (node.mark !== "" || node.confirmed) && !profileChain.has(node.id))
+          .map((node) => node.id),
         tree.parentOf,
       ),
     [data.nodes, profileChain, tree],
@@ -647,7 +649,9 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
               topicOf={topicOf}
               prerequisiteOf={prerequisiteOf}
             />
-            <p className="skill-group-note">Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка.</p>
+            <p className="skill-group-note">
+              Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка или подтверждение.
+            </p>
           </section>
         ) : null}
       </div>
@@ -662,7 +666,7 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
             {legendButton("in_progress", "в процессе", "skill-legend__swatch--progress")}
             {legendButton("lacks", "нет", "skill-legend__swatch--lacks")}
             {legendButton("none", "без пометки", "skill-legend__swatch--none")}
-            {legendButton("confirmed", "подтверждено приёмкой", "skill-legend__swatch--star")}
+            {legendButton("confirmed", "подтверждено приёмкой или вручную", "skill-legend__swatch--star")}
             {legendButton("plan", "шаг ИПР", "skill-legend__swatch--plan")}
             <li>
               <span className="skill-legend__note">

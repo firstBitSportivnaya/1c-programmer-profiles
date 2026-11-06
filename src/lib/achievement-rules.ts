@@ -1,7 +1,8 @@
 /**
  * Автоматические правила достижений (ADR 0010). Правило — предикат по текущим данным сотрудника:
  * ИПР и их строки, справочник компетенций, профиль текущей должности, должность и оргсвязь.
- * Личные пометки условием не служат — это заметка сотрудника для себя (ADR 0007).
+ * Подтверждение компетенции берётся из общего расчёта: приёмка строки или действующая ручная
+ * запись (ADR 0011). Личные пометки условием не служат — это заметка сотрудника для себя (ADR 0007).
  *
  * Планировщика нет: `syncEmployeeAchievements` идемпотентно сверяет выдачи после изменения данных
  * и при открытии `/me/achievements`. Повторное выполнение условия второй строки не даёт,
@@ -14,12 +15,17 @@ import type { AchievementRule } from "@/lib/achievement-catalog";
 import {
   collectConfirmed,
   loadPlans,
-  planConfirmed,
   type AcceptedItem,
   type ConfirmedCompetency,
   type PlanFacts,
 } from "@/lib/achievements";
-import { ensureSchema, getEmployee, groupedProfile, listDirectReports } from "@/lib/queries";
+import {
+  ensureSchema,
+  getEmployee,
+  groupedProfile,
+  listCompetencyConfirmations,
+  listDirectReports,
+} from "@/lib/queries";
 
 type Facts = {
   employeeId: string;
@@ -32,25 +38,38 @@ type Facts = {
   profileSkills: Set<string>;
   reports: number;
   reportCompletedIdp: string | null;
-  reportConfirmedPlan: string | null;
+  /** Подтверждённая компетенция подчинённого: приёмкой или ручной записью (ADR 0011). */
+  reportConfirmed: Condition;
 };
 
 type Condition = { holds: boolean; sourceRef: string | null };
 
 const NO_CONDITION: Condition = { holds: false, sourceRef: null };
 
-/** Сигналы подчинённых для правил наставничества: выполненный план и подтверждённая компетенция. */
-function reportSignals(employeeIds: string[]) {
+/**
+ * Сигналы подчинённых для правил наставничества: выполненный план и подтверждённая компетенция.
+ * Подтверждение берётся из общего расчёта (ADR 0011), поэтому ручная запись считается так же,
+ * как приёмка; у ручной нет плана, и достижение остаётся без ссылки.
+ */
+function reportSignals(employeeIds: string[]): { completed: string | null; confirmed: Condition } {
   let completed: string | null = null;
-  let confirmed: string | null = null;
+  let confirmed: Condition | null = null;
   for (const employeeId of employeeIds) {
-    for (const plan of loadPlans(employeeId)) {
+    const plans = loadPlans(employeeId);
+    for (const plan of plans) {
       if (plan.status === "completed") completed ??= plan.id;
-      if (plan.status !== "cancelled" && confirmed == null && planConfirmed(plan).size > 0) confirmed = plan.id;
+    }
+    if (confirmed == null) {
+      const rows = collectConfirmed(
+        plans.filter((plan) => plan.status !== "cancelled"),
+        listCompetencyConfirmations(employeeId),
+      );
+      const row = rows.find((item) => item.planId != null) ?? rows[0];
+      if (row) confirmed = { holds: true, sourceRef: row.planId };
     }
     if (completed && confirmed) break;
   }
-  return { completed, confirmed };
+  return { completed, confirmed: confirmed ?? NO_CONDITION };
 }
 
 /** Снимок данных сотрудника: должность, планы, приёмки, профиль и прямые подчинённые. */
@@ -69,23 +88,23 @@ function buildFacts(employee: { id: string; jobId: string }): Facts {
     (profile?.technical ?? []).concat(profile?.personal ?? []).map((row) => row.competency.id),
   );
   const reports = listDirectReports(employee.id).map((row) => row.id);
-  const signals = reports.length > 0 ? reportSignals(reports) : { completed: null, confirmed: null };
+  const signals = reports.length > 0 ? reportSignals(reports) : { completed: null, confirmed: NO_CONDITION };
   return {
     employeeId: employee.id,
     jobId: employee.jobId,
     plans,
     live,
     accepted,
-    confirmed: collectConfirmed(live),
+    confirmed: collectConfirmed(live, listCompetencyConfirmations(employee.id)),
     profileSkills,
     reports: reports.length,
     reportCompletedIdp: signals.completed,
-    reportConfirmedPlan: signals.confirmed,
+    reportConfirmed: signals.confirmed,
   };
 }
 
 /** План, к которому относится N-я по счёту запись: из него берётся ссылка достижения. */
-function planAt(items: { planId: string }[], index: number) {
+function planAt(items: { planId: string | null }[], index: number) {
   return items[index]?.planId ?? null;
 }
 
@@ -124,15 +143,15 @@ function evaluateRule(rule: AchievementRule, ruleParam: string | null, facts: Fa
     case "idp.items-10":
       return facts.accepted.length >= 10 ? { holds: true, sourceRef: planAt(facts.accepted, 9) } : NO_CONDITION;
     case "idp.competency-confirmed":
+      // Ручная запись может быть раньше приёмки: ссылку берём у записи с планом, если она есть.
       return facts.confirmed.length >= 1
-        ? { holds: true, sourceRef: planAt(facts.confirmed, 0) }
+        ? { holds: true, sourceRef: facts.confirmed.find((row) => row.planId != null)?.planId ?? null }
         : NO_CONDITION;
     case "idp.pool-confirmed": {
-      const plan = facts.live.find((row) => {
-        if (row.pool.length === 0) return false;
-        const confirmed = planConfirmed(row);
-        return row.pool.every((item) => confirmed.has(item.competencyId));
-      });
+      const confirmedIds = new Set(facts.confirmed.map((row) => row.competencyId));
+      const plan = facts.live.find(
+        (row) => row.pool.length > 0 && row.pool.every((item) => confirmedIds.has(item.competencyId)),
+      );
       return plan ? { holds: true, sourceRef: plan.id } : NO_CONDITION;
     }
     case "idp.completed":
@@ -191,7 +210,7 @@ function evaluateRule(rule: AchievementRule, ruleParam: string | null, facts: Fa
     case "manager.report-idp-completed":
       return facts.reportCompletedIdp ? { holds: true, sourceRef: facts.reportCompletedIdp } : NO_CONDITION;
     case "manager.report-competency":
-      return facts.reportConfirmedPlan ? { holds: true, sourceRef: facts.reportConfirmedPlan } : NO_CONDITION;
+      return facts.reportConfirmed;
   }
 }
 
@@ -254,7 +273,16 @@ export function syncEmployeeAchievements(employeeId: string): void {
             continue;
           }
           // Решение человека сильнее предиката: отозванное вручную автоматика не оживляет.
-          if (existing.source !== "auto" || existing.revokedAt == null || existing.revokedById != null) continue;
+          // Действующей выдаче обновляется только ссылка: источник мог смениться (план отменён,
+          // компетенция осталась подтверждённой вручную), дата и ручные выдачи не трогаются.
+          if (existing.source !== "auto") continue;
+          if (existing.revokedAt == null) {
+            if (existing.sourceRef !== sourceRef) {
+              db.update(employeeAchievements).set({ sourceRef }).where(key(row.id)).run();
+            }
+            continue;
+          }
+          if (existing.revokedById != null) continue;
           db.update(employeeAchievements)
             .set({ revokedAt: null, revokedById: null, revokeReason: null, grantedAt: t, ruleKey: row.rule, sourceRef })
             .where(key(row.id))

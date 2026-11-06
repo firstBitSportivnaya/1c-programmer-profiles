@@ -1,8 +1,8 @@
 /**
- * Достижения сотрудника (ADR 0010): выдачи из таблицы и снимок приёмок, по которому видны
- * подтверждённые компетенции. Сами достижения здесь не считаются: их выдаёт `achievement-rules.ts`,
- * а страница только читает результат. Подтверждённые компетенции — отдельный блок: в каталог
- * и в таблицу выдач они не попадают (ADR 0006).
+ * Достижения сотрудника (ADR 0010): выдачи из таблицы и снимок подтверждений — приёмки строк плана
+ * и действующие ручные записи (ADR 0011). Сами достижения здесь не считаются: их выдаёт
+ * `achievement-rules.ts`, а страница только читает результат. Подтверждённые компетенции — отдельный
+ * блок: в каталог и в таблицу выдач они не попадают (ADR 0006).
  */
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -14,7 +14,7 @@ import {
   idps,
 } from "@/db/schema";
 import type { AchievementCategory, AchievementIcon } from "@/lib/achievement-catalog";
-import { ensureSchema, getCompetency, getIdp } from "@/lib/queries";
+import { ensureSchema, getCompetency, getIdp, listCompetencyConfirmations } from "@/lib/queries";
 
 /** Строка плана для правил: приёмка и срок нужны для условий, название — для блока компетенций. */
 export type PlanItemFacts = {
@@ -37,13 +37,30 @@ export type PlanFacts = {
 /** Принятая строка: из неё берётся ссылка достижений «первая строка» и порогов по числу строк. */
 export type AcceptedItem = { planId: string; itemId: number; acceptedAt: number };
 
-/** Подтверждённая компетенция: все строки плана по ней приняты, поэтому она видна отдельным блоком. */
+/** Действующая ручная запись для расчёта (ADR 0011): её дата, автор и основание. */
+export type ManualConfirmation = {
+  competencyId: string;
+  competencyName: string;
+  confirmedAt: number;
+  confirmedByName: string;
+  note: string;
+};
+
+/**
+ * Подтверждённая компетенция: приёмка строк плана, ручная запись или оба источника сразу.
+ * Запись одна на компетенцию, поэтому пороги не считают её дважды (ADR 0011).
+ */
 export type ConfirmedCompetency = {
   competencyId: string;
   name: string;
-  /** План, приёмка в котором подтвердила компетенцию: из него берётся ссылка достижения. */
-  planId: string;
-  acceptedAt: number;
+  /** Откуда взялось подтверждение: приёмка ИПР, ручная запись или оба источника. */
+  source: "idp" | "manual" | "both";
+  /** План, приёмка в котором подтвердила компетенцию; `null` — подтверждено только вручную. */
+  planId: string | null;
+  /** Самое раннее подтверждение: по нему идёт сортировка порогов и ссылок на план. */
+  confirmedAt: number;
+  /** Ручная часть записи; `null` — подтверждено только приёмкой. */
+  manual: { confirmedAt: number; confirmedByName: string; note: string } | null;
 };
 
 export type EmployeeAchievement = {
@@ -113,29 +130,53 @@ export function planConfirmed(plan: PlanFacts): Map<string, { name: string; acce
 }
 
 /**
- * Подтверждённые компетенции не отменённых планов: одна запись на компетенцию, первая по времени.
- * Имя берётся из справочника, а удалённая оттуда компетенция остаётся названием из строки плана.
+ * Подтверждённые компетенции сотрудника (ADR 0011): приёмки не отменённых планов и действующие
+ * ручные записи складываются, одна запись на компетенцию. Приёмка даёт ссылку на план, ручная
+ * запись — дату, автора и основание; при двух источниках видно оба. Имя берётся из справочника,
+ * удалённая оттуда компетенция остаётся названием из строки плана или снимка ручной записи.
  */
-export function collectConfirmed(live: PlanFacts[]): ConfirmedCompetency[] {
-  const byId = new Map<string, ConfirmedCompetency>();
+export function collectConfirmed(live: PlanFacts[], manual: ManualConfirmation[]): ConfirmedCompetency[] {
+  const fromIdp = new Map<string, { planId: string; acceptedAt: number; name: string }>();
   for (const plan of live) {
     for (const [competencyId, row] of planConfirmed(plan)) {
-      const known = byId.get(competencyId);
+      const known = fromIdp.get(competencyId);
       if (known && known.acceptedAt <= row.acceptedAt) continue;
-      byId.set(competencyId, {
-        competencyId,
-        name: getCompetency(competencyId)?.name ?? row.name,
-        planId: plan.id,
-        acceptedAt: row.acceptedAt,
-      });
+      fromIdp.set(competencyId, { planId: plan.id, acceptedAt: row.acceptedAt, name: row.name });
     }
   }
-  return [...byId.values()].sort((a, b) => a.acceptedAt - b.acceptedAt || a.competencyId.localeCompare(b.competencyId));
+  const confirmed = new Map<string, ConfirmedCompetency>();
+  for (const [competencyId, row] of fromIdp) {
+    confirmed.set(competencyId, {
+      competencyId,
+      name: getCompetency(competencyId)?.name ?? row.name,
+      source: "idp",
+      planId: row.planId,
+      confirmedAt: row.acceptedAt,
+      manual: null,
+    });
+  }
+  for (const row of manual) {
+    const idpPart = confirmed.get(row.competencyId);
+    confirmed.set(row.competencyId, {
+      competencyId: row.competencyId,
+      name: getCompetency(row.competencyId)?.name ?? idpPart?.name ?? row.competencyName,
+      source: idpPart ? "both" : "manual",
+      planId: idpPart?.planId ?? null,
+      confirmedAt: idpPart ? Math.min(idpPart.confirmedAt, row.confirmedAt) : row.confirmedAt,
+      manual: { confirmedAt: row.confirmedAt, confirmedByName: row.confirmedByName, note: row.note },
+    });
+  }
+  return [...confirmed.values()].sort(
+    (a, b) => a.confirmedAt - b.confirmedAt || a.competencyId.localeCompare(b.competencyId),
+  );
 }
 
 /** Подтверждённые компетенции сотрудника для блока на странице достижений; строкой выдачи они не становятся. */
 export function confirmedCompetencies(employeeId: string): ConfirmedCompetency[] {
-  return collectConfirmed(loadPlans(employeeId).filter((plan) => plan.status !== "cancelled"));
+  return collectConfirmed(
+    loadPlans(employeeId).filter((plan) => plan.status !== "cancelled"),
+    listCompetencyConfirmations(employeeId),
+  );
 }
 
 /**

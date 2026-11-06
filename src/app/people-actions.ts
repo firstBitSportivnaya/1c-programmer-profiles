@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
-import { getDb, now, retryIfClosed } from "@/db";
+import { getDb, getSqlite, now, retryIfClosed } from "@/db";
 import {
   employeeAchievements,
   employeeCompetencyConfirmations,
@@ -70,6 +70,8 @@ function readLogin(formData: FormData) {
 
 function revalidatePeople(employeeId: string, idpId?: string) {
   revalidatePath("/me");
+  revalidatePath("/me/achievements");
+  revalidatePath("/me/skills");
   revalidatePath("/people");
   revalidatePath("/idps");
   revalidatePath("/assignments");
@@ -77,9 +79,15 @@ function revalidatePeople(employeeId: string, idpId?: string) {
   if (idpId) revalidatePath(`/idps/${idpId}`);
 }
 
+/** Карточка руководителя показывает свои достижения: подтверждение подчинённого их меняет. */
+function revalidateManagerCard(managerId: string | null | undefined) {
+  if (managerId) revalidatePath(`/people/${managerId}`);
+}
+
 /**
- * Сверка автоматических достижений после смены должности или оргсвязи (ADR 0010):
- * у сотрудника меняются правила должности и профиля, у обоих руководителей — правила наставничества.
+ * Сверка автоматических достижений после смены должности или оргсвязи (ADR 0010), а также после
+ * ручного подтверждения компетенции и его отзыва (ADR 0011): у сотрудника меняются правила
+ * должности, профиля и подтверждений, у затронутых руководителей — правила наставничества.
  */
 function syncPeopleAchievements(...ids: (string | null | undefined)[]) {
   for (const id of new Set(ids.filter((value): value is string => Boolean(value)))) {
@@ -325,7 +333,8 @@ function readConfirmableSkill(id: string) {
 /**
  * Ручное подтверждение компетенции (ADR 0011). Админ подтверждает любому, руководитель — только
  * прямому подчинённому: то же условие, что у приёмки ИПР. Повтор обновляет ту же строку и снимает
- * отзыв, поэтому второй записи по паре «сотрудник × компетенция» не появляется.
+ * отзыв, поэтому второй записи по паре «сотрудник × компетенция» не появляется. После записи
+ * сверяются достижения сотрудника и его руководителя: ручная запись — второй источник правил.
  */
 export async function confirmCompetencyAction(
   _prev: ActionResult,
@@ -344,6 +353,7 @@ export async function confirmCompetencyAction(
     if (note.length > CONFIRMATION_NOTE_LIMIT) {
       throw new InvariantError(`Основание: не длиннее ${CONFIRMATION_NOTE_LIMIT} символов`);
     }
+    const managerId = getEmployee(employeeId)?.managerId;
     const t = now();
     getDb()
       .insert(employeeCompetencyConfirmations)
@@ -368,7 +378,9 @@ export async function confirmCompetencyAction(
         },
       })
       .run();
+    syncPeopleAchievements(employeeId, managerId);
     revalidatePeople(employeeId);
+    revalidateManagerCard(managerId);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return confirmCompetencyAction(_prev, formData, true);
@@ -401,13 +413,23 @@ export async function revokeCompetencyConfirmationAction(
       eq(employeeCompetencyConfirmations.employeeId, employeeId),
       eq(employeeCompetencyConfirmations.competencyId, competencyId),
     );
-    const existing = db.select().from(employeeCompetencyConfirmations).where(key).get();
-    if (!existing || existing.revokedAt != null) throw new InvariantError("Подтверждение не найдено");
-    db.update(employeeCompetencyConfirmations)
-      .set({ revokedAt: now(), revokedById: actor.id, revokeReason: reason })
-      .where(key)
-      .run();
+    const managerId = getEmployee(employeeId)?.managerId;
+    // Проверка, отзыв и сверка — одной транзакцией: иначе сбой сверки оставил бы подтверждение
+    // снятым, а достижения — действующими, и повторный отзыв уже не запустил бы пересчёт.
+    getSqlite()
+      .transaction(() => {
+        const existing = db.select().from(employeeCompetencyConfirmations).where(key).get();
+        if (!existing || existing.revokedAt != null) throw new InvariantError("Подтверждение не найдено");
+        db.update(employeeCompetencyConfirmations)
+          .set({ revokedAt: now(), revokedById: actor.id, revokeReason: reason })
+          .where(key)
+          .run();
+        syncPeopleAchievements(employeeId, managerId);
+        return true;
+      })
+      .immediate(null);
     revalidatePeople(employeeId);
+    revalidateManagerCard(managerId);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return revokeCompetencyConfirmationAction(_prev, formData, true);

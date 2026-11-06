@@ -7,6 +7,14 @@ import { getSessionEmployee } from "@/lib/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** `confirmed_at` ручной записи хранится в секундах Unix; на странице дата видна как ДД.ММ.ГГГГ. */
+function dottedDate(unixSeconds: number) {
+  const date = new Date(unixSeconds * 1000);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${date.getFullYear()}`;
+}
+
 /**
  * Достижения сотрудника — единственное место, где виден весь список. Страница только своя:
  * адреса с id сотрудника нет, чужие достижения по ссылке не открыть.
@@ -36,13 +44,25 @@ export default async function MyAchievementsPage() {
         <h2 className="section-title">Подтверждённые компетенции</h2>
         {confirmed.length === 0 ? (
           <p className="muted" data-testid="confirmed-empty">
-            Подтверждённых компетенций нет: компетенция подтверждается, когда все строки плана по ней приняты.
+            Подтверждённых компетенций нет: компетенция подтверждается, когда все строки плана по ней приняты, или
+            действующей ручной записью руководителя или админа.
           </p>
         ) : (
           <ul className="panel">
             {confirmed.map((row) => (
-              <li key={row.competencyId} className="list-row">
-                {row.name}
+              <li key={row.competencyId} className="list-row" data-testid={`confirmed-${row.competencyId}`}>
+                <span>{row.name}</span>
+                <span className="muted">
+                  {row.planId ? (
+                    <a href={`/idps/${encodeURIComponent(row.planId)}`} className="link-accent">
+                      приёмкой ИПР
+                    </a>
+                  ) : null}
+                  {row.planId && row.manual ? " · " : null}
+                  {row.manual
+                    ? `вручную ${dottedDate(row.manual.confirmedAt)} · ${row.manual.confirmedByName}`
+                    : null}
+                </span>
               </li>
             ))}
           </ul>

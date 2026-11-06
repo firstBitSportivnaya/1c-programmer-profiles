@@ -30,7 +30,7 @@
     {
       "id": "idp-competency-confirmed",
       "title": "Компетенция подтверждена",
-      "description": "Все строки хотя бы одной компетенции плана приняты.",
+      "description": "Компетенция подтверждена приёмкой строк плана или вручную.",
       "category": "idp",
       "rule": "idp.competency-confirmed",
       "ruleParam": null,
@@ -75,7 +75,7 @@
     {
       "id": "competency-3",
       "title": "Три компетенции",
-      "description": "Подтверждены три разные компетенции по приёмкам строк ИПР.",
+      "description": "Подтверждены три разные компетенции — приёмками ИПР или вручную.",
       "category": "competency",
       "rule": "competency.confirmed-3",
       "ruleParam": null,
@@ -84,7 +84,7 @@
     {
       "id": "competency-5",
       "title": "Пять компетенций",
-      "description": "Подтверждены пять разных компетенций по приёмкам строк ИПР.",
+      "description": "Подтверждены пять разных компетенций — приёмками ИПР или вручную.",
       "category": "competency",
       "rule": "competency.confirmed-5",
       "ruleParam": null,
@@ -93,7 +93,7 @@
     {
       "id": "competency-10",
       "title": "Десять компетенций",
-      "description": "Подтверждены десять разных компетенций по приёмкам строк ИПР.",
+      "description": "Подтверждены десять разных компетенций — приёмками ИПР или вручную.",
       "category": "competency",
       "rule": "competency.confirmed-10",
       "ruleParam": null,
@@ -102,7 +102,7 @@
     {
       "id": "competency-20",
       "title": "Двадцать компетенций",
-      "description": "Подтверждены двадцать разных компетенций по приёмкам строк ИПР.",
+      "description": "Подтверждены двадцать разных компетенций — приёмками ИПР или вручную.",
       "category": "competency",
       "rule": "competency.confirmed-20",
       "ruleParam": null,
