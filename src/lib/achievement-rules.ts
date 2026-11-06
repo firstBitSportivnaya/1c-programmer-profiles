@@ -273,7 +273,16 @@ export function syncEmployeeAchievements(employeeId: string): void {
             continue;
           }
           // Решение человека сильнее предиката: отозванное вручную автоматика не оживляет.
-          if (existing.source !== "auto" || existing.revokedAt == null || existing.revokedById != null) continue;
+          // Действующей выдаче обновляется только ссылка: источник мог смениться (план отменён,
+          // компетенция осталась подтверждённой вручную), дата и ручные выдачи не трогаются.
+          if (existing.source !== "auto") continue;
+          if (existing.revokedAt == null) {
+            if (existing.sourceRef !== sourceRef) {
+              db.update(employeeAchievements).set({ sourceRef }).where(key(row.id)).run();
+            }
+            continue;
+          }
+          if (existing.revokedById != null) continue;
           db.update(employeeAchievements)
             .set({ revokedAt: null, revokedById: null, revokeReason: null, grantedAt: t, ruleKey: row.rule, sourceRef })
             .where(key(row.id))

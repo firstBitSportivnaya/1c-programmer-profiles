@@ -479,6 +479,7 @@ function ensureAchievementTables() {
         CREATE INDEX IF NOT EXISTS employee_achievements_achievement ON employee_achievements (achievement_id);
       `);
       fillAchievementCatalog();
+      refreshAchievementDescriptions();
       if (fresh) backfillLegacyAchievements();
       return true;
     })
@@ -496,6 +497,30 @@ function fillAchievementCatalog() {
   const t = now();
   for (const row of catalogSeed.achievements as AchievementRecord[]) {
     insert.run(row.id, row.title, row.description, row.category, row.rule, row.ruleParam, row.icon, t);
+  }
+}
+
+/**
+ * Описания пяти достижений до ADR 0011 говорили только о приёмке строк ИПР, хотя ручное
+ * подтверждение тоже даёт условие. Строку меняем, только если её текст остался прежним:
+ * правку администратора `INSERT OR IGNORE` не перезаписывает, и здесь она тоже не трогается.
+ */
+const OLD_ACHIEVEMENT_DESCRIPTIONS: Record<string, string> = {
+  "idp-competency-confirmed": "Все строки хотя бы одной компетенции плана приняты.",
+  "competency-3": "Подтверждены три разные компетенции по приёмкам строк ИПР.",
+  "competency-5": "Подтверждены пять разных компетенций по приёмкам строк ИПР.",
+  "competency-10": "Подтверждены десять разных компетенций по приёмкам строк ИПР.",
+  "competency-20": "Подтверждены двадцать разных компетенций по приёмкам строк ИПР.",
+};
+
+function refreshAchievementDescriptions() {
+  const sqlite = getSqlite();
+  const update = sqlite.prepare("UPDATE achievements SET description = ?, updated_at = ? WHERE id = ? AND description = ?");
+  const t = now();
+  for (const row of catalogSeed.achievements as AchievementRecord[]) {
+    const before = OLD_ACHIEVEMENT_DESCRIPTIONS[row.id];
+    if (before === undefined) continue;
+    update.run(row.description, t, row.id, before);
   }
 }
 

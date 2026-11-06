@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
-import { getDb, now, retryIfClosed } from "@/db";
+import { getDb, getSqlite, now, retryIfClosed } from "@/db";
 import {
   employeeAchievements,
   employeeCompetencyConfirmations,
@@ -70,11 +70,18 @@ function readLogin(formData: FormData) {
 
 function revalidatePeople(employeeId: string, idpId?: string) {
   revalidatePath("/me");
+  revalidatePath("/me/achievements");
+  revalidatePath("/me/skills");
   revalidatePath("/people");
   revalidatePath("/idps");
   revalidatePath("/assignments");
   revalidatePath(`/people/${employeeId}`);
   if (idpId) revalidatePath(`/idps/${idpId}`);
+}
+
+/** Карточка руководителя показывает свои достижения: подтверждение подчинённого их меняет. */
+function revalidateManagerCard(managerId: string | null | undefined) {
+  if (managerId) revalidatePath(`/people/${managerId}`);
 }
 
 /**
@@ -346,6 +353,7 @@ export async function confirmCompetencyAction(
     if (note.length > CONFIRMATION_NOTE_LIMIT) {
       throw new InvariantError(`Основание: не длиннее ${CONFIRMATION_NOTE_LIMIT} символов`);
     }
+    const managerId = getEmployee(employeeId)?.managerId;
     const t = now();
     getDb()
       .insert(employeeCompetencyConfirmations)
@@ -370,8 +378,9 @@ export async function confirmCompetencyAction(
         },
       })
       .run();
-    syncPeopleAchievements(employeeId, getEmployee(employeeId)?.managerId);
+    syncPeopleAchievements(employeeId, managerId);
     revalidatePeople(employeeId);
+    revalidateManagerCard(managerId);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return confirmCompetencyAction(_prev, formData, true);
@@ -404,14 +413,23 @@ export async function revokeCompetencyConfirmationAction(
       eq(employeeCompetencyConfirmations.employeeId, employeeId),
       eq(employeeCompetencyConfirmations.competencyId, competencyId),
     );
-    const existing = db.select().from(employeeCompetencyConfirmations).where(key).get();
-    if (!existing || existing.revokedAt != null) throw new InvariantError("Подтверждение не найдено");
-    db.update(employeeCompetencyConfirmations)
-      .set({ revokedAt: now(), revokedById: actor.id, revokeReason: reason })
-      .where(key)
-      .run();
-    syncPeopleAchievements(employeeId, getEmployee(employeeId)?.managerId);
+    const managerId = getEmployee(employeeId)?.managerId;
+    // Проверка, отзыв и сверка — одной транзакцией: иначе сбой сверки оставил бы подтверждение
+    // снятым, а достижения — действующими, и повторный отзыв уже не запустил бы пересчёт.
+    getSqlite()
+      .transaction(() => {
+        const existing = db.select().from(employeeCompetencyConfirmations).where(key).get();
+        if (!existing || existing.revokedAt != null) throw new InvariantError("Подтверждение не найдено");
+        db.update(employeeCompetencyConfirmations)
+          .set({ revokedAt: now(), revokedById: actor.id, revokeReason: reason })
+          .where(key)
+          .run();
+        syncPeopleAchievements(employeeId, managerId);
+        return true;
+      })
+      .immediate(null);
     revalidatePeople(employeeId);
+    revalidateManagerCard(managerId);
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return revokeCompetencyConfirmationAction(_prev, formData, true);

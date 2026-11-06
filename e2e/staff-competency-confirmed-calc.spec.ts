@@ -27,6 +27,7 @@ const B = account("b", "Расчёт B");
 const C = account("c", "Расчёт C");
 const D = account("d", "Расчёт D");
 const E = account("e", "Расчёт E");
+const F = account("f", "Расчёт F");
 const M = account("m", "Руководитель M");
 const S = account("s", "Подчинённый S");
 
@@ -42,8 +43,10 @@ const D_PROGRAMMING_NOTE = `Подтверждение D1 E2E ${STAMP}`;
 const D_OBUCHAEMOST_NOTE = `Подтверждение D2 E2E ${STAMP}`;
 const D_QUERY_NOTE = `Подтверждение D3 E2E ${STAMP}`;
 const E_NOTE = `Подтверждение E E2E ${STAMP}`;
+const F_NOTE = `Подтверждение F E2E ${STAMP}`;
 const S_NOTE = `Подтверждение S E2E ${STAMP}`;
 const C_REVOKE_REASON = `Причина отзыва C E2E ${STAMP}`;
+const D_REVOKE_REASON = `Причина отзыва D E2E ${STAMP}`;
 const S_REVOKE_REASON = `Причина отзыва S E2E ${STAMP}`;
 
 const C_ITEM_ACCEPTED = `Расчёт C: запросы 1 ${STAMP}`;
@@ -336,6 +339,27 @@ test("критерий 1: ручное подтверждение без пла�
   await login(page);
 });
 
+test("критерий 1 (без профиля): подтверждение само открывает дерево и раздел «Вне профиля»", async ({
+  page,
+}, testInfo) => {
+  await createStaff(page, F, "consultant");
+  const employee = employeeId(testInfo, F.login);
+  expect(employee, "id сотрудника F найден").not.toBe("");
+
+  await confirmViaUi(page, employee, PROGRAMMING, F_NOTE);
+
+  await login(page, F);
+  await page.goto("/me/skills");
+  // У должности consultant профиля нет, пометок тоже: холст держит одно подтверждение.
+  await expect(page.getByTestId("skill-tree-no-profile"), "пустого состояния нет").toHaveCount(0);
+  await expect(page.getByTestId("skill-outside"), "подтверждённый навык в разделе «Вне профиля»").toBeVisible();
+  await expect(skillNode(page, PROGRAMMING), "узел навыка на холсте").toBeVisible();
+  await expect(skillNode(page, PROGRAMMING)).toHaveAttribute("data-confirmed", "true");
+  await expect(skillBadge(page, PROGRAMMING), "значок подтверждения виден").toBeVisible();
+
+  await login(page);
+});
+
 test("критерий 2: ручная выдача «Первый шаг» не переписана, повторное открытие не дублирует строку", async ({
   page,
 }, testInfo) => {
@@ -355,6 +379,7 @@ test("критерий 2: ручная выдача «Первый шаг» не
   expect(firstStep, "ручная строка по-прежнему одна").toHaveLength(1);
   expect(firstStep[0].source, "источник остался ручным").toBe("manual");
   expect(firstStep[0].granted_at, "дата ручной выдачи не переписана").toBe(grantedAt);
+  expect(firstStep[0].revoked_at, "ручная выдача действует").toBeNull();
 
   // Два открытия страницы прогоняют сверку дважды: второй автоматической строки быть не должно.
   await login(page, B);
@@ -364,6 +389,9 @@ test("критерий 2: ручная выдача «Первый шаг» не
     grants(testInfo, B.login).filter((row) => row.achievement_id === "idp-competency-confirmed"),
     "строка выдачи одна после повторной сверки",
   ).toHaveLength(1);
+  const firstStepAfterReconcile = grants(testInfo, B.login).filter((row) => row.achievement_id === "idp-first-step");
+  expect(firstStepAfterReconcile, "ручная строка одна после повторной сверки").toHaveLength(1);
+  expect(firstStepAfterReconcile[0].revoked_at, "ручная выдача действует после повторной сверки").toBeNull();
 
   await login(page);
 });
@@ -427,11 +455,22 @@ test("критерий 4: два источника считаются одно�
   expect(employee, "id сотрудника D найден").not.toBe("");
 
   await confirmViaUi(page, employee, PROGRAMMING, D_PROGRAMMING_NOTE);
+  const manualGrant = grants(testInfo, D.login).find((row) => row.achievement_id === "idp-competency-confirmed");
+  expect(manualGrant, "ручное подтверждение выдало достижение").toBeDefined();
+  expect(manualGrant!.source_ref, "ручной записи план не приписан").toBeNull();
   await confirmViaUi(page, employee, OBUCHAEMOST, D_OBUCHAEMOST_NOTE);
 
   const planPath = await createPlan(page, D, "programmer");
+  const planId = planPath.split("/").pop() ?? "";
+  expect(planId, "id плана известен").not.toBe("");
   await addItem(page, PROGRAMMING, D_ITEM);
   await acceptItem(page, D_ITEM);
+
+  // Сверка после приёмки обновляет ссылку действующей выдачи, не переписывая дату.
+  const bothSources = grants(testInfo, D.login).find((row) => row.achievement_id === "idp-competency-confirmed");
+  expect(bothSources, "выдача «Компетенция подтверждена» одна").toBeDefined();
+  expect(bothSources!.source_ref, "появился план — ссылка обновилась").toBe(planId);
+  expect(bothSources!.granted_at, "дата выдачи не переписана").toBe(manualGrant!.granted_at);
 
   await login(page, D);
   await openAchievements(page);
@@ -458,6 +497,40 @@ test("критерий 4: два источника считаются одно�
   await login(page, D);
   await openAchievements(page);
   await expect(confirmedBlock(page).getByRole("listitem"), "в блоке три компетенции").toHaveCount(3);
+
+  // Отзыв ручного источника оставляет компетенцию подтверждённой приёмкой: ссылка на план,
+  // звезда и достижение остаются. Приёмка относится к той же компетенции, что и ручная запись.
+  await login(page);
+  await revokeViaUi(page, employee, PROGRAMMING, D_REVOKE_REASON);
+  const afterManualRevoke = grants(testInfo, D.login).filter(
+    (row) => row.achievement_id === "idp-competency-confirmed",
+  );
+  expect(afterManualRevoke, "выдача одна").toHaveLength(1);
+  expect(afterManualRevoke[0].revoked_at, "достижение держит приёмка").toBeNull();
+  expect(afterManualRevoke[0].source_ref, "ссылка на план сохранилась").toBe(planId);
+
+  await login(page, D);
+  await openAchievements(page);
+  const afterManualRecord = page.getByTestId(`confirmed-${PROGRAMMING}`);
+  await expect(afterManualRecord, "запись осталась").toHaveCount(1);
+  await expect(afterManualRecord.getByRole("link", { name: "приёмкой ИПР" })).toHaveAttribute("href", planPath);
+  await expect(afterManualRecord, "ручного источника больше нет").not.toContainText("вручную");
+  await page.goto("/me/skills");
+  await expect(skillNode(page, PROGRAMMING), "звезда осталась от приёмки").toHaveAttribute("data-confirmed", "true");
+
+  // Обратный случай: ручная запись возвращена, приёмку сняли. Ссылка на план очищается,
+  // дата выдачи и ручная запись остаются.
+  await login(page);
+  await confirmViaUi(page, employee, PROGRAMMING, D_PROGRAMMING_NOTE);
+  await page.goto(planPath);
+  const itemRow = page.getByRole("row", { name: new RegExp(D_ITEM) });
+  await itemRow.getByRole("button", { name: "Снять подтверждение", exact: true }).click();
+  await expect(itemRow.getByRole("button", { name: "Подтвердить", exact: true }), "приёмка снята").toBeVisible();
+
+  const afterUnaccept = grants(testInfo, D.login).filter((row) => row.achievement_id === "idp-competency-confirmed");
+  expect(afterUnaccept, "выдача одна").toHaveLength(1);
+  expect(afterUnaccept[0].revoked_at, "ручное подтверждение держит достижение").toBeNull();
+  expect(afterUnaccept[0].source_ref, "приёмки больше нет — ссылка очищена").toBeNull();
 });
 
 test("критерий 2 (пул): ручное подтверждение закрывает пул живого плана", async ({ page }, testInfo) => {

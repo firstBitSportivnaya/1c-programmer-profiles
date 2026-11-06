@@ -133,6 +133,8 @@ export default async function SkillTreePage() {
 
   const hasProfile = data.nodes.some((node) => node.relation !== "none");
   const hasMarks = data.nodes.some((node) => node.mark !== "");
+  // Ручное подтверждение открывает дерево и без профиля и пометок: звезда видна в «Вне профиля».
+  const hasConfirmed = data.nodes.some((node) => node.confirmed);
 
   return (
     <article className="space-y-6">
@@ -142,7 +144,7 @@ export default async function SkillTreePage() {
         </a>
         <h1 className="page-title">Дерево навыков</h1>
       </div>
-      {hasProfile || hasMarks ? (
+      {hasProfile || hasMarks || hasConfirmed ? (
         <SkillTree data={data} motto={MOTTO} />
       ) : (
         <p className="muted" data-testid="skill-tree-no-profile">
