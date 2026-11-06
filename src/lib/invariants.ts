@@ -1,5 +1,16 @@
-import { eq, or } from "drizzle-orm";
-import { competencies, employees, idpAssignments, idpItems, idpPool, idps, jobTransitions, profileSkills, profiles } from "@/db/schema";
+import { and, eq, isNull, or } from "drizzle-orm";
+import {
+  competencies,
+  employees,
+  employeeCompetencyConfirmations,
+  idpAssignments,
+  idpItems,
+  idpPool,
+  idps,
+  jobTransitions,
+  profileSkills,
+  profiles,
+} from "@/db/schema";
 import { getDb } from "@/db";
 import type { SessionEmployee } from "@/lib/auth";
 
@@ -197,5 +208,20 @@ export function assertCompetencyDeletable(id: string) {
   const item = db.select().from(idpItems).where(eq(idpItems.competencyId, id)).get();
   if (item) {
     throw new InvariantError("Нельзя удалить компетенцию: есть строки ИПР");
+  }
+  // Отозванная строка историю держит, но удаление не блокирует (ADR 0011): после отзыва
+  // подтверждений компетенцию убрать можно, вместе с ней уходят и отозванные записи.
+  const confirmation = db
+    .select()
+    .from(employeeCompetencyConfirmations)
+    .where(
+      and(
+        eq(employeeCompetencyConfirmations.competencyId, id),
+        isNull(employeeCompetencyConfirmations.revokedAt),
+      ),
+    )
+    .get();
+  if (confirmation) {
+    throw new InvariantError("Нельзя удалить компетенцию: есть ручные подтверждения");
   }
 }

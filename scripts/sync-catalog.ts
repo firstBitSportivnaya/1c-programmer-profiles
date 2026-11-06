@@ -1,7 +1,8 @@
 /**
  * Перезаписывает компетенции и профили из seed/data.json в уже существующую базу.
  * Сотрудников, ИПР и задания не удаляет. Компетенцию, которой нет в исходниках,
- * убирает только если на неё не ссылаются задания, пул, строки плана и личные пометки.
+ * убирает только если на неё не ссылаются задания, пул, строки плана, личные пометки
+ * и ручные подтверждения.
  *
  *   npm run db:sync-catalog -- <файл базы>
  */
@@ -37,6 +38,7 @@ const BLOCKS: { table: string; label: string }[] = [
   { table: "idp_pool", label: "пул ИПР" },
   { table: "idp_items", label: "строки ИПР" },
   { table: "employee_competency_marks", label: "личные пометки" },
+  { table: "employee_competency_confirmations", label: "ручные подтверждения" },
 ];
 
 function placeholders(count: number) {
@@ -124,7 +126,7 @@ function apply(sqlite: SqliteClient, data: Seed, t: number) {
   }
   if (blockers.length > 0) {
     throw new Error(
-      `Нельзя убрать компетенции, пока на них есть планы, задания или пометки. База не изменена.\n${blockers.join("\n")}`,
+      `Нельзя убрать компетенции, пока на них есть планы, задания, пометки или подтверждения. База не изменена.\n${blockers.join("\n")}`,
     );
   }
 

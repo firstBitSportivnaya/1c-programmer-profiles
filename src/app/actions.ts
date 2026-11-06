@@ -8,6 +8,7 @@ import {
   competencies,
   competencyLinks,
   employeeAchievements,
+  employeeCompetencyConfirmations,
   employeeCompetencyMarks,
   employees,
   jobTransitions,
@@ -286,6 +287,11 @@ export async function deleteCompetencyAction(
     assertCompetencyDeletable(id);
     const db = getDb();
     db.delete(employeeCompetencyMarks).where(eq(employeeCompetencyMarks.competencyId, id)).run();
+    // Действующие подтверждения сюда не доходят (их отсекает assertCompetencyDeletable),
+    // остаются отозванные: компетенция уходит вместе со своей историей (ADR 0011).
+    db.delete(employeeCompetencyConfirmations)
+      .where(eq(employeeCompetencyConfirmations.competencyId, id))
+      .run();
     db.delete(competencyLinks).where(eq(competencyLinks.competencyId, id)).run();
     db.delete(competencies).where(eq(competencies.id, id)).run();
     revalidateCompetencyAdmin(id);
