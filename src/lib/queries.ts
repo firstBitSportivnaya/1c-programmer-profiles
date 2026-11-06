@@ -1,11 +1,12 @@
 import { cache } from "react";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { migrate } from "@/db/migrate";
 import {
   achievements,
   competencies,
   competencyLinks,
+  employeeCompetencyConfirmations,
   employeeCompetencyMarks,
   employees,
   idpAssignmentOptions,
@@ -242,6 +243,57 @@ export type MarkableCompetency = {
   onlyInTarget: boolean;
   criteria: string | null;
 };
+
+/**
+ * Действующие ручные подтверждения сотрудника (ADR 0011) с автором. Отозванные строки в карточку
+ * не попадают: они остаются в базе с датой, автором отзыва и причиной. Название берётся из
+ * справочника, а удалённое оттуда — из снимка, который хранит сама запись.
+ */
+export type CompetencyConfirmationView = {
+  competencyId: string;
+  competencyName: string;
+  note: string;
+  confirmedAt: number;
+  confirmedByName: string;
+};
+
+export function listCompetencyConfirmations(employeeId: string): CompetencyConfirmationView[] {
+  ensureSchema();
+  return getDb()
+    .select({
+      confirmation: employeeCompetencyConfirmations,
+      currentName: competencies.name,
+      authorName: employees.name,
+    })
+    .from(employeeCompetencyConfirmations)
+    .leftJoin(competencies, eq(competencies.id, employeeCompetencyConfirmations.competencyId))
+    .innerJoin(employees, eq(employees.id, employeeCompetencyConfirmations.confirmedById))
+    .where(
+      and(
+        eq(employeeCompetencyConfirmations.employeeId, employeeId),
+        isNull(employeeCompetencyConfirmations.revokedAt),
+      ),
+    )
+    .orderBy(desc(employeeCompetencyConfirmations.confirmedAt), asc(employeeCompetencyConfirmations.competencyName))
+    .all()
+    .map(({ confirmation, currentName, authorName }) => ({
+      competencyId: confirmation.competencyId,
+      competencyName: currentName ?? confirmation.competencyName,
+      note: confirmation.note,
+      confirmedAt: confirmation.confirmedAt,
+      confirmedByName: authorName,
+    }));
+}
+
+/**
+ * Навыки справочника для подтверждения (ADR 0011): без обязанностей и без групп разделов,
+ * как в выборе навыка для профиля. Группа называется так же, как её навыки, и подтверждать её нечего.
+ */
+export function listSkillCompetencies() {
+  const all = listCompetencies();
+  const groupIds = new Set(all.flatMap((row) => (row.parentId ? [row.parentId] : [])));
+  return all.filter((row) => row.type !== "duty" && !groupIds.has(row.id));
+}
 
 /**
  * Навыки, которые сотрудник может пометить впервые (ADR 0007): профиль текущей должности
