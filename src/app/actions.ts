@@ -284,16 +284,23 @@ export async function deleteCompetencyAction(
   try {
     await requireAdmin();
     const id = String(formData.get("id") ?? "");
-    assertCompetencyDeletable(id);
     const db = getDb();
-    db.delete(employeeCompetencyMarks).where(eq(employeeCompetencyMarks.competencyId, id)).run();
-    // Действующие подтверждения сюда не доходят (их отсекает assertCompetencyDeletable),
-    // остаются отозванные: компетенция уходит вместе со своей историей (ADR 0011).
-    db.delete(employeeCompetencyConfirmations)
-      .where(eq(employeeCompetencyConfirmations.competencyId, id))
-      .run();
-    db.delete(competencyLinks).where(eq(competencyLinks.competencyId, id)).run();
-    db.delete(competencies).where(eq(competencies.id, id)).run();
+    // Проверка и все удаления — одной транзакцией: иначе сбой на последнем шаге оставил бы
+    // компетенцию без пометок, материалов и истории отзывов.
+    getSqlite()
+      .transaction(() => {
+        assertCompetencyDeletable(id);
+        db.delete(employeeCompetencyMarks).where(eq(employeeCompetencyMarks.competencyId, id)).run();
+        // Действующие подтверждения сюда не доходят (их отсекает assertCompetencyDeletable),
+        // остаются отозванные: компетенция уходит вместе со своей историей (ADR 0011).
+        db.delete(employeeCompetencyConfirmations)
+          .where(eq(employeeCompetencyConfirmations.competencyId, id))
+          .run();
+        db.delete(competencyLinks).where(eq(competencyLinks.competencyId, id)).run();
+        db.delete(competencies).where(eq(competencies.id, id)).run();
+        return true;
+      })
+      .immediate(null);
     revalidateCompetencyAdmin(id);
     return null;
   } catch (error) {

@@ -88,6 +88,23 @@ export function assertTypeChangeAllowed(id: string, nextType: string) {
   if (assignment) {
     throw new InvariantError("Тип нельзя менять: есть задания ИПР");
   }
+  // Обязанность уровнем не обладает и в подтверждениях не участвует (ADR 0011): пока запись
+  // действует, навык в обязанность не переводим.
+  if (nextType === "duty") {
+    const confirmed = db
+      .select()
+      .from(employeeCompetencyConfirmations)
+      .where(
+        and(
+          eq(employeeCompetencyConfirmations.competencyId, id),
+          isNull(employeeCompetencyConfirmations.revokedAt),
+        ),
+      )
+      .get();
+    if (confirmed) {
+      throw new InvariantError("Тип нельзя менять: есть ручное подтверждение");
+    }
+  }
 }
 
 export function assertJobDeletable(jobId: string) {

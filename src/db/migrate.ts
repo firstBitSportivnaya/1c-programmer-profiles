@@ -318,7 +318,6 @@ function retargetMergedCompetencies() {
   };
 
   move("employee_competency_marks", ["employee_id"]);
-  move("employee_competency_confirmations", ["employee_id"], "competency_name");
   move("idp_pool", ["idp_id"], "competency_name");
   move("idp_items", ["id"], "competency_name");
   if (tableExists("idp_assignments")) {
