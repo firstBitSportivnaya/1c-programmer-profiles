@@ -1,7 +1,8 @@
 /**
  * Перезаписывает компетенции и профили из seed/data.json в уже существующую базу.
  * Сотрудников, ИПР и задания не удаляет. Компетенцию, которой нет в исходниках,
- * убирает только если на неё не ссылаются задания, пул, строки плана и личные пометки.
+ * убирает только если на неё не ссылаются задания, пул, строки плана, личные пометки
+ * и ручные подтверждения.
  *
  *   npm run db:sync-catalog -- <файл базы>
  */
@@ -37,6 +38,7 @@ const BLOCKS: { table: string; label: string }[] = [
   { table: "idp_pool", label: "пул ИПР" },
   { table: "idp_items", label: "строки ИПР" },
   { table: "employee_competency_marks", label: "личные пометки" },
+  { table: "employee_competency_confirmations", label: "ручные подтверждения" },
 ];
 
 function placeholders(count: number) {
@@ -49,6 +51,25 @@ function apply(sqlite: SqliteClient, data: Seed, t: number) {
   const existing = new Set(
     (sqlite.prepare("SELECT id FROM competencies").all() as { id: string }[]).map((row) => row.id),
   );
+  // Подтверждённый вручную навык не может стать обязанностью (ADR 0011): обязанность уровнем
+  // не обладает, и действующая запись осталась бы у компетенции, которая в подтверждениях не участвует.
+  const currentType = sqlite.prepare("SELECT type FROM competencies WHERE id = ?");
+  const confirmed = sqlite.prepare(
+    "SELECT COUNT(*) AS n FROM employee_competency_confirmations WHERE competency_id = ? AND revoked_at IS NULL",
+  );
+  const dutyBlockers: string[] = [];
+  for (const row of data.competencies) {
+    if (row.type !== "duty") continue;
+    const current = currentType.get(row.id) as { type: string } | undefined;
+    if (!current || current.type === "duty") continue;
+    const count = (confirmed.get(row.id) as { n: number }).n;
+    if (count > 0) dutyBlockers.push(`«${row.name}» — подтверждений: ${count}`);
+  }
+  if (dutyBlockers.length > 0) {
+    throw new Error(
+      `Нельзя перевести подтверждённый навык в обязанность. База не изменена.\n${dutyBlockers.join("\n")}`,
+    );
+  }
   const insertCompetency = sqlite.prepare(
     "INSERT INTO competencies (id, name, description, type, parent_id, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
   );
@@ -124,7 +145,7 @@ function apply(sqlite: SqliteClient, data: Seed, t: number) {
   }
   if (blockers.length > 0) {
     throw new Error(
-      `Нельзя убрать компетенции, пока на них есть планы, задания или пометки. База не изменена.\n${blockers.join("\n")}`,
+      `Нельзя убрать компетенции, пока на них есть планы, задания, пометки или подтверждения. База не изменена.\n${blockers.join("\n")}`,
     );
   }
 

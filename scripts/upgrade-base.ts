@@ -12,6 +12,7 @@ import path from "node:path";
 import {
   competencyLinks,
   employeeAchievements,
+  employeeCompetencyConfirmations,
   employeeCompetencyMarks,
   employees,
   idpAssignmentOptions,
@@ -191,12 +192,20 @@ function main() {
           { employeeId: "emp-junior", achievementId: "idp-completed", source: "auto", ruleKey: "idp.completed", sourceRef: "idp-done", grantedAt: t },
         ])
         .run();
+
+      // Ручные подтверждения (ADR 0011): одна действующая, одна отозванная, чтобы проверка видела обе.
+      db.insert(employeeCompetencyConfirmations)
+        .values([
+          { employeeId: "emp-junior", competencyId: skills[0].competencyId, competencyName: skills[0].competencyName, note: "Проект на проде", confirmedAt: t, confirmedById: "emp-manager" },
+          { employeeId: "emp-junior", competencyId: skills[1].competencyId, competencyName: skills[1].competencyName, note: "Наставничество", confirmedAt: t, confirmedById: "emp-manager", revokedAt: t, revokedById: "emp-admin", revokeReason: "Подтвердили по ошибке" },
+        ])
+        .run();
       return true;
     })
     .deferred(null);
 
   console.log(
-    "upgrade base: employees=4 idps=2 idp_assignments=3 idp_pool=3 idp_items=2 employee_competency_marks=2 competency_links=2 idp_assignment_questions=1 idp_item_questions=1 idp_item_attempts=1 achievements=30 employee_achievements=2",
+    "upgrade base: employees=4 idps=2 idp_assignments=3 idp_pool=3 idp_items=2 employee_competency_marks=2 competency_links=2 idp_assignment_questions=1 idp_item_questions=1 idp_item_attempts=1 achievements=30 employee_achievements=2 employee_competency_confirmations=2",
   );
 }
 

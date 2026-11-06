@@ -270,6 +270,36 @@ export const employeeAchievements = sqliteTable(
   ],
 );
 
+/**
+ * Ручное подтверждение компетенции (ADR 0011): пара «сотрудник × компетенция», поэтому повторное
+ * подтверждение обновляет ту же строку. Ставит человек с основанием, отзыв строку не удаляет:
+ * остаются дата, автор и причина. Название хранится снимком: справочник может переименоваться.
+ */
+export const employeeCompetencyConfirmations = sqliteTable(
+  "employee_competency_confirmations",
+  {
+    employeeId: text("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    competencyId: text("competency_id")
+      .notNull()
+      .references(() => competencies.id),
+    competencyName: text("competency_name").notNull(),
+    note: text("note").notNull(),
+    confirmedAt: integer("confirmed_at").notNull(),
+    confirmedById: text("confirmed_by_id")
+      .notNull()
+      .references(() => employees.id),
+    revokedAt: integer("revoked_at"),
+    revokedById: text("revoked_by_id").references(() => employees.id),
+    revokeReason: text("revoke_reason"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.employeeId, t.competencyId] }),
+    index("employee_competency_confirmations_competency").on(t.competencyId),
+  ],
+);
+
 export type JobLane = "executor" | "manager" | "other";
 export type TransitionKind = "linear" | "level_change";
 export type CompetencyType = "professional" | "universal" | "duty";

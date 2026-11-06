@@ -146,6 +146,20 @@ CREATE TABLE IF NOT EXISTS competency_links (
   sort_order INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS employee_competency_confirmations (
+  employee_id TEXT NOT NULL REFERENCES employees(id),
+  competency_id TEXT NOT NULL REFERENCES competencies(id),
+  competency_name TEXT NOT NULL,
+  note TEXT NOT NULL,
+  confirmed_at INTEGER NOT NULL,
+  confirmed_by_id TEXT NOT NULL REFERENCES employees(id),
+  revoked_at INTEGER,
+  revoked_by_id TEXT REFERENCES employees(id),
+  revoke_reason TEXT,
+  PRIMARY KEY (employee_id, competency_id)
+);
+CREATE INDEX IF NOT EXISTS employee_competency_confirmations_competency
+  ON employee_competency_confirmations (competency_id);
 `;
 
 function ensureCompetenciesParentFk() {
