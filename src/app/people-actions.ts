@@ -187,6 +187,10 @@ export async function assignJobAction(
 
 const REVOKE_REASON_LIMIT = 1000;
 
+/**
+ * Ключ достижения из формы: сотрудник должен существовать, запись каталога — быть выбрана.
+ * Права и наличие самой записи проверяются действием, здесь только то, без чего запрос бессмыслен.
+ */
 function readAchievementKey(formData: FormData) {
   const employeeId = String(formData.get("employeeId") ?? "").trim();
   const achievementId = String(formData.get("achievementId") ?? "").trim();
