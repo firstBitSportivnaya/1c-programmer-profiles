@@ -4,7 +4,13 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getDb, now, retryIfClosed } from "@/db";
-import { employeeCompetencyMarks, employees, idps, type CompetencyMarkStatus } from "@/db/schema";
+import {
+  employeeAchievements,
+  employeeCompetencyMarks,
+  employees,
+  idps,
+  type CompetencyMarkStatus,
+} from "@/db/schema";
 import { requireAdmin, requireEmployee } from "@/lib/auth";
 import { syncEmployeeAchievements } from "@/lib/achievement-rules";
 import {
@@ -15,6 +21,7 @@ import {
 } from "@/lib/invariants";
 import { hashPassword } from "@/lib/password";
 import {
+  getAchievement,
   getActiveIdp,
   getEmployee,
   getEmployeeByLogin,
@@ -174,6 +181,115 @@ export async function assignJobAction(
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return assignJobAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+const REVOKE_REASON_LIMIT = 1000;
+
+/**
+ * Ключ достижения из формы: сотрудник должен существовать, запись каталога — быть выбрана.
+ * Права и наличие самой записи проверяются действием, здесь только то, без чего запрос бессмыслен.
+ */
+function readAchievementKey(formData: FormData) {
+  const employeeId = String(formData.get("employeeId") ?? "").trim();
+  const achievementId = String(formData.get("achievementId") ?? "").trim();
+  if (!getEmployee(employeeId)) throw new InvariantError("Сотрудник не найден");
+  if (!achievementId) throw new InvariantError("Достижение не выбрано");
+  return { employeeId, achievementId };
+}
+
+/**
+ * Ручная выдача достижения (ADR 0010). Админ выдаёт любому, руководитель — только прямому
+ * подчинённому: то же условие, что у приёмки ИПР. Повторная выдача не добавляет строку,
+ * а снимает отзыв и ставит новую дату; `granted_by_id` подписывает её человеком.
+ */
+export async function grantAchievementAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireEmployee();
+    const { employeeId, achievementId } = readAchievementKey(formData);
+    if (!canManageEmployee(actor, employeeId)) {
+      throw new InvariantError("Нельзя выдать достижение этому сотруднику");
+    }
+    const achievement = getAchievement(achievementId);
+    if (!achievement) throw new InvariantError("Достижение не найдено");
+    if (achievement.archived !== 0) throw new InvariantError("Достижение скрыто из каталога");
+    const t = now();
+    getDb()
+      .insert(employeeAchievements)
+      .values({
+        employeeId,
+        achievementId,
+        source: "manual",
+        ruleKey: achievement.rule,
+        sourceRef: null,
+        grantedAt: t,
+        grantedById: actor.id,
+      })
+      .onConflictDoUpdate({
+        target: [employeeAchievements.employeeId, employeeAchievements.achievementId],
+        set: {
+          source: "manual",
+          ruleKey: achievement.rule,
+          sourceRef: null,
+          grantedAt: t,
+          grantedById: actor.id,
+          revokedAt: null,
+          revokedById: null,
+          revokeReason: null,
+        },
+      })
+      .run();
+    revalidatePeople(employeeId);
+    revalidatePath("/me/achievements");
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return grantAchievementAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+/**
+ * Ручной отзыв выданного достижения (ADR 0010). Строка не удаляется: остаются дата, автор
+ * и причина. Отозвать можно и автоматическую выдачу — подпись человека сильнее правила,
+ * сверка такую строку больше не оживляет.
+ */
+export async function revokeAchievementAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireEmployee();
+    const { employeeId, achievementId } = readAchievementKey(formData);
+    if (!canManageEmployee(actor, employeeId)) {
+      throw new InvariantError("Нельзя отозвать достижение этого сотрудника");
+    }
+    const reason = String(formData.get("reason") ?? "").trim();
+    if (!reason) throw new InvariantError("Нужна причина отзыва");
+    if (reason.length > REVOKE_REASON_LIMIT) {
+      throw new InvariantError(`Причина: не длиннее ${REVOKE_REASON_LIMIT} символов`);
+    }
+    const db = getDb();
+    const key = and(
+      eq(employeeAchievements.employeeId, employeeId),
+      eq(employeeAchievements.achievementId, achievementId),
+    );
+    const existing = db.select().from(employeeAchievements).where(key).get();
+    if (!existing || existing.revokedAt != null) throw new InvariantError("Достижение не выдано");
+    db.update(employeeAchievements)
+      .set({ revokedAt: now(), revokedById: actor.id, revokeReason: reason })
+      .where(key)
+      .run();
+    revalidatePeople(employeeId);
+    revalidatePath("/me/achievements");
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return revokeAchievementAction(_prev, formData, true);
     return asActionError(error);
   }
 }

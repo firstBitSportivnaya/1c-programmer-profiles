@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
+import { EmployeeAchievements } from "@/components/EmployeeAchievements";
 import { EmployeeIdpSummary } from "@/components/IdpBlock";
 import { assignJobAction, deactivateEmployeeAction, saveEmployeeAction } from "@/app/people-actions";
 import { getSessionEmployee } from "@/lib/auth";
@@ -9,6 +10,10 @@ import { getEmployee, getJob, jobHref, listEmployees, listJobs } from "@/lib/que
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Карточка сотрудника: сведения, назначение должности, админская правка, сводка ИПР и достижения.
+ * Открывается только тому, кто видит сотрудника: самому сотруднику, его руководителю и админу.
+ */
 export default async function PersonPage({ params }: { params: Promise<{ employeeId: string }> }) {
   const actor = await getSessionEmployee();
   if (!actor) redirect("/login");
@@ -124,6 +129,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
       ) : null}
 
       <EmployeeIdpSummary employeeId={row.id} />
+      <EmployeeAchievements employeeId={row.id} canManage={manage} />
     </article>
   );
 }
