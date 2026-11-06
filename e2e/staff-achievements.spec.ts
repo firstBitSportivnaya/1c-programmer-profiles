@@ -365,7 +365,12 @@ test("критерий 5: компетенции остаются текстом
   const block = page.getByTestId("confirmed-competencies");
   await expect(block.getByRole("listitem").filter({ hasText: cCompetency })).toHaveCount(1);
   await expect(block.getByRole("listitem").filter({ hasText: cSecondCompetency })).toHaveCount(1);
-  await expect(block.locator("a"), "компетенции в блоке — текст, а не ссылки").toHaveCount(0);
+  // ADR 0011: у записи из приёмки есть ссылка на план, но компетенций по-прежнему по одной.
+  for (const name of [cCompetency, cSecondCompetency]) {
+    const record = block.getByRole("listitem").filter({ hasText: name });
+    await expect(record, "запись компетенции одна").toHaveCount(1);
+    await expect(record.getByRole("link", { name: "приёмкой ИПР" })).toHaveAttribute("href", /^\/idps\//);
+  }
 
   const list = page.getByTestId("achievements-list");
   await expect(list.getByRole("listitem").filter({ hasText: "Компетенция подтверждена" })).toHaveCount(1);

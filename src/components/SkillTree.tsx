@@ -662,7 +662,7 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
             {legendButton("in_progress", "в процессе", "skill-legend__swatch--progress")}
             {legendButton("lacks", "нет", "skill-legend__swatch--lacks")}
             {legendButton("none", "без пометки", "skill-legend__swatch--none")}
-            {legendButton("confirmed", "подтверждено приёмкой", "skill-legend__swatch--star")}
+            {legendButton("confirmed", "подтверждено приёмкой или вручную", "skill-legend__swatch--star")}
             {legendButton("plan", "шаг ИПР", "skill-legend__swatch--plan")}
             <li>
               <span className="skill-legend__note">

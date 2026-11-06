@@ -325,7 +325,8 @@ function readConfirmableSkill(id: string) {
 /**
  * Ручное подтверждение компетенции (ADR 0011). Админ подтверждает любому, руководитель — только
  * прямому подчинённому: то же условие, что у приёмки ИПР. Повтор обновляет ту же строку и снимает
- * отзыв, поэтому второй записи по паре «сотрудник × компетенция» не появляется.
+ * отзыв, поэтому второй записи по паре «сотрудник × компетенция» не появляется. После записи
+ * сверяются достижения сотрудника и его руководителя: ручная запись — второй источник правил.
  */
 export async function confirmCompetencyAction(
   _prev: ActionResult,
@@ -368,6 +369,7 @@ export async function confirmCompetencyAction(
         },
       })
       .run();
+    syncPeopleAchievements(employeeId, getEmployee(employeeId)?.managerId);
     revalidatePeople(employeeId);
     return null;
   } catch (error) {
@@ -407,6 +409,7 @@ export async function revokeCompetencyConfirmationAction(
       .set({ revokedAt: now(), revokedById: actor.id, revokeReason: reason })
       .where(key)
       .run();
+    syncPeopleAchievements(employeeId, getEmployee(employeeId)?.managerId);
     revalidatePeople(employeeId);
     return null;
   } catch (error) {
