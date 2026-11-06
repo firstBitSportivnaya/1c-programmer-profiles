@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, now, retryIfClosed } from "@/db";
 import {
   employeeAchievements,
+  employeeCompetencyConfirmations,
   employeeCompetencyMarks,
   employees,
   idps,
@@ -23,9 +24,11 @@ import { hashPassword } from "@/lib/password";
 import {
   getAchievement,
   getActiveIdp,
+  getCompetency,
   getEmployee,
   getEmployeeByLogin,
   getJob,
+  listSkillCompetencies,
   markableCompetencies,
 } from "@/lib/queries";
 import type { ActionResult } from "@/lib/action-result";
@@ -294,8 +297,125 @@ export async function revokeAchievementAction(
   }
 }
 
-const MARK_STATUSES: CompetencyMarkStatus[] = ["has", "lacks", "in_progress"];
+const CONFIRMATION_NOTE_LIMIT = 1000;
 
+/** Ключ подтверждения из формы: сотрудник должен существовать, навык — быть выбран. */
+function readConfirmationKey(formData: FormData) {
+  const employeeId = String(formData.get("employeeId") ?? "").trim();
+  const competencyId = String(formData.get("competencyId") ?? "").trim();
+  if (!getEmployee(employeeId)) throw new InvariantError("Сотрудник не найден");
+  if (!competencyId) throw new InvariantError("Навык не выбран");
+  return { employeeId, competencyId };
+}
+
+/**
+ * Подтвердить можно только навык (ADR 0011): обязанность уровнем не обладает и в подтверждениях
+ * не участвует, а группа разделов — не навык, хотя и хранится в том же справочнике. Список навыков
+ * тот же, что в форме, поэтому действие не расходится с тем, что предлагает интерфейс.
+ */
+function readConfirmableSkill(id: string) {
+  const competency = getCompetency(id);
+  if (!competency) throw new InvariantError("Навык не найден");
+  if (!listSkillCompetencies().some((row) => row.id === id)) {
+    throw new InvariantError("Подтвердить можно только навык");
+  }
+  return competency;
+}
+
+/**
+ * Ручное подтверждение компетенции (ADR 0011). Админ подтверждает любому, руководитель — только
+ * прямому подчинённому: то же условие, что у приёмки ИПР. Повтор обновляет ту же строку и снимает
+ * отзыв, поэтому второй записи по паре «сотрудник × компетенция» не появляется.
+ */
+export async function confirmCompetencyAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireEmployee();
+    const { employeeId, competencyId } = readConfirmationKey(formData);
+    if (!canManageEmployee(actor, employeeId)) {
+      throw new InvariantError("Нельзя подтвердить компетенцию этому сотруднику");
+    }
+    const competency = readConfirmableSkill(competencyId);
+    const note = String(formData.get("note") ?? "").trim();
+    if (!note) throw new InvariantError("Нужно основание подтверждения");
+    if (note.length > CONFIRMATION_NOTE_LIMIT) {
+      throw new InvariantError(`Основание: не длиннее ${CONFIRMATION_NOTE_LIMIT} символов`);
+    }
+    const t = now();
+    getDb()
+      .insert(employeeCompetencyConfirmations)
+      .values({
+        employeeId,
+        competencyId,
+        competencyName: competency.name,
+        note,
+        confirmedAt: t,
+        confirmedById: actor.id,
+      })
+      .onConflictDoUpdate({
+        target: [employeeCompetencyConfirmations.employeeId, employeeCompetencyConfirmations.competencyId],
+        set: {
+          competencyName: competency.name,
+          note,
+          confirmedAt: t,
+          confirmedById: actor.id,
+          revokedAt: null,
+          revokedById: null,
+          revokeReason: null,
+        },
+      })
+      .run();
+    revalidatePeople(employeeId);
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return confirmCompetencyAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+/**
+ * Отзыв ручного подтверждения (ADR 0011). Строка не удаляется: остаются дата, автор и причина.
+ * Повторный отзыв получает отказ и данные не меняет.
+ */
+export async function revokeCompetencyConfirmationAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireEmployee();
+    const { employeeId, competencyId } = readConfirmationKey(formData);
+    if (!canManageEmployee(actor, employeeId)) {
+      throw new InvariantError("Нельзя отозвать подтверждение этого сотрудника");
+    }
+    const reason = String(formData.get("reason") ?? "").trim();
+    if (!reason) throw new InvariantError("Нужна причина отзыва");
+    if (reason.length > REVOKE_REASON_LIMIT) {
+      throw new InvariantError(`Причина: не длиннее ${REVOKE_REASON_LIMIT} символов`);
+    }
+    const db = getDb();
+    const key = and(
+      eq(employeeCompetencyConfirmations.employeeId, employeeId),
+      eq(employeeCompetencyConfirmations.competencyId, competencyId),
+    );
+    const existing = db.select().from(employeeCompetencyConfirmations).where(key).get();
+    if (!existing || existing.revokedAt != null) throw new InvariantError("Подтверждение не найдено");
+    db.update(employeeCompetencyConfirmations)
+      .set({ revokedAt: now(), revokedById: actor.id, revokeReason: reason })
+      .where(key)
+      .run();
+    revalidatePeople(employeeId);
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return revokeCompetencyConfirmationAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+const MARK_STATUSES: CompetencyMarkStatus[] = ["has", "lacks", "in_progress"];
 const MARK_NOTE_LIMIT = 1000;
 
 /** Ставит, меняет или снимает личную пометку вошедшего сотрудника (ADR 0007, ADR 0008). Пустой статус снимает пометку и пояснение. */

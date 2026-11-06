@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
 import { EmployeeAchievements } from "@/components/EmployeeAchievements";
+import { EmployeeCompetencyConfirmations } from "@/components/EmployeeCompetencyConfirmations";
 import { EmployeeIdpSummary } from "@/components/IdpBlock";
 import { assignJobAction, deactivateEmployeeAction, saveEmployeeAction } from "@/app/people-actions";
 import { getSessionEmployee } from "@/lib/auth";
@@ -130,6 +131,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
 
       <EmployeeIdpSummary employeeId={row.id} />
       <EmployeeAchievements employeeId={row.id} canManage={manage} />
+      <EmployeeCompetencyConfirmations employeeId={row.id} canManage={manage} />
     </article>
   );
 }
