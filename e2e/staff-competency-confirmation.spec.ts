@@ -32,6 +32,7 @@ const Y3 = account("y3", "Сотрудник Y3");
 const P4 = account("p4", "Основание P4");
 const D4 = account("d4", "Подложное D4");
 const R5 = account("r5", "Отзыв R5");
+const E5 = account("e5", "Причина E5");
 const GT = account("gt", "Гость GT");
 
 const SKILL = "comp-yazyk-sql";
@@ -47,6 +48,7 @@ const FORGED_NOTE = `Подложенное подтверждение E2E ${STA
 const OWN_NOTE = `Подтверждение сотрудника E2E ${STAMP}`;
 const REVOKE_REASON = `Причина отзыва E2E ${STAMP}`;
 const FOREIGN_REASON = `Чужой отзыв E2E ${STAMP}`;
+const OWN_REASON = `Свой отзыв E2E ${STAMP}`;
 const GUEST_NOTE = `Гостевое подтверждение E2E ${STAMP}`;
 
 const CONFIRM_DENIED = "Нельзя подтвердить компетенцию этому сотруднику";
@@ -358,10 +360,11 @@ test("критерий 3 (негативный): сотрудник не под�
   const beforeTarget = confirmations(testInfo, X3.login);
   const beforeSelf = confirmations(testInfo, Y3.login);
 
-  // Оба POST подтверждения и POST отзыва снимаются админом: первый — на чужую карточку, второй — на свою.
+  // Оба POST подтверждения и оба POST отзыва снимаются админом: чужая карточка и своя.
   const foreignPost = await captureConfirmPost(page, target, SKILL, FORGED_NOTE);
   const selfPost = await captureConfirmPost(page, actor, SKILL, FORGED_NOTE);
   const revokePost = await captureRevokePost(page, target, SKILL, FOREIGN_REASON);
+  const selfRevokePost = await captureRevokePost(page, actor, SKILL, OWN_REASON);
 
   await login(page, Y3);
   const foreign = await page.goto(`/people/${target}`);
@@ -391,7 +394,10 @@ test("критерий 3 (негативный): сотрудник не под�
   const selfReplay = await replayCaptured(page, selfPost);
   expect(await selfReplay.text(), "сервер отказал в подтверждении себе").toContain(CONFIRM_DENIED);
   const revokeReplay = await replayCaptured(page, revokePost);
-  expect(await revokeReplay.text(), "сервер отказал в отзыве").toContain(REVOKE_DENIED);
+  expect(await revokeReplay.text(), "сервер отказал в отзыве чужого").toContain(REVOKE_DENIED);
+  // Своё подтверждение не отзывается так же: подмена «чужое» на «своё» не должна проходить.
+  const selfRevokeReplay = await replayCaptured(page, selfRevokePost);
+  expect(await selfRevokeReplay.text(), "сервер отказал в отзыве своего").toContain(REVOKE_DENIED);
 
   expect(confirmations(testInfo, X3.login), "чужая строка не изменилась").toEqual(beforeTarget);
   expect(confirmations(testInfo, Y3.login), "своя строка не изменилась").toEqual(beforeSelf);
@@ -441,11 +447,10 @@ test("критерий 4 (негативный): основание из про�
   await form.getByRole("button", { name: "Подтвердить", exact: true }).click();
   await posted;
 
-  // Ошибку ищем внутри секции: в production-сборке рядом есть `__next-route-announcer__` с role="alert".
-  await expect(
-    section(page).locator('.form-error[role="alert"]'),
-    "ошибка показана в форме секции",
-  ).toHaveText("Нужно основание подтверждения");
+  // Ошибку ищем внутри формы: в production-сборке рядом есть `__next-route-announcer__` с role="alert".
+  await expect(form.getByRole("alert"), "ошибка показана в форме секции").toHaveText(
+    "Нужно основание подтверждения",
+  );
   await expect(page.getByTestId("employee-confirmations-empty"), "список остался пустым").toBeVisible();
   expect(confirmations(testInfo, P4.login), "записи в базе нет").toHaveLength(0);
 });
@@ -507,4 +512,30 @@ test("критерий 5: отзыв с причиной, повторное п�
   expect(restored[0].note, "основание обновлено").toBe(NOTE_2);
   expect(restored[0].confirmed_at, "дата подтверждения обновлена").toBeGreaterThan(revoked!.confirmed_at);
   await expect(confirmationRow(page, SKILL), "строка вернулась в список").toContainText(NOTE_2);
+});
+
+test("критерий 5 (негативный): отзыв без причины и из пробелов отклоняется, строка остаётся действующей", async ({
+  page,
+}, testInfo) => {
+  await login(page);
+  const employee = await createPerson(page, E5);
+  expect(employee, "id сотрудника найден").not.toBe("");
+
+  await confirmViaUi(page, employee, SKILL, NOTE);
+  const before = confirmations(testInfo, E5.login);
+  const row = confirmationRow(page, SKILL);
+  await expect(row, "строка подтверждения видна").toBeVisible();
+  const form = row.locator("form");
+
+  // Поле причины не имеет `required`: пустое значение и пробелы доходят до сервера и получают отказ.
+  for (const reason of ["", "   "]) {
+    await form.getByRole("textbox", { name: "Причина", exact: true }).fill(reason);
+    await form.getByRole("button", { name: "Отозвать", exact: true }).click();
+    await expect(form.getByRole("alert"), `отзыв с причиной «${reason}» отклонён`).toHaveText(
+      "Нужна причина отзыва",
+    );
+  }
+
+  await expect(confirmationRow(page, SKILL), "строка не ушла из списка").toBeVisible();
+  expect(confirmations(testInfo, E5.login), "строка в базе не изменилась").toEqual(before);
 });
