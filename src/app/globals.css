@@ -466,6 +466,11 @@ details[open] > .skill-summary::before {
   flex: none;
 }
 
+/* Достижение в карточке сотрудника: форма отзыва переносится на узком экране. */
+.achievement-row {
+  flex-wrap: wrap;
+}
+
 .mark-row {
   align-items: stretch;
   flex-direction: column;
