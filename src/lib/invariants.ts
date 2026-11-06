@@ -59,6 +59,21 @@ export function assertCompetencyTree(parentId: string | null, type?: string) {
   if (type && parent.type !== type) {
     throw new InvariantError("Тип дочерней компетенции должен совпадать с родителем");
   }
+  // Подтверждённый навык в группу не превращается (ADR 0011): группа осталась бы в общем расчёте
+  // и поддерживала бы пороги, хотя подтвердить её как навык нельзя. Отозвали — детей заводить можно.
+  const confirmed = db
+    .select()
+    .from(employeeCompetencyConfirmations)
+    .where(
+      and(
+        eq(employeeCompetencyConfirmations.competencyId, parentId),
+        isNull(employeeCompetencyConfirmations.revokedAt),
+      ),
+    )
+    .get();
+  if (confirmed) {
+    throw new InvariantError("Нельзя добавить дочернюю компетенцию: навык подтверждён");
+  }
 }
 
 export function assertCompetencyNameUnique(id: string, parentId: string | null, name: string) {
