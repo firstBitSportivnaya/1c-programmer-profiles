@@ -78,6 +78,68 @@ export type AchievementRecord = {
   icon: AchievementIcon;
 };
 
+/** Подписи категорий для админки: ключ закрытого списка на экране не показывается. */
+export const ACHIEVEMENT_CATEGORY_LABELS: Record<AchievementCategory, string> = {
+  idp: "ИПР",
+  competency: "Компетенции",
+  career: "Карьера",
+  mentoring: "Наставничество",
+  contribution: "Вклад",
+};
+
+/** Подписи правил выдачи: условие словами, а не ключом из кода. */
+export const ACHIEVEMENT_RULE_LABELS: Record<AchievementRule, string> = {
+  manual: "Вручную",
+  "idp.first-accepted-item": "Первая строка ИПР принята",
+  "idp.items-3": "Три строки ИПР",
+  "idp.items-10": "Десять строк ИПР",
+  "idp.competency-confirmed": "Компетенция подтверждена",
+  "idp.pool-confirmed": "Пул подтверждён",
+  "idp.completed": "ИПР выполнен",
+  "idp.completed-2": "Два ИПР выполнены",
+  "idp.on-time": "ИПР выполнен в срок",
+  "competency.confirmed-3": "Три компетенции",
+  "competency.confirmed-5": "Пять компетенций",
+  "competency.confirmed-10": "Десять компетенций",
+  "competency.confirmed-20": "Двадцать компетенций",
+  "competency.half-profile": "Половина профиля",
+  "competency.full-profile": "Профиль закрыт",
+  "competency.outside-profile": "Компетенция вне профиля",
+  "job.assigned": "Назначена должность",
+  "manager.direct-1": "Один подчинённый",
+  "manager.direct-3": "Трое подчинённых",
+  "manager.report-idp-completed": "У подчинённого выполнен ИПР",
+  "manager.report-competency": "У подчинённого подтверждена компетенция",
+};
+
+/** Подписи пиктограмм: в форме иконка выбирается словами, глиф остаётся декоративным. */
+export const ACHIEVEMENT_ICON_LABELS: Record<AchievementIcon, string> = {
+  flag: "Флаг",
+  checklist: "Список",
+  kanban: "Канбан",
+  award: "Медаль",
+  target: "Цель",
+  "file-check": "Проверенный файл",
+  branch: "Ветка",
+  clock: "Часы",
+  grid: "Сетка",
+  layers: "Слои",
+  scale: "Весы",
+  gauge: "Датчик",
+  "shield-check": "Щит",
+  compass: "Компас",
+  code: "Код",
+  blocks: "Блоки",
+  users: "Люди",
+  chat: "Беседа",
+  book: "Книга",
+  send: "Отправка",
+  bug: "Ошибка",
+  search: "Поиск",
+  ruler: "Линейка",
+  wrench: "Ключ",
+};
+
 /** Правило, которому нужен параметр (сейчас единственное — назначенная должность). */
 export function ruleNeedsParam(rule: AchievementRule): boolean {
   return rule === "job.assigned";

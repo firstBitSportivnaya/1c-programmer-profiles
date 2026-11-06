@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { migrate } from "@/db/migrate";
 import {
+  achievements,
   competencies,
   competencyLinks,
   employeeCompetencyMarks,
@@ -71,6 +72,24 @@ export const listCompetencies = cache(function listCompetencies() {
 export function getCompetency(id: string) {
   ensureSchema();
   return getDb().select().from(competencies).where(eq(competencies.id, id)).get();
+}
+
+/**
+ * Каталог достижений целиком (ADR 0010): скрытые записи тоже нужны админке, из списка их не убираем.
+ * Сначала по категории, внутри — скрытые в конце, затем по названию.
+ */
+export const listAchievements = cache(function listAchievements() {
+  ensureSchema();
+  return getDb()
+    .select()
+    .from(achievements)
+    .orderBy(asc(achievements.category), asc(achievements.archived), asc(achievements.title))
+    .all();
+});
+
+export function getAchievement(id: string) {
+  ensureSchema();
+  return getDb().select().from(achievements).where(eq(achievements.id, id)).get();
 }
 
 export function profileSkillRows(profileId: string) {
