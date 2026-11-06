@@ -47,6 +47,11 @@ export function Header({
               Компетенции
             </a>
           ) : null}
+          {employee?.isAdmin ? (
+            <a href="/admin/achievements" className="nav-link">
+              Достижения
+            </a>
+          ) : null}
           {employee ? (
             <form action="/api/session" method="post">
               <input type="hidden" name="intent" value="logout" />

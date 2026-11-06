@@ -224,8 +224,19 @@ export function syncEmployeeAchievements(employeeId: string): void {
           .map((row) => [row.achievementId, row]),
       );
       for (const row of catalog) {
-        if (row.rule === "manual") continue;
         const existing = current.get(row.id);
+        // Ручная запись ничего не выдаёт автоматически. Автоматическая строка прошлого правила
+        // при этом остаётся без условия: сверять её больше не с чем, поэтому она отзывается.
+        // Ручные выдачи (в том числе по этой же записи) не трогаются.
+        if (row.rule === "manual") {
+          if (existing && existing.source === "auto" && existing.revokedAt == null) {
+            db.update(employeeAchievements)
+              .set({ revokedAt: t, revokedById: null, revokeReason: null })
+              .where(key(row.id))
+              .run();
+          }
+          continue;
+        }
         if (row.archived !== 0 && (!existing || existing.revokedAt != null)) continue;
         const { holds, sourceRef } = evaluateRule(row.rule, row.ruleParam, facts);
         if (holds) {

@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getDb, getSqlite, now, retryIfClosed } from "@/db";
 import {
+  achievements,
   competencies,
   competencyLinks,
+  employeeAchievements,
   employeeCompetencyMarks,
   employees,
   jobTransitions,
@@ -17,6 +19,16 @@ import {
 import { requireAdmin } from "@/lib/auth";
 import { syncEmployeeAchievements } from "@/lib/achievement-rules";
 import {
+  ACHIEVEMENT_CATEGORIES,
+  ACHIEVEMENT_ICONS,
+  ACHIEVEMENT_RULE_LABELS,
+  ACHIEVEMENT_RULES,
+  ruleNeedsParam,
+  type AchievementCategory,
+  type AchievementIcon,
+  type AchievementRule,
+} from "@/lib/achievement-catalog";
+import {
   InvariantError,
   assertCompetencyDeletable,
   assertCompetencyNameUnique,
@@ -26,7 +38,7 @@ import {
   assertTransition,
   assertTypeChangeAllowed,
 } from "@/lib/invariants";
-import { getCompetency } from "@/lib/queries";
+import { getCompetency, getJob } from "@/lib/queries";
 import { parseMaterialJson, parseMaterialSheet } from "@/lib/material-workbook";
 import { readXlsxSheet } from "@/lib/xlsx-sheet";
 import type { ActionResult } from "@/lib/action-result";
@@ -37,6 +49,39 @@ function revalidateCompetencyAdmin(id?: string) {
   revalidatePath("/jobs/[jobId]/profile", "page");
   revalidatePath("/idps/[idpId]", "page");
 }
+
+function revalidateAchievementAdmin(id?: string) {
+  revalidatePath("/admin/achievements");
+  if (id) revalidatePath(`/admin/achievements/${id}`);
+}
+
+/** Закрытые списки каталога (ADR 0010): неизвестное значение из формы не сохраняем. */
+function isAchievementCategory(value: string): value is AchievementCategory {
+  return (ACHIEVEMENT_CATEGORIES as readonly string[]).includes(value);
+}
+
+/** Правило из закрытого списка; `manual` — единственное, что не проверяется по данным. */
+function isAchievementRule(value: string): value is AchievementRule {
+  return (ACHIEVEMENT_RULES as readonly string[]).includes(value);
+}
+
+/** Иконка из общего набора глифов: неизвестное имя дало бы строку без картинки. */
+function isAchievementIcon(value: string): value is AchievementIcon {
+  return (ACHIEVEMENT_ICONS as readonly string[]).includes(value);
+}
+
+/** Сотрудники с выдачей достижения: после смены правила их строки надо сверить заново. */
+function achievementHolders(achievementId: string): string[] {
+  const rows = getDb()
+    .select({ employeeId: employeeAchievements.employeeId })
+    .from(employeeAchievements)
+    .where(eq(employeeAchievements.achievementId, achievementId))
+    .all();
+  return [...new Set(rows.map((row) => row.employeeId))];
+}
+
+/** Ключ каталога — slug: на него ссылаются выдачи, поэтому после создания он не меняется. */
+const ACHIEVEMENT_ID_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * Сверка достижений после правки профиля должности (ADR 0010): правила `competency.half-profile`,
@@ -484,6 +529,94 @@ export async function createProfileAction(
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return createProfileAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+/**
+ * Создание и правка записи каталога достижений (ADR 0010). Ключ у существующей записи не меняется:
+ * поле `id` при правке приходит скрытым, а новые выдачи ссылаются именно на ключ. Скрытие — отдельное
+ * действие: правка названия и правила не должна заодно менять доступность выдачи.
+ */
+export async function saveAchievementAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const id = String(formData.get("id") ?? "").trim();
+    const title = String(formData.get("title") ?? "").trim();
+    const description = String(formData.get("description") ?? "").trim();
+    const category = String(formData.get("category") ?? "");
+    const rule = String(formData.get("rule") ?? "");
+    const icon = String(formData.get("icon") ?? "");
+    const ruleParamRaw = String(formData.get("ruleParam") ?? "").trim();
+    const creating = formData.get("create") === "1";
+    if (!ACHIEVEMENT_ID_RE.test(id)) throw new InvariantError("Ключ: латиница, цифры и дефис");
+    // Ключ `new` занят адресом формы создания: запись с ним нельзя ни открыть, ни скрыть.
+    if (creating && id === "new") throw new InvariantError("Ключ new зарезервирован");
+    if (!title) throw new InvariantError("Нужно название");
+    if (!description) throw new InvariantError("Нужно описание");
+    if (!isAchievementCategory(category)) throw new InvariantError("Категория: выберите из списка");
+    if (!isAchievementRule(rule)) throw new InvariantError("Правило: выберите из списка");
+    if (!isAchievementIcon(icon)) throw new InvariantError("Иконка: выберите из списка");
+    let ruleParam: string | null = null;
+    if (ruleNeedsParam(rule)) {
+      if (!ruleParamRaw) throw new InvariantError(`Правилу «${ACHIEVEMENT_RULE_LABELS[rule]}» нужна должность`);
+      if (!getJob(ruleParamRaw)) throw new InvariantError("Должность не найдена");
+      ruleParam = ruleParamRaw;
+    }
+    const db = getDb();
+    const existing = db.select().from(achievements).where(eq(achievements.id, id)).get();
+    if (creating) {
+      if (existing) throw new InvariantError("Ключ уже занят");
+      db.insert(achievements)
+        .values({ id, title, description, category, rule, ruleParam, icon, archived: 0, updatedAt: now() })
+        .run();
+    } else {
+      if (!existing) throw new InvariantError("Достижение не найдено");
+      db.update(achievements)
+        .set({ title, description, category, rule, ruleParam, icon, updatedAt: now() })
+        .where(eq(achievements.id, id))
+        .run();
+      // Смена правила меняет условие у всех выдач записи: сверяем их сразу, не дожидаясь
+      // открытия страницы достижений. Сменили на `manual` — автоматическая строка отзывается.
+      if (existing.rule !== rule || existing.ruleParam !== ruleParam) {
+        for (const employeeId of achievementHolders(id)) syncEmployeeAchievements(employeeId);
+      }
+    }
+    revalidateAchievementAdmin(id);
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return saveAchievementAction(_prev, formData, true);
+    if (isUniqueConstraint(error)) return { error: "Ключ уже занят" };
+    return asActionError(error);
+  }
+}
+
+/**
+ * Скрытие записи вместо удаления (ADR 0010). Выдачи не трогаются: у сотрудников достижение остаётся,
+ * а из каталога уходит только предложение выдать его снова.
+ */
+export async function setAchievementArchivedAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const id = String(formData.get("id") ?? "").trim();
+    const archived = String(formData.get("archived") ?? "") === "1" ? 1 : 0;
+    const db = getDb();
+    if (!db.select().from(achievements).where(eq(achievements.id, id)).get()) {
+      throw new InvariantError("Достижение не найдено");
+    }
+    db.update(achievements).set({ archived, updatedAt: now() }).where(eq(achievements.id, id)).run();
+    revalidateAchievementAdmin(id);
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return setAchievementArchivedAction(_prev, formData, true);
     return asActionError(error);
   }
 }
