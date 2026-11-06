@@ -21,6 +21,7 @@ const DESCRIPTION = `Описание награды ${STAMP}`;
 const EDITED = `E2E награда правка ${STAMP}`;
 const EDITED_DESCRIPTION = `Описание после правки ${STAMP}`;
 const JOB_KEY = `e2e-award-job-${STAMP}`;
+const RULE_KEY = `e2e-award-changerule-${STAMP}`;
 const PLAIN = { login: `e2e.award.admin.${STAMP}`, name: `Не админ каталога ${STAMP}`, password: "e2e-award-password" };
 /** Идентификатор серверного действия создания: его запоминает проверка сотрудника, гость повторяет POST. */
 let createActionId = "";
@@ -90,6 +91,24 @@ function grantManually(testInfo: TestInfo, loginName: string, achievementId: str
          (employee_id, achievement_id, source, rule_key, source_ref, granted_at, granted_by_id)
        VALUES (?, ?, 'manual', NULL, NULL, ?, ?)`,
     ).run(employee.id, achievementId, Math.floor(Date.now() / 1000), admin.id);
+  } finally {
+    db.close();
+  }
+}
+
+/** Автоматическая выдача прямо в базу: смена правила каталога не должна ждать выполнения условия. */
+function grantAuto(testInfo: TestInfo, loginName: string, achievementId: string, ruleKey: string) {
+  const db = new DatabaseSync(dbFile(testInfo));
+  try {
+    const employee = db.prepare("SELECT id FROM employees WHERE login = ?").get(loginName) as
+      | { id: string }
+      | undefined;
+    if (!employee) throw new Error(`автоматическая выдача: не найден сотрудник ${loginName}`);
+    db.prepare(
+      `INSERT INTO employee_achievements
+         (employee_id, achievement_id, source, rule_key, source_ref, granted_at, granted_by_id)
+       VALUES (?, ?, 'auto', ?, NULL, ?, NULL)`,
+    ).run(employee.id, achievementId, ruleKey, Math.floor(Date.now() / 1000));
   } finally {
     db.close();
   }
@@ -165,6 +184,12 @@ async function addOption(select: Locator, value: string) {
     element.append(option);
   }, value);
   await select.selectOption(value);
+}
+
+/** Ошибка формы после отправки: текст роли `alert` внутри формы, а не класс оформления. */
+async function expectFormError(form: Locator, message: string) {
+  await form.getByRole("button", { name: "Создать", exact: true }).click();
+  await expect(form.getByRole("alert")).toHaveText(message);
 }
 
 /**
@@ -344,6 +369,41 @@ test("критерий 3: скрытие убирает запись из выд
   ).toBeVisible();
 });
 
+test("смена правила на «Вручную» отзывает автоматическую выдачу прошлого правила", async ({ page }, testInfo) => {
+  // Предыдущий шаг закончился учёткой сотрудника: каталог правит админ.
+  await login(page);
+  await page.goto("/admin/achievements/new");
+  const create = createForm(page);
+  await fillAchievement(create, {
+    key: RULE_KEY,
+    title: `E2E правило ${STAMP}`,
+    description: `Описание правила ${STAMP}`,
+    category: "idp",
+    rule: "idp.items-3",
+    icon: "checklist",
+  });
+  await create.getByRole("button", { name: "Создать", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/admin/achievements/${RULE_KEY}$`));
+
+  // Автоматическая выдача прошлого правила: строку пишем в базу, условие выполнять не нужно.
+  grantAuto(testInfo, PLAIN.login, RULE_KEY, "idp.items-3");
+
+  const edit = editForm(page);
+  await edit.getByLabel(/^Правило/).selectOption("manual");
+  const posted = page.waitForResponse((response) => response.request().method() === "POST");
+  await edit.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await posted;
+
+  // Страницу достижений сотрудника не открываем: отзыв даёт само сохранение правила.
+  await expect
+    .poll(
+      () => grants(testInfo, PLAIN.login).find((row) => row.achievement_id === RULE_KEY)?.revoked_at,
+      "автоматическая выдача отозвана",
+    )
+    .not.toBeNull();
+  expect(catalogRow(testInfo, RULE_KEY)?.rule, "правило записи стало ручным").toBe("manual");
+});
+
 test("критерий 4 (негативный): сотрудник раздел не видит, сервер правку не принимает", async ({ page }, testInfo) => {
   await page.goto("/admin/achievements/new");
   createActionId = await readCreateActionId(page);
@@ -396,17 +456,12 @@ test.describe("гость", () => {
 test("критерий 5 (негативный): пустое название и значения вне закрытых списков не сохраняются", async ({
   page,
 }, testInfo) => {
-  const expectError = async (form: Locator, message: string) => {
-    await form.getByRole("button", { name: "Создать", exact: true }).click();
-    await expect(form.locator(".form-error")).toHaveText(message);
-  };
-
   // Пустое название.
   const emptyKey = `e2e-award-empty-${STAMP}`;
   await page.goto("/admin/achievements/new");
   let form = createForm(page);
   await fillAchievement(form, { key: emptyKey, title: "", description: DESCRIPTION });
-  await expectError(form, "Нужно название");
+  await expectFormError(form, "Нужно название");
   expect(catalogRow(testInfo, emptyKey), "запись без названия не создана").toBeUndefined();
 
   // Категория, правило и иконка вне закрытых списков: значение добавляется в DOM и уходит в POST.
@@ -422,7 +477,7 @@ test("критерий 5 (негативный): пустое название �
     await fillAchievement(form, { key, title: `E2E ${item.suffix}`, description: DESCRIPTION });
     const select = form.getByRole("combobox", { name: item.field });
     await addOption(select, "space");
-    await expectError(form, item.message);
+    await expectFormError(form, item.message);
     expect(catalogRow(testInfo, key), `запись с чужим значением ${item.suffix} не создана`).toBeUndefined();
   }
 
@@ -432,6 +487,14 @@ test("критерий 5 (негативный): пустое название �
   form = createForm(page);
   await fillAchievement(form, { key: jobKey, title: `E2E без должности ${STAMP}`, description: DESCRIPTION, rule: "job.assigned" });
   await expect(form.getByLabel(/^Должность/)).toHaveValue("");
-  await expectError(form, "Правилу «Назначена должность» нужна должность");
+  await expectFormError(form, "Правилу «Назначена должность» нужна должность");
   expect(catalogRow(testInfo, jobKey), "запись без должности не создана").toBeUndefined();
+});
+
+test("ключ new зарезервирован: запись, которую нельзя открыть и скрыть, не создаётся", async ({ page }, testInfo) => {
+  await page.goto("/admin/achievements/new");
+  const form = createForm(page);
+  await fillAchievement(form, { key: "new", title: `E2E ключ new ${STAMP}`, description: DESCRIPTION });
+  await expectFormError(form, "Ключ new зарезервирован");
+  expect(catalogRow(testInfo, "new"), "запись с ключом new не создана").toBeUndefined();
 });

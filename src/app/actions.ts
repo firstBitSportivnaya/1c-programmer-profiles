@@ -7,6 +7,7 @@ import {
   achievements,
   competencies,
   competencyLinks,
+  employeeAchievements,
   employeeCompetencyMarks,
   employees,
   jobTransitions,
@@ -59,12 +60,24 @@ function isAchievementCategory(value: string): value is AchievementCategory {
   return (ACHIEVEMENT_CATEGORIES as readonly string[]).includes(value);
 }
 
+/** Правило из закрытого списка; `manual` — единственное, что не проверяется по данным. */
 function isAchievementRule(value: string): value is AchievementRule {
   return (ACHIEVEMENT_RULES as readonly string[]).includes(value);
 }
 
+/** Иконка из общего набора глифов: неизвестное имя дало бы строку без картинки. */
 function isAchievementIcon(value: string): value is AchievementIcon {
   return (ACHIEVEMENT_ICONS as readonly string[]).includes(value);
+}
+
+/** Сотрудники с выдачей достижения: после смены правила их строки надо сверить заново. */
+function achievementHolders(achievementId: string): string[] {
+  const rows = getDb()
+    .select({ employeeId: employeeAchievements.employeeId })
+    .from(employeeAchievements)
+    .where(eq(employeeAchievements.achievementId, achievementId))
+    .all();
+  return [...new Set(rows.map((row) => row.employeeId))];
 }
 
 /** Ключ каталога — slug: на него ссылаются выдачи, поэтому после создания он не меняется. */
@@ -539,7 +552,10 @@ export async function saveAchievementAction(
     const rule = String(formData.get("rule") ?? "");
     const icon = String(formData.get("icon") ?? "");
     const ruleParamRaw = String(formData.get("ruleParam") ?? "").trim();
+    const creating = formData.get("create") === "1";
     if (!ACHIEVEMENT_ID_RE.test(id)) throw new InvariantError("Ключ: латиница, цифры и дефис");
+    // Ключ `new` занят адресом формы создания: запись с ним нельзя ни открыть, ни скрыть.
+    if (creating && id === "new") throw new InvariantError("Ключ new зарезервирован");
     if (!title) throw new InvariantError("Нужно название");
     if (!description) throw new InvariantError("Нужно описание");
     if (!isAchievementCategory(category)) throw new InvariantError("Категория: выберите из списка");
@@ -553,7 +569,6 @@ export async function saveAchievementAction(
     }
     const db = getDb();
     const existing = db.select().from(achievements).where(eq(achievements.id, id)).get();
-    const creating = formData.get("create") === "1";
     if (creating) {
       if (existing) throw new InvariantError("Ключ уже занят");
       db.insert(achievements)
@@ -565,6 +580,11 @@ export async function saveAchievementAction(
         .set({ title, description, category, rule, ruleParam, icon, updatedAt: now() })
         .where(eq(achievements.id, id))
         .run();
+      // Смена правила меняет условие у всех выдач записи: сверяем их сразу, не дожидаясь
+      // открытия страницы достижений. Сменили на `manual` — автоматическая строка отзывается.
+      if (existing.rule !== rule || existing.ruleParam !== ruleParam) {
+        for (const employeeId of achievementHolders(id)) syncEmployeeAchievements(employeeId);
+      }
     }
     revalidateAchievementAdmin(id);
     return null;
