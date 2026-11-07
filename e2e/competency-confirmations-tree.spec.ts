@@ -88,23 +88,36 @@ function childCount(testInfo: Worker) {
  * Убирает за собой созданное: базу воркера делят все файлы, которые он выполняет по очереди.
  * Ребёнок остаётся навыком дерева, и следующая спецификация увидит на один узел больше, чем в seed.
  * Порядок важен: подтверждение и ребёнок ссылаются на корневой навык.
+ *
+ * Берутся все компетенции с нашим префиксом, а не только id этого прогона: если прогон упал
+ * на упавшем браузере, `afterAll` мог не выполниться, и строки от прошлого запуска остались.
  */
 function removeCreated(testInfo: Worker) {
   const db = new DatabaseSync(dbFile(testInfo));
   try {
     db.exec("PRAGMA busy_timeout = 5000");
-    db.prepare("DELETE FROM employee_competency_confirmations WHERE competency_id = ?").run(SKILL.id);
-    db.prepare("DELETE FROM competencies WHERE id = ?").run(CHILD.id);
-    db.prepare("DELETE FROM competencies WHERE id = ?").run(SKILL.id);
+    const ours = "SELECT id FROM competencies WHERE id LIKE 'e2etree%'";
+    db.prepare(`DELETE FROM employee_competency_confirmations WHERE competency_id IN (${ours})`).run();
+    // Дети ссылаются на корень, поэтому удаляются первыми.
+    db.prepare("DELETE FROM competencies WHERE parent_id IN (SELECT id FROM competencies WHERE id LIKE 'e2etree%')").run();
+    db.prepare("DELETE FROM competencies WHERE id LIKE 'e2etree%'").run();
   } finally {
     db.close();
   }
 }
 
-/** Чистка идёт после всех тестов файла: при упавшей проверке она тоже выполняется. */
+/**
+ * Чистка до теста и после него. `afterAll` выполняется и после упавшей проверки, но не после
+ * аварийного завершения воркера: тогда мусор убирает следующий запуск этого файла.
+ */
+test.beforeAll(async ({}, testInfo) => {
+  removeCreated(testInfo);
+});
+
 test.afterAll(async ({}, testInfo) => {
   removeCreated(testInfo);
 });
+
 
 /** Заводит корневой навык без детей и профиля: в группу его превращает только форма ребёнка. */
 async function createSkill(page: Page) {
