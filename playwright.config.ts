@@ -47,6 +47,12 @@ const workerServers = Array.from({ length: E2E_WORKERS }, (_, index) =>
 // База без админа: `session.spec.ts` проверяет на ней создание первого админа.
 const bootstrapServer = server(E2E_PORT, E2E_BOOTSTRAP_DB_PATH, false);
 
+/**
+ * Быстрый путь `npm run check:fast`: спеки основного проекта идут без сервера `session.spec.ts`.
+ * Лишний сервер — это его запуск, seed и отдельная база на каждый прогон одного файла.
+ */
+const skipBootstrap = process.env.E2E_SKIP_BOOTSTRAP === "1";
+
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
@@ -62,10 +68,12 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [
-    // Одна база без админа и один сервер: файл идёт сам по себе и не задаёт порядок остальным.
-    { name: "bootstrap", testMatch: "session.spec.ts", metadata: { e2eServer: "bootstrap" } },
-    { name: "main", testIgnore: "session.spec.ts", metadata: { e2eServer: "worker" } },
-  ],
-  webServer: [bootstrapServer, ...workerServers],
+  projects: skipBootstrap
+    ? [{ name: "main", testIgnore: "session.spec.ts", metadata: { e2eServer: "worker" } }]
+    : [
+        // Одна база без админа и один сервер: файл идёт сам по себе и не задаёт порядок остальным.
+        { name: "bootstrap", testMatch: "session.spec.ts", metadata: { e2eServer: "bootstrap" } },
+        { name: "main", testIgnore: "session.spec.ts", metadata: { e2eServer: "worker" } },
+      ],
+  webServer: skipBootstrap ? workerServers : [bootstrapServer, ...workerServers],
 });

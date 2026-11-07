@@ -7,7 +7,7 @@
  * кладёт сам тест в базу воркера: здесь проверяется правило дерева, а не форма карточки.
  */
 import { DatabaseSync } from "node:sqlite";
-import type { Page, TestInfo } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { workerDbPath } from "./env";
 
@@ -20,13 +20,16 @@ const SKILL = { id: `e2etree${STAMP}`, name: `Корневой навык ${STAM
 const CHILD = { id: `e2etreechild${STAMP}`, name: `Дочерняя компетенция ${STAMP}` };
 const MESSAGE = "Нельзя добавить дочернюю компетенцию: навык подтверждён";
 
+/** Что нужно от хука или теста: номер воркера, а не весь `TestInfo`. */
+type Worker = { parallelIndex: number };
+
 /** База воркера этого теста: у каждого воркера своя, см. `e2e/env.ts`. */
-function dbFile(testInfo: TestInfo) {
+function dbFile(testInfo: Worker) {
   return workerDbPath(testInfo.parallelIndex);
 }
 
 /** Сотрудник для подтверждения: в базе воркера до теста заведён только админ. */
-function adminId(testInfo: TestInfo) {
+function adminId(testInfo: Worker) {
   const db = new DatabaseSync(dbFile(testInfo), { readOnly: true });
   try {
     const row = db.prepare("SELECT id FROM employees WHERE is_admin = 1 ORDER BY login LIMIT 1").get() as
@@ -39,7 +42,7 @@ function adminId(testInfo: TestInfo) {
 }
 
 /** Действующее подтверждение даёт тот же админ: права проверяет не этот тест. */
-function confirm(testInfo: TestInfo, employee: string) {
+function confirm(testInfo: Worker, employee: string) {
   const db = new DatabaseSync(dbFile(testInfo));
   try {
     db.exec("PRAGMA busy_timeout = 5000");
@@ -54,7 +57,7 @@ function confirm(testInfo: TestInfo, employee: string) {
 }
 
 /** Отзыв оставляет строку в базе: история подтверждения сохраняется. */
-function revoke(testInfo: TestInfo, employee: string) {
+function revoke(testInfo: Worker, employee: string) {
   const db = new DatabaseSync(dbFile(testInfo));
   try {
     db.exec("PRAGMA busy_timeout = 5000");
@@ -69,7 +72,7 @@ function revoke(testInfo: TestInfo, employee: string) {
 }
 
 /** Сколько детей заведено у корневого навыка. */
-function childCount(testInfo: TestInfo) {
+function childCount(testInfo: Worker) {
   const db = new DatabaseSync(dbFile(testInfo), { readOnly: true });
   try {
     const row = db
@@ -80,6 +83,28 @@ function childCount(testInfo: TestInfo) {
     db.close();
   }
 }
+
+/**
+ * Убирает за собой созданное: базу воркера делят все файлы, которые он выполняет по очереди.
+ * Ребёнок остаётся навыком дерева, и следующая спецификация увидит на один узел больше, чем в seed.
+ * Порядок важен: подтверждение и ребёнок ссылаются на корневой навык.
+ */
+function removeCreated(testInfo: Worker) {
+  const db = new DatabaseSync(dbFile(testInfo));
+  try {
+    db.exec("PRAGMA busy_timeout = 5000");
+    db.prepare("DELETE FROM employee_competency_confirmations WHERE competency_id = ?").run(SKILL.id);
+    db.prepare("DELETE FROM competencies WHERE id = ?").run(CHILD.id);
+    db.prepare("DELETE FROM competencies WHERE id = ?").run(SKILL.id);
+  } finally {
+    db.close();
+  }
+}
+
+/** Чистка идёт после всех тестов файла: при упавшей проверке она тоже выполняется. */
+test.afterAll(async ({}, testInfo) => {
+  removeCreated(testInfo);
+});
 
 /** Заводит корневой навык без детей и профиля: в группу его превращает только форма ребёнка. */
 async function createSkill(page: Page) {

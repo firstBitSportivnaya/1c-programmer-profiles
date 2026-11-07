@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "verify": "tsx scripts/verify.ts",
+    "check:fast": "tsx scripts/check-fast.ts",
+    "review:summary": "node scripts/review-summary.mjs",
     "db:seed": "tsx scripts/seed.ts",
     "db:sync-catalog": "tsx scripts/sync-catalog.ts",
     "check:seed": "tsx scripts/check-seed.ts",
