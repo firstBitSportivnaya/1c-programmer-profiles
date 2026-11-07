@@ -18,7 +18,13 @@ const STEPS: Step[] = [
   { command: "npm", args: ["run", "lint"] },
   { command: "npm", args: ["run", "build"] },
   // Сборка только что прошла: e2e не собирает её второй раз (см. e2e/ensure-build.ts).
-  { command: "npm", args: ["run", "test:e2e"], env: { E2E_BUILD_FRESH: "1" } },
+  // `E2E_SKIP_BOOTSTRAP` выключается здесь явно: эта переменная осталась бы в оболочке после
+  // `check:fast` и тихо убрала бы из полного прогона `session.spec.ts` — проверку первого админа.
+  {
+    command: "npm",
+    args: ["run", "test:e2e"],
+    env: { E2E_BUILD_FRESH: "1", E2E_SKIP_BOOTSTRAP: "0" },
+  },
 ];
 
 function label(step: Step): string {
