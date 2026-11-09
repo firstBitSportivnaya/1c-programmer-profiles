@@ -30,13 +30,22 @@ export function EmployeeCompetencyConfirmations({
   const skills = listSkillCompetencies();
   return (
     <section className="space-y-4" data-testid="employee-confirmations">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="section-title">Компетенции</h2>
-        {/* Дерево в контексте карточки: подтверждать можно в узле, не выбирая навык из плоского списка. */}
-        <a className="link-accent" href={`/people/${employeeId}/skills`} data-testid="employee-skills-link">
-          Дерево навыков
-        </a>
-      </div>
+      <h2 className="section-title">Компетенции</h2>
+      {/* Дерево — часть группы «Компетенции»: заметная строка-ссылка, чтобы не искать действие
+          в плоском списке навыков. Подтверждение ставится прямо в узле дерева. */}
+      <a
+        className="panel panel-pad employee-skills-link"
+        href={`/people/${employeeId}/skills`}
+        data-testid="employee-skills-link"
+      >
+        <span className="employee-skills-link__main">
+          <span className="employee-skills-link__title">Дерево навыков</span>
+          <span className="muted">Профиль должности, цель ИПР и подтверждение — в узлах</span>
+        </span>
+        <span className="employee-skills-link__arrow" aria-hidden="true">
+          →
+        </span>
+      </a>
       {list.length === 0 ? (
         <p className="muted" data-testid="employee-confirmations-empty">
           Ручных подтверждений нет: компетенцию подтверждает руководитель или админ, либо её подтверждает

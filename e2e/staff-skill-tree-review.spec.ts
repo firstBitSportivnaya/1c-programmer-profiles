@@ -438,7 +438,11 @@ test("критерий 2: подтверждение в узле зажигае�
   const panel = await openNode(page, TARGET);
   await expect(panel.getByTestId("skill-panel-not-confirmed"), "до подтверждения записи нет").toBeVisible();
   const form = panel.locator("form");
-  await form.getByRole("textbox", { name: "Основание", exact: true }).fill(MANAGER_NOTE);
+  const noteField = form.getByRole("textbox", { name: "Основание", exact: true });
+  // Пробел в поле — ввод, а не выбор узла: панель не закрывается, пробелы остаются в основании.
+  await noteField.pressSequentially(MANAGER_NOTE);
+  await expect(noteField, "пробелы в основании сохранены").toHaveValue(MANAGER_NOTE);
+  await expect(panel, "панель не закрылась от пробела").toBeVisible();
   const posted = page.waitForResponse(
     (response) => response.request().method() === "POST" && new URL(response.url()).pathname === `/people/${staffId}/skills`,
   );

@@ -355,10 +355,14 @@ function SkillBoard({
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const target = event.target as HTMLElement | null;
-    const node = target?.closest<HTMLElement>('[data-testid^="skill-node-"]');
+    // В полях панели пробел и Enter — это ввод, а не выбор узла.
+    if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+    // Панель узла тоже начинается с `skill-node-`, поэтому узел ищем по `data-skill`:
+    // этот атрибут есть только у узлов холста.
+    const node = target?.closest<HTMLElement>('[data-testid^="skill-node-"][data-skill]');
     if (!node) return;
     event.preventDefault();
-    onSelect(node.dataset.testid?.slice("skill-node-".length) ?? null);
+    onSelect(node.dataset.skill ?? null);
   };
 
   const selected = selectedId ? nodes.find((node) => node.id === selectedId) : undefined;
