@@ -30,7 +30,13 @@ export function EmployeeCompetencyConfirmations({
   const skills = listSkillCompetencies();
   return (
     <section className="space-y-4" data-testid="employee-confirmations">
-      <h2 className="section-title">Компетенции</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="section-title">Компетенции</h2>
+        {/* Дерево в контексте карточки: подтверждать можно в узле, не выбирая навык из плоского списка. */}
+        <a className="link-accent" href={`/people/${employeeId}/skills`} data-testid="employee-skills-link">
+          Дерево навыков
+        </a>
+      </div>
       {list.length === 0 ? (
         <p className="muted" data-testid="employee-confirmations-empty">
           Ручных подтверждений нет: компетенцию подтверждает руководитель или админ, либо её подтверждает

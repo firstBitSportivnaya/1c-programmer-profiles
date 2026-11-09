@@ -714,6 +714,8 @@ function treeCounters(page: Page) {
  * навык бывает помечен «есть» и одновременно иметь шаг плана, поэтому каждый счётчик сверяется отдельно.
  */
 async function expectCountersMatchBoard(page: Page) {
+  // Холст рисует узлы после гидратации: без ожидания под нагрузкой читается ещё пустой DOM.
+  await expect(page.locator(SKILL_NODES).first()).toBeAttached();
   const counters = await treeCounters(page);
   expect(counters.total).toBeGreaterThan(0);
   expect(counters.shown.total).toBe(String(counters.total));

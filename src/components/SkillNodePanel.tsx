@@ -1,6 +1,9 @@
 "use client";
 
 import { SkillMarkForm } from "@/components/SkillMarkForm";
+import { ActionForm } from "@/components/ActionForm";
+import { confirmCompetencyAction, revokeCompetencyConfirmationAction } from "@/app/people-actions";
+import type { ConfirmedCompetency } from "@/lib/achievements";
 import type { SkillTreeNode } from "@/lib/skill-tree";
 
 const ITEM_STATUS: Record<string, string> = {
@@ -14,6 +17,49 @@ const LINK_KIND: Record<string, string> = {
   training: "Обучение",
   video: "Видео",
 };
+
+/** `confirmed_at` хранит секунды Unix; в панели показываем дату как ДД.ММ.ГГГГ. */
+function dottedDate(unixSeconds: number) {
+  const date = new Date(unixSeconds * 1000);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${date.getFullYear()}`;
+}
+
+/**
+ * Режим просмотра чужого сотрудника (issue #133, ADR 0007, 0011): блока пометки нет вовсе,
+ * зато есть подтверждение — с источником, основанием и, у того, кто может менять карточку,
+ * формами подтверждения и отзыва. Права всё равно проверяет серверное действие.
+ */
+export type SkillConfirmationReview = {
+  employeeId: string;
+  canManage: boolean;
+  /** Действующее подтверждение навыка: приёмка ИПР, ручная запись или оба источника. */
+  confirmation: ConfirmedCompetency | null;
+};
+
+/** Строка действующего подтверждения: приёмка ИПР со ссылкой на план или ручная запись. */
+function ConfirmationState({ confirmation }: { confirmation: ConfirmedCompetency }) {
+  const manual = confirmation.manual;
+  return (
+    <ul className="skill-card__list" data-testid="skill-panel-confirmation-state">
+      {confirmation.planId ? (
+        <li>
+          Приёмкой ИПР:{" "}
+          <a className="link-accent" href={`/idps/${confirmation.planId}`}>
+            план
+          </a>
+        </li>
+      ) : null}
+      {manual ? (
+        <li>
+          Вручную: {dottedDate(manual.confirmedAt)} · {manual.confirmedByName}
+          <span className="skill-card__note"> · {manual.note}</span>
+        </li>
+      ) : null}
+    </ul>
+  );
+}
 
 /**
  * Название уровня из профиля должности: в справочнике он записан числом 1–3.
@@ -51,6 +97,7 @@ export function levelShort(node: Pick<SkillTreeNode, "currentLevel" | "targetLev
 
 /**
  * Карточка узла в панели справа: критерий профиля, предпосылка, материалы, личная пометка и строки плана.
+ * В режиме просмотра чужого сотрудника вместо пометки стоит подтверждение (ADR 0007, 0011).
  * Размеров шрифта три: заголовок, текст и подпись; иерархия — весом и регистром.
  */
 export function SkillNodePanel({
@@ -59,6 +106,7 @@ export function SkillNodePanel({
   planId,
   prerequisite,
   onOpenPrerequisite,
+  review,
   onClose,
 }: {
   node: SkillTreeNode;
@@ -67,6 +115,8 @@ export function SkillNodePanel({
   /** Ближайшая предпосылка: соседний навык, который открывает этот. */
   prerequisite: { id: string; name: string } | null;
   onOpenPrerequisite: (id: string) => void;
+  /** `null` — свой кабинет: панель показывает личную пометку, подтверждения в ней нет. */
+  review: SkillConfirmationReview | null;
   onClose: () => void;
 }) {
   return (
@@ -118,13 +168,60 @@ export function SkillNodePanel({
         )}
       </section>
 
-      <section>
-        <h3 className="skill-card__label">Пометка</h3>
-        <SkillMarkForm key={node.id} competencyId={node.id} name={node.name} status={node.mark} note={node.note} />
-        <a className="link-accent skill-card__link" href="/me/marks">
-          Все пометки по компетенциям
-        </a>
-      </section>
+      {review ? (
+        <section data-testid="skill-panel-confirmation">
+          <h3 className="skill-card__label">Подтверждение</h3>
+          {node.confirmed && review.confirmation ? (
+            <ConfirmationState confirmation={review.confirmation} />
+          ) : (
+            <p className="skill-card__note" data-testid="skill-panel-not-confirmed">
+              Компетенция не подтверждена: её подтверждает приёмка строки ИПР или руководитель либо админ.
+            </p>
+          )}
+          {review.canManage ? (
+            node.confirmed ? (
+              // Снять можно только ручную запись: подтверждение приёмкой ИПР снимается отменой приёмки.
+              review.confirmation?.manual ? (
+                <ActionForm action={revokeCompetencyConfirmationAction} className="skill-card__form">
+                  <input type="hidden" name="employeeId" value={review.employeeId} />
+                  <input type="hidden" name="competencyId" value={node.id} />
+                  <label className="lbl">
+                    Причина
+                    <input className="field" name="reason" maxLength={1000} />
+                  </label>
+                  <button className="btn-danger" type="submit">
+                    Снять
+                  </button>
+                </ActionForm>
+              ) : (
+                <p className="skill-card__note" data-testid="skill-panel-confirmed-by-idp">
+                  Подтверждено приёмкой ИПР: снимается отменой приёмки в плане.
+                </p>
+              )
+            ) : (
+              <ActionForm action={confirmCompetencyAction} className="skill-card__form">
+                <input type="hidden" name="employeeId" value={review.employeeId} />
+                <input type="hidden" name="competencyId" value={node.id} />
+                <label className="lbl">
+                  Основание
+                  <input className="field" name="note" maxLength={1000} />
+                </label>
+                <button className="btn-primary" type="submit">
+                  Подтвердить
+                </button>
+              </ActionForm>
+            )
+          ) : null}
+        </section>
+      ) : (
+        <section>
+          <h3 className="skill-card__label">Пометка</h3>
+          <SkillMarkForm key={node.id} competencyId={node.id} name={node.name} status={node.mark} note={node.note} />
+          <a className="link-accent skill-card__link" href="/me/marks">
+            Все пометки по компетенциям
+          </a>
+        </section>
+      )}
 
       <section>
         <h3 className="skill-card__label">Материалы</h3>

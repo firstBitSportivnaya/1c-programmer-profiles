@@ -21,6 +21,7 @@ import {
 import { useThemeMode } from "@/components/useThemeMode";
 import { SkillIcon } from "@/components/skill-icons";
 import { levelLabel, levelShort, SkillNodePanel } from "@/components/SkillNodePanel";
+import type { ConfirmedCompetency } from "@/lib/achievements";
 import { skillTreeStats, type SkillTreeData, type SkillTreeNode } from "@/lib/skill-tree";
 import { buildPrerequisiteTree } from "@/lib/skill-tree-graph";
 import { layoutSkillTree } from "@/lib/skill-tree-layout";
@@ -68,11 +69,22 @@ const LEGEND_MATCH: Record<LegendKey, (node: SkillTreeNode) => boolean> = {
 /** Сколько тем навыков получают свой цвет бейджа: столько же пар stroke/fill в палитре. */
 const TOPIC_COUNT = 6;
 
-type SkillNodeData = { skill: SkillTreeNode; depth: number; topic: number; selected: boolean };
+/**
+ * Режим просмотра чужого сотрудника (issue #133): личного слоя в данных нет вовсе (ADR 0007),
+ * в панели узла вместо пометки стоит подтверждение. `confirmations` — только действующие записи.
+ */
+export type SkillTreeReview = {
+  employeeId: string;
+  /** Может ли смотрящий менять карточку: сервер проверяет права повторно. */
+  canManage: boolean;
+  confirmations: Record<string, ConfirmedCompetency>;
+};
+
+type SkillNodeData = { skill: SkillTreeNode; depth: number; topic: number; selected: boolean; review: boolean };
 
 /** Узел дерева: бейдж темы, название, требование должности и шаг плана. */
 function SkillNodeView({ data }: NodeProps) {
-  const { skill, depth, topic, selected } = data as unknown as SkillNodeData;
+  const { skill, depth, topic, selected, review } = data as unknown as SkillNodeData;
   const mark = skill.mark || "none";
   const planNote =
     skill.plan.total === 0
@@ -82,6 +94,11 @@ function SkillNodeView({ data }: NodeProps) {
         : skill.plan.accepted > 0
           ? `принято ${skill.plan.accepted} из ${skill.plan.total}`
           : PLAN_LABEL[skill.plan.state];
+
+  // В просмотре чужого дерева пометок нет: вместо них в подписи узла — подтверждение.
+  const ariaLabel = review
+    ? `${skill.name}: ${levelLabel(skill)}, ${skill.confirmed ? "компетенция подтверждена" : "компетенция не подтверждена"}`
+    : `${skill.name}: ${levelLabel(skill)}, пометка ${MARK_LABEL[mark] ?? "не отмечено"}`;
 
   return (
     <div
@@ -98,7 +115,7 @@ function SkillNodeView({ data }: NodeProps) {
       data-confirmed={skill.confirmed ? "true" : "false"}
       data-plan-state={skill.plan.total === 0 ? "none" : skill.plan.state}
       data-topic={topic >= 0 ? topic : undefined}
-      aria-label={`${skill.name}: ${levelLabel(skill)}, пометка ${MARK_LABEL[mark] ?? "не отмечено"}`}
+      aria-label={ariaLabel}
     >
       <Handle type="target" position={Position.Top} />
       {skill.confirmed ? (
@@ -189,6 +206,8 @@ type BoardProps = {
   topicOf: Map<string, number>;
   /** Предпосылка выбранного навыка: из неё панель ведёт на соседний узел. */
   prerequisiteOf: Map<string, { id: string; name: string }>;
+  /** Просмотр чужого сотрудника: пометок нет, в панели — подтверждение (issue #133). */
+  review: SkillTreeReview | null;
 };
 
 /** Один холст раздела: своя раскладка, свой зум и своя панель узла. */
@@ -205,6 +224,7 @@ function SkillBoard({
   testId,
   topicOf,
   prerequisiteOf,
+  review,
 }: BoardProps) {
   const theme = useThemeMode();
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -239,6 +259,7 @@ function SkillBoard({
           depth: spot?.depth ?? 0,
           topic: node.groupId ? (topicOf.get(node.groupId) ?? -1) : -1,
           selected: node.id === selectedId,
+          review: review !== null,
         },
         style: { width: NODE_W, height: NODE_H },
         className: dimmed ? "skill-dim" : highlight !== null ? "skill-lit" : undefined,
@@ -277,7 +298,7 @@ function SkillBoard({
     });
 
     return { nodes: flowNodes, edges };
-  }, [highlight, nodes, selectedId, topicOf, tree]);
+  }, [highlight, nodes, review, selectedId, topicOf, tree]);
 
   /**
    * Панель перекрывает правый край холста. Если выбранный узел оказался под ней,
@@ -400,6 +421,15 @@ function SkillBoard({
               planId={data.planId}
               prerequisite={prerequisiteOf.get(selected.id) ?? null}
               onOpenPrerequisite={onSelect}
+              review={
+                review
+                  ? {
+                      employeeId: review.employeeId,
+                      canManage: review.canManage,
+                      confirmation: review.confirmations[selected.id] ?? null,
+                    }
+                  : null
+              }
               onClose={() => onSelect(null)}
             />
           </div>
@@ -412,8 +442,17 @@ function SkillBoard({
 /**
  * Дерево навыков: профессиональные и личные компетенции раздельно, вне профиля — своим разделом.
  * Слева — легенда, статистика и девиз; справа от холста выезжает панель навыка.
+ * `review` — просмотр чужого сотрудника: личного слоя в данных нет, в панели стоит подтверждение (issue #133).
  */
-export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string }) {
+export function SkillTree({
+  data,
+  motto,
+  review = null,
+}: {
+  data: SkillTreeData;
+  motto: string;
+  review?: SkillTreeReview | null;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [legend, setLegend] = useState<LegendKey | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -435,11 +474,12 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
     () =>
       withAncestors(
         data.nodes
-          .filter((node) => (node.mark !== "" || node.confirmed) && !profileChain.has(node.id))
+          // В просмотре чужого сотрудника пометок в данных нет: навык держит только подтверждение.
+          .filter((node) => (node.confirmed || (!review && node.mark !== "")) && !profileChain.has(node.id))
           .map((node) => node.id),
         tree.parentOf,
       ),
-    [data.nodes, profileChain, tree],
+    [data.nodes, profileChain, review, tree],
   );
 
   const shown = useMemo(() => {
@@ -613,6 +653,7 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
             testId="skill-board-professional"
             topicOf={topicOf}
             prerequisiteOf={prerequisiteOf}
+            review={review}
           />
         ) : null}
 
@@ -630,6 +671,7 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
             testId="skill-board-personal"
             topicOf={topicOf}
             prerequisiteOf={prerequisiteOf}
+            review={review}
           />
         ) : null}
 
@@ -648,9 +690,12 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
               testId="skill-board-outside"
               topicOf={topicOf}
               prerequisiteOf={prerequisiteOf}
+              review={review}
             />
             <p className="skill-group-note">
-              Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка или подтверждение.
+              {review
+                ? "Навыки вне должности и цели ИПР остаются здесь, пока у них стоит подтверждение."
+                : "Навыки вне должности и цели ИПР остаются здесь, пока стоит пометка или подтверждение."}
             </p>
           </section>
         ) : null}
@@ -662,10 +707,15 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
         <section className="skill-sidebar__block">
           <h2 className="skill-sidebar__title">Легенда</h2>
           <ul className="skill-legend" aria-label="Обозначения дерева: выберите запись, чтобы выделить её узлы">
-            {legendButton("has", "есть", "skill-legend__swatch--has")}
-            {legendButton("in_progress", "в процессе", "skill-legend__swatch--progress")}
-            {legendButton("lacks", "нет", "skill-legend__swatch--lacks")}
-            {legendButton("none", "без пометки", "skill-legend__swatch--none")}
+            {/* В просмотре чужого сотрудника легенды пометок нет: их не видит никто, кроме автора (ADR 0007). */}
+            {review ? null : (
+              <>
+                {legendButton("has", "есть", "skill-legend__swatch--has")}
+                {legendButton("in_progress", "в процессе", "skill-legend__swatch--progress")}
+                {legendButton("lacks", "нет", "skill-legend__swatch--lacks")}
+                {legendButton("none", "без пометки", "skill-legend__swatch--none")}
+              </>
+            )}
             {legendButton("confirmed", "подтверждено приёмкой или вручную", "skill-legend__swatch--star")}
             {legendButton("plan", "шаг ИПР", "skill-legend__swatch--plan")}
             <li>
@@ -681,7 +731,8 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
             </li>
             <li>
               <span className="skill-legend__note">
-                Нажмите на навык — панель справа покажет критерий, материалы, пометку и строки плана.
+                Нажмите на навык — панель справа покажет{" "}
+                {review ? "критерий, материалы, подтверждение и строки плана." : "критерий, материалы, пометку и строки плана."}
               </span>
             </li>
           </ul>
@@ -698,13 +749,26 @@ export function SkillTree({ data, motto }: { data: SkillTreeData; motto: string 
           <dl className="skill-stats__grid">
             <dt>Всего навыков</dt>
             <dd data-testid="skill-stat-total">{stats.total}</dd>
-            <dt>Освоено</dt>
-            <dd data-testid="skill-stat-mastered">{stats.mastered}</dd>
+            {review ? null : (
+              <>
+                <dt>Освоено</dt>
+                <dd data-testid="skill-stat-mastered">{stats.mastered}</dd>
+              </>
+            )}
             <dt>В плане</dt>
             <dd data-testid="skill-stat-plan">{stats.inPlan}</dd>
-            <dt>Прогресс</dt>
-            <dd data-testid="skill-stat-progress">{stats.progress}%</dd>
+            {review ? null : (
+              <>
+                <dt>Прогресс</dt>
+                <dd data-testid="skill-stat-progress">{stats.progress}%</dd>
+              </>
+            )}
           </dl>
+          {review ? (
+            <p className="muted" data-testid="skill-stat-privacy">
+              Пометки сотрудника видны только ему.
+            </p>
+          ) : null}
         </section>
 
         <p className="skill-sidebar__motto" data-testid="skill-motto">

@@ -1256,6 +1256,19 @@ details[open] > .skill-summary::before {
   gap: 0.35rem;
 }
 
+/* Подтверждение в узле при просмотре чужого дерева: поле основания и кнопка в столбик. */
+.skill-card__form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* `ActionForm` вешает тот же класс и на внутренний `fieldset`: отступ и сетку он не дублирует. */
+.skill-card__form.form-fields {
+  display: block;
+  margin-top: 0;
+}
+
 .skill-mark__note {
   width: 100%;
   resize: vertical;
