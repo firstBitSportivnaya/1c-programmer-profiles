@@ -3,7 +3,7 @@
 import { SkillMarkForm } from "@/components/SkillMarkForm";
 import { ActionForm } from "@/components/ActionForm";
 import { confirmCompetencyAction, revokeCompetencyConfirmationAction } from "@/app/people-actions";
-import type { ConfirmedCompetency } from "@/lib/achievements";
+import type { SkillConfirmationView } from "@/lib/skill-tree-snapshot";
 import type { SkillTreeNode } from "@/lib/skill-tree";
 
 const ITEM_STATUS: Record<string, string> = {
@@ -18,14 +18,6 @@ const LINK_KIND: Record<string, string> = {
   video: "Видео",
 };
 
-/** `confirmed_at` хранит секунды Unix; в панели показываем дату как ДД.ММ.ГГГГ. */
-function dottedDate(unixSeconds: number) {
-  const date = new Date(unixSeconds * 1000);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${date.getFullYear()}`;
-}
-
 /**
  * Режим просмотра чужого сотрудника (issue #133, ADR 0007, 0011): блока пометки нет вовсе,
  * зато есть подтверждение — с источником, основанием и, у того, кто может менять карточку,
@@ -35,11 +27,11 @@ export type SkillConfirmationReview = {
   employeeId: string;
   canManage: boolean;
   /** Действующее подтверждение навыка: приёмка ИПР, ручная запись или оба источника. */
-  confirmation: ConfirmedCompetency | null;
+  confirmation: SkillConfirmationView | null;
 };
 
 /** Строка действующего подтверждения: приёмка ИПР со ссылкой на план или ручная запись. */
-function ConfirmationState({ confirmation }: { confirmation: ConfirmedCompetency }) {
+function ConfirmationState({ confirmation }: { confirmation: SkillConfirmationView }) {
   const manual = confirmation.manual;
   return (
     <ul className="skill-card__list" data-testid="skill-panel-confirmation-state">
@@ -53,7 +45,7 @@ function ConfirmationState({ confirmation }: { confirmation: ConfirmedCompetency
       ) : null}
       {manual ? (
         <li>
-          Вручную: {dottedDate(manual.confirmedAt)} · {manual.confirmedByName}
+          Вручную: {manual.confirmedOn} · {manual.confirmedByName}
           <span className="skill-card__note"> · {manual.note}</span>
         </li>
       ) : null}
@@ -179,37 +171,42 @@ export function SkillNodePanel({
             </p>
           )}
           {review.canManage ? (
-            node.confirmed ? (
+            review.confirmation?.manual ? (
               // Снять можно только ручную запись: подтверждение приёмкой ИПР снимается отменой приёмки.
-              review.confirmation?.manual ? (
-                <ActionForm action={revokeCompetencyConfirmationAction} className="skill-card__form">
-                  <input type="hidden" name="employeeId" value={review.employeeId} />
-                  <input type="hidden" name="competencyId" value={node.id} />
-                  <label className="lbl">
-                    Причина
-                    <input className="field" name="reason" maxLength={1000} />
-                  </label>
-                  <button className="btn-danger" type="submit">
-                    Снять
-                  </button>
-                </ActionForm>
-              ) : (
-                <p className="skill-card__note" data-testid="skill-panel-confirmed-by-idp">
-                  Подтверждено приёмкой ИПР: снимается отменой приёмки в плане.
-                </p>
-              )
-            ) : (
-              <ActionForm action={confirmCompetencyAction} className="skill-card__form">
+              <ActionForm action={revokeCompetencyConfirmationAction} className="skill-card__form">
                 <input type="hidden" name="employeeId" value={review.employeeId} />
                 <input type="hidden" name="competencyId" value={node.id} />
                 <label className="lbl">
-                  Основание
-                  <input className="field" name="note" maxLength={1000} />
+                  Причина
+                  <input className="field" name="reason" maxLength={1000} />
                 </label>
-                <button className="btn-primary" type="submit">
-                  Подтвердить
+                <button className="btn-danger" type="submit">
+                  Снять
                 </button>
               </ActionForm>
+            ) : (
+              /*
+                Ручное основание пишется и поверх приёмки ИПР: иначе после отмены приёмки навык
+                остаётся без подтверждения, а записать основание можно было бы только в карточке.
+              */
+              <>
+                {node.confirmed ? (
+                  <p className="skill-card__note" data-testid="skill-panel-confirmed-by-idp">
+                    Подтверждено приёмкой ИПР: снимается отменой приёмки в плане.
+                  </p>
+                ) : null}
+                <ActionForm action={confirmCompetencyAction} className="skill-card__form">
+                  <input type="hidden" name="employeeId" value={review.employeeId} />
+                  <input type="hidden" name="competencyId" value={node.id} />
+                  <label className="lbl">
+                    Основание
+                    <input className="field" name="note" maxLength={1000} />
+                  </label>
+                  <button className="btn-primary" type="submit">
+                    Подтвердить
+                  </button>
+                </ActionForm>
+              </>
             )
           ) : null}
         </section>

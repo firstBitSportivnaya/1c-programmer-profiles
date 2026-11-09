@@ -45,6 +45,8 @@ const OUTSIDE_NOTE = `Проект вне профиля E2E ${STAMP}`;
 const STAFF_NOTE = `Личная заметка сотрудника E2E ${STAMP}`;
 const MANAGER_NOTE = `Подтверждение руководителя E2E ${STAMP}`;
 const MANAGER_NOTE_2 = `Подтверждение руководителя, повтор E2E ${STAMP}`;
+const IDP_OVER_NOTE = `Ручное основание поверх приёмки E2E ${STAMP}`;
+const DRAFT_NOTE = `Черновик основания E2E ${STAMP}`;
 const REVOKE_REASON = `Причина снятия E2E ${STAMP}`;
 const GUEST_NOTE = `Гостевое подтверждение E2E ${STAMP}`;
 
@@ -477,6 +479,18 @@ test("критерий 2: подтверждение в узле зажигае�
   await expect(page.getByTestId(`employee-confirmation-${TARGET}`), "в карточке новое основание").toContainText(
     MANAGER_NOTE_2,
   );
+
+  // Дата ручной записи одна и та же в карточке и в панели: её собирает сервер, а не браузер
+  // в своём часовом поясе (замечание ревью).
+  const cardText = (await page.getByTestId(`employee-confirmation-${TARGET}`).textContent()) ?? "";
+  const shownDate = cardText.match(/\d{2}\.\d{2}\.\d{4}/)?.[0] ?? "";
+  expect(shownDate, "дата подтверждения есть в карточке").not.toBe("");
+  await openTree(page, staffId);
+  const dated = await openNode(page, TARGET);
+  await expect(
+    dated.getByTestId("skill-panel-confirmation-state"),
+    "дата в панели узла совпадает с карточкой",
+  ).toContainText(shownDate);
 });
 
 test("критерий 2: подтверждение приёмкой ИПР не снимается формой в узле", async ({ page }, testInfo) => {
@@ -484,6 +498,10 @@ test("критерий 2: подтверждение приёмкой ИПР н�
   expect(planPath, "путь плана из критерия 1 сохранён").not.toBe("");
 
   await login(page, MANAGER);
+  // Дерево открывается до приёмки: звезды ещё нет.
+  await openTree(page, staffId);
+  await expect(page.getByTestId(`skill-badge-${CURRENT}`), "до приёмки звезды нет").toHaveCount(0);
+
   await page.goto(planPath);
   const row = page.getByRole("row", { name: new RegExp(IDP_ITEM) });
   await row.getByRole("button", { name: "Подтвердить", exact: true }).click();
@@ -495,8 +513,12 @@ test("критерий 2: подтверждение приёмкой ИПР н�
     "ручной записи по приёмке нет",
   ).toEqual([]);
 
-  await openTree(page, staffId);
-  await expect(page.getByTestId(`skill-badge-${CURRENT}`), "звезда от приёмки горит").toBeVisible();
+  // Назад, а не новым переходом: браузер может вернуть дерево из bfcache со старым снимком,
+  // и звезда должна появиться после обновления, а не только после ручной перезагрузки.
+  await page.goBack();
+  await expect(page.getByTestId("skill-tree-layout")).toBeVisible();
+  await expect(page.getByTestId(`skill-badge-${CURRENT}`), "после возврата звезда от приёмки горит").toBeVisible();
+
   const panel = await openNode(page, CURRENT);
   const state = panel.getByTestId("skill-panel-confirmation-state");
   await expect(state, "источник подтверждения виден").toContainText("Приёмкой ИПР");
@@ -506,6 +528,20 @@ test("критерий 2: подтверждение приёмкой ИПР н�
     panel.getByRole("button", { name: "Снять", exact: true }),
     "формы снятия подтверждения приёмкой нет",
   ).toHaveCount(0);
+
+  // Ручное основание пишется и поверх приёмки: иначе после её отмены навык останется без подтверждения.
+  const form = panel.locator("form");
+  await form.getByRole("textbox", { name: "Основание", exact: true }).fill(IDP_OVER_NOTE);
+  const posted = page.waitForResponse(
+    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === `/people/${staffId}/skills`,
+  );
+  await form.getByRole("button", { name: "Подтвердить", exact: true }).click();
+  await posted;
+
+  const manualRow = confirmations(testInfo, STAFF.login).find((item) => item.competency_id === CURRENT);
+  expect(manualRow, "ручная запись поверх приёмки записана").toBeDefined();
+  expect(manualRow!.note, "основание записано").toBe(IDP_OVER_NOTE);
+  await expect(page.getByTestId(`skill-badge-${CURRENT}`), "звезда осталась").toBeVisible();
 });
 
 test("критерий 3 (негативный): в чужом дереве нет формы пометки, POST пометки пишет автору", async ({
@@ -650,9 +686,28 @@ test("критерий 4 (негативный): повтор POST отзыва 
   expect(confirmations(testInfo, STAFF.login), "база не изменилась").toEqual(before);
 });
 
+test("замечание ревью: основание не уезжает в другой навык при переходе по предпосылке", async ({ page }) => {
+  expect(staffId, "сотрудник из критерия 1 есть").not.toBe("");
+
+  await login(page, MANAGER);
+  await openTree(page, staffId);
+  const panel = await openNode(page, FREE);
+  await panel.locator("form").getByRole("textbox", { name: "Основание", exact: true }).fill(DRAFT_NOTE);
+  await panel.getByTestId("skill-panel-prerequisite-link").click();
+
+  // Панель открылась заново: основание прошлого навыка и его ошибка не переносятся.
+  const nextPanel = nodePanel(page);
+  await expect(nextPanel, "панель показывает предпосылку").not.toContainText("Знание типовых конфигураций");
+  const nextForm = nextPanel.locator("form");
+  await expect(nextForm, "у предпосылки есть форма подтверждения").toHaveCount(1);
+  await expect(
+    nextForm.getByRole("textbox", { name: "Основание", exact: true }),
+    "поле основания пустое",
+  ).toHaveValue("");
+});
+
 // Гость идёт без сессии: файл по умолчанию от админа, здесь это выключено.
-test.describe("гость", () => {
-  test.use({ asAdmin: false });
+test.describe("гость", () => {  test.use({ asAdmin: false });
 
   test("критерий 4 (негативный): гость уходит на вход, подтверждение не проходит", async ({ page }, testInfo) => {
     expect(staffId, "дерево для гостя подготовлено").not.toBe("");

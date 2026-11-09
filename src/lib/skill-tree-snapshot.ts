@@ -26,6 +26,40 @@ export const SKILL_TREE_MOTTO = "Навык не появляется сразу
  */
 export type SkillTreeMode = "own" | "review";
 
+/**
+ * Подтверждение для панели узла (issue #133, ADR 0011): дата ручной записи приходит с сервера
+ * готовой строкой. Панель — клиентский компонент, и `new Date` в браузере дал бы другую дату
+ * в другом часовом поясе, чем карточка сотрудника, которая форматирует её на сервере.
+ */
+export type SkillConfirmationView = {
+  /** План, приёмка в котором подтвердила навык; `null` — подтверждено только вручную. */
+  planId: string | null;
+  /** Ручная часть записи; `null` — подтверждено только приёмкой. */
+  manual: { confirmedOn: string; confirmedByName: string; note: string } | null;
+};
+
+/** `confirmed_at` хранит секунды Unix; в карточке и панели дата — ДД.ММ.ГГГГ по времени сервера. */
+function dottedDate(unixSeconds: number): string {
+  const date = new Date(unixSeconds * 1000);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${date.getFullYear()}`;
+}
+
+/** Строка подтверждения для панели: источник и готовая дата ручной записи. */
+function confirmationView(row: ConfirmedCompetency): SkillConfirmationView {
+  return {
+    planId: row.planId,
+    manual: row.manual
+      ? {
+          confirmedOn: dottedDate(row.manual.confirmedAt),
+          confirmedByName: row.manual.confirmedByName,
+          note: row.manual.note,
+        }
+      : null,
+  };
+}
+
 export type SkillTreeSnapshot = {
   data: SkillTreeData;
   /** Навыки должности и цели: без них дерево показывает пустое состояние. */
@@ -34,8 +68,8 @@ export type SkillTreeSnapshot = {
   hasMarks: boolean;
   /** Подтверждённые компетенции: они открывают дерево и без профиля (ADR 0011). */
   hasConfirmed: boolean;
-  /** Подтверждения по компетенциям: источник, план, дата, автор и основание. */
-  confirmations: Record<string, ConfirmedCompetency>;
+  /** Подтверждения по компетенциям: источник, план и ручная запись с готовой датой. */
+  confirmations: Record<string, SkillConfirmationView>;
 };
 
 type ProfileRow = { level: number | null; criteria: string | null };
@@ -127,8 +161,8 @@ export function loadSkillTreeSnapshot(employeeId: string, jobId: string, mode: S
 
   const confirmedRows = confirmedCompetencies(employeeId);
   const confirmed = new Set(confirmedRows.map((row) => row.competencyId));
-  const confirmations: Record<string, ConfirmedCompetency> = {};
-  for (const row of confirmedRows) confirmations[row.competencyId] = row;
+  const confirmations: Record<string, SkillConfirmationView> = {};
+  for (const row of confirmedRows) confirmations[row.competencyId] = confirmationView(row);
 
   const data = buildSkillTree({
     currentJob: currentJob ? { id: currentJob.id, name: currentJob.name, href: jobHref(currentJob.id) } : null,

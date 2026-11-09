@@ -21,7 +21,7 @@ import {
 import { useThemeMode } from "@/components/useThemeMode";
 import { SkillIcon } from "@/components/skill-icons";
 import { levelLabel, levelShort, SkillNodePanel } from "@/components/SkillNodePanel";
-import type { ConfirmedCompetency } from "@/lib/achievements";
+import type { SkillConfirmationView } from "@/lib/skill-tree-snapshot";
 import { skillTreeStats, type SkillTreeData, type SkillTreeNode } from "@/lib/skill-tree";
 import { buildPrerequisiteTree } from "@/lib/skill-tree-graph";
 import { layoutSkillTree } from "@/lib/skill-tree-layout";
@@ -77,7 +77,7 @@ export type SkillTreeReview = {
   employeeId: string;
   /** Может ли смотрящий менять карточку: сервер проверяет права повторно. */
   canManage: boolean;
-  confirmations: Record<string, ConfirmedCompetency>;
+  confirmations: Record<string, SkillConfirmationView>;
 };
 
 type SkillNodeData = { skill: SkillTreeNode; depth: number; topic: number; selected: boolean; review: boolean };
@@ -419,7 +419,10 @@ function SkillBoard({
 
         {selected ? (
           <div className="skill-popup" data-testid="skill-panel-slot" ref={popupRef}>
+            {/* Ключ по узлу: переход по предпосылке открывает панель заново, и основание
+                прошлого навыка с его ошибкой не уезжает в форму нового. */}
             <SkillNodePanel
+              key={selected.id}
               node={selected}
               context={relationContext(selected, data)}
               planId={data.planId}
@@ -589,6 +592,19 @@ export function SkillTree({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId]);
+
+  /**
+   * Возврат из bfcache: снимок мог устареть, пока руководитель принимал строку ИПР на другой
+   * странице. Браузер восстанавливает документ целиком и запрос не повторяет, поэтому звезда
+   * и состояние строк остались бы прежними. После перезагрузки снимок собирается заново.
+   */
+  useEffect(() => {
+    const onShow = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   const toggleLegend = (key: LegendKey) => {
     setLegend((current) => (current === key ? null : key));
