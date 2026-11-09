@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Профили должностей",
+    "output": ".archify/architecture/architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/firstBitSportivnaya/1c-programmer-profiles.git",
+      "provider": "github",
+      "revision": "e69fe7a6ceb63b3a4806f0fce52d682cce77aaa3"
+    }
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Браузер",
+      "sublabel": "гость или сотрудник",
+      "pos": [40, 80],
+      "size": [160, 64]
+    },
+    {
+      "id": "pages",
+      "type": "frontend",
+      "label": "Страницы",
+      "sublabel": "Next.js App Router",
+      "pos": [280, 80],
+      "size": [170, 64],
+      "sources": [
+        { "path": "src/app/layout.tsx", "line": 24, "end_line": 40, "label": "сессия в макете" },
+        { "path": "src/app/page.tsx", "line": 14, "end_line": 27, "label": "граф должностей" },
+        { "path": "src/app/me/skills/page.tsx", "line": 10, "end_line": 25, "label": "дерево навыков" }
+      ]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "node:sqlite · Drizzle",
+      "pos": [540, 80],
+      "size": [170, 64],
+      "sources": [
+        { "path": "src/db/index.ts", "line": 17, "end_line": 26, "label": "файл и одно соединение" },
+        { "path": "src/db/sqlite.ts", "line": 1, "end_line": 21, "label": "DatabaseSync" },
+        { "path": "src/lib/queries.ts", "line": 31, "end_line": 36, "label": "схема до чтения" }
+      ]
+    },
+    {
+      "id": "actions",
+      "type": "backend",
+      "label": "Серверные действия",
+      "sublabel": "actions · idp · people",
+      "pos": [40, 280],
+      "size": [170, 64],
+      "sources": [
+        { "path": "src/app/actions.ts", "line": 1, "end_line": 20, "label": "справочник после requireAdmin" },
+        { "path": "src/app/idp-actions.ts", "line": 1, "end_line": 18, "label": "ИПР и задания" },
+        { "path": "src/app/people-actions.ts", "line": 1, "end_line": 16, "label": "люди и подтверждения" }
+      ]
+    },
+    {
+      "id": "session",
+      "type": "security",
+      "label": "Сессия",
+      "sublabel": "cookie HMAC",
+      "pos": [280, 280],
+      "size": [170, 64],
+      "sources": [
+        { "path": "src/lib/auth.ts", "line": 9, "end_line": 17, "label": "cookie pp_session" },
+        { "path": "src/lib/auth.ts", "line": 87, "end_line": 100, "label": "подпись и активность" },
+        { "path": "src/lib/auth.ts", "line": 164, "end_line": 170, "label": "доступ админа" }
+      ]
+    },
+    {
+      "id": "scripts",
+      "type": "external",
+      "label": "Данные и скрипты",
+      "sublabel": "seed · sync-catalog",
+      "pos": [540, 280],
+      "size": [190, 64],
+      "sources": [
+        { "path": "scripts/seed.ts", "line": 1, "end_line": 5, "label": "seed из data.json" },
+        { "path": "scripts/sync-catalog.ts", "line": 1, "end_line": 10, "label": "живой каталог" },
+        { "path": "scripts/upgrade-base.ts", "line": 1, "end_line": 6, "label": "проверка обновления" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Один процесс Node.js",
+      "wraps": ["pages", "actions", "session"]
+    }
+  ],
+  "connections": [
+    { "id": "open-page", "from": "browser", "to": "pages", "label": "HTTP", "variant": "emphasis" },
+    { "id": "read-db", "from": "pages", "to": "sqlite", "label": "чтение" },
+    { "id": "page-session", "from": "pages", "to": "session", "label": "cookie", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "id": "submit", "from": "browser", "to": "actions", "label": "POST", "fromSide": "bottom", "toSide": "top" },
+    { "id": "authorize", "from": "actions", "to": "session", "label": "права" },
+    { "id": "write-db", "from": "actions", "to": "sqlite", "label": "запись", "fromSide": "bottom", "toSide": "right", "labelAt": [170, 368] },
+    { "id": "seed-data", "from": "scripts", "to": "sqlite", "label": "наполнение", "variant": "dashed", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Запрос страницы",
+      "items": [
+        "Серверные компоненты читают SQLite в том же процессе",
+        "Граф и дерево навыков — React Flow, снимок данных собирает сервер"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Запись",
+      "items": [
+        "ActionForm и useActionState; вход и выход — POST /api/session",
+        "Права — в каждом действии; личные пометки видит только сотрудник"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Данные и выкладка",
+      "items": [
+        "Профили — seed/data.json; живой каталог обновляет db:sync-catalog, не db:seed",
+        "IIS проксирует 127.0.0.1:3000; база data/profiles.sqlite в git не входит"
+      ]
+    }
+  ]
+}
