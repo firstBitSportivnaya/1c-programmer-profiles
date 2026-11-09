@@ -76,6 +76,8 @@ function revalidatePeople(employeeId: string, idpId?: string) {
   revalidatePath("/idps");
   revalidatePath("/assignments");
   revalidatePath(`/people/${employeeId}`);
+  // Дерево сотрудника в карточке показывает подтверждения: подтверждение и отзыв меняют его тоже.
+  revalidatePath(`/people/${employeeId}/skills`);
   if (idpId) revalidatePath(`/idps/${idpId}`);
 }
 

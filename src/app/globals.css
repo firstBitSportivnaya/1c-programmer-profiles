@@ -523,6 +523,40 @@ details[open] > .skill-summary::before {
   text-decoration: underline;
 }
 
+/* Дерево навыков в группе «Компетенции» карточки: строка-ссылка с рамкой акцента,
+   чтобы действие было заметно без выбора навыка в плоском списке. */
+.employee-skills-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-color: var(--accent);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.employee-skills-link:hover {
+  border-color: var(--accent-text);
+}
+
+.employee-skills-link:hover .employee-skills-link__title {
+  text-decoration: underline;
+}
+
+.employee-skills-link__main {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.employee-skills-link__title {
+  font-weight: 700;
+}
+
+.employee-skills-link__arrow {
+  color: var(--accent-text);
+  font-size: var(--fs-md);
+}
+
 /* Кабинет: шапка с должностью и статусом, основная колонка карточек и колонка действий.
    На узком экране действия идут сразу после шапки; панели внутри карточек не рисуют вторую рамку. */
 .cabinet-head {
@@ -1254,6 +1288,21 @@ details[open] > .skill-summary::before {
 .skill-mark {
   display: grid;
   gap: 0.35rem;
+}
+
+/* Подтверждение в узле при просмотре чужого дерева: поле основания и кнопка в столбик. */
+.skill-card__form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* `ActionForm` вешает тот же класс и на внутренний `fieldset`: отступ сверху остаётся у формы,
+   а сетка с зазором — у поля, чтобы кнопка не прижималась к вводу. */
+.skill-card__form.form-fields {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0;
 }
 
 .skill-mark__note {
