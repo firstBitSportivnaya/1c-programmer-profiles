@@ -81,12 +81,13 @@ function addItemForm(page: Page) {
   return page.locator("form", { has: page.getByRole("heading", { name: "Добавить задание" }) });
 }
 
-async function addItem(page: Page, competencyId: string, name: string) {
+async function addItem(page: Page, competencyId: string, name: string, dueOn?: string) {
   const form = addItemForm(page);
   await form.getByLabel(/^Компетенция/).selectOption(competencyId);
   await form.getByLabel(/^Название/).fill(name);
   await form.getByLabel(/^Узнать/).fill(`Узнать ${name}`);
   await form.getByLabel(/^Проверить/).fill(`Проверить ${name}`);
+  if (dueOn) await form.getByRole("textbox", { name: "Срок" }).fill(dueOn);
   await form.getByRole("button", { name: "Добавить" }).click();
   await expect(page.getByRole("row", { name: new RegExp(name) })).toBeVisible();
 }
@@ -293,7 +294,7 @@ function boardIds(board: Locator) {
 test("админ заводит сотрудников, ИПР, строки плана и материал", async ({ page }) => {
   await createStaff(page, STUDENT, "junior");
   studentPlanPath = await createPlan(page, STUDENT, "programmer");
-  await addItem(page, PROGRAMMING.id, GOAL_ITEM);
+  await addItem(page, PROGRAMMING.id, GOAL_ITEM, "2026-03-01");
   await addItem(page, TESTING.id, TESTING_ITEM);
 
   const testingRow = page.getByRole("row", { name: new RegExp(TESTING_ITEM) });
@@ -434,6 +435,18 @@ test("заливка узла — пометка, панель показыва�
   );
   await expect(panel.getByRole("link", { name: MATERIAL })).toHaveAttribute("href", MATERIAL_URL);
   await expect(panel.getByTestId("skill-panel-rows")).toContainText(GOAL_ITEM);
+  await expect(panel.getByTestId("skill-panel-rows")).toContainText("до 01.03.2026");
+  const panelText = await panel.evaluate((element) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const chunks: string[] = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || parent.closest("input, textarea, select, script, style")) continue;
+      chunks.push(node.textContent ?? "");
+    }
+    return chunks.join("\n");
+  });
+  expect(panelText, "в тексте панели нет ISO-даты").not.toMatch(/\d{4}-\d{2}-\d{2}/);
 
   // Пояснение, сохранённое на странице пометок, видно в карточке навыка.
   await skillNode(page, OBUCHAEMOST).click();

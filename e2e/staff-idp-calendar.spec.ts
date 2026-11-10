@@ -13,6 +13,10 @@ const END = "2026-09-20";
 const ADDED = "2026-06-15";
 const EDITED = "2026-07-02";
 const OUTSIDE = "2026-01-15";
+const START_LABEL = "02.03.2026";
+const END_LABEL = "20.09.2026";
+const ADDED_LABEL = "15.06.2026";
+const EDITED_LABEL = "02.07.2026";
 const WITH_DUE = "Срок из календаря";
 const WITHOUT_DUE = "Пустой срок";
 
@@ -67,7 +71,7 @@ test("в тёмной теме день начала и конца выбира�
   await pickDay(create, "periodEnd", END);
   await create.getByRole("button", { name: "Создать" }).click();
   await page.locator("li", { hasText: STAFF.name }).getByRole("link", { name: "Младший программист → Программист" }).click();
-  await expect(page.getByText(`${START} — ${END}`)).toBeVisible();
+  await expect(page.getByText(`${START_LABEL} — ${END_LABEL}`)).toBeVisible();
 });
 
 test("в светлой теме срок задания выбирается календарём в обеих формах", async ({ page }) => {
@@ -83,18 +87,18 @@ test("в светлой теме срок задания выбирается к
   await add.getByLabel("Проверить").fill("День в строке");
   await pickDay(add, "dueOn", ADDED);
   await add.getByRole("button", { name: "Добавить" }).click();
-  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(ADDED, { exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(ADDED_LABEL, { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(ADDED, { exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(ADDED_LABEL, { exact: true })).toBeVisible();
 
   const row = page.getByRole("row", { name: new RegExp(WITH_DUE) });
   await row.getByText("Править", { exact: true }).click();
   const editing = page.getByRole("row").filter({ has: page.getByRole("button", { name: "Сохранить", exact: true }) });
   await pickDay(editing, "dueOn", EDITED);
   await editing.getByRole("button", { name: "Сохранить", exact: true }).click();
-  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(EDITED, { exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(EDITED_LABEL, { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(EDITED, { exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(EDITED_LABEL, { exact: true })).toBeVisible();
 });
 
 test("день вне периода не записывается, пустой срок остаётся", async ({ page }) => {

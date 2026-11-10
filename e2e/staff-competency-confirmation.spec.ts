@@ -301,6 +301,7 @@ test("критерий 1: админ подтверждает навык с ос
   await expect(row, "в строке название навыка").toContainText(SKILL_NAME);
   await expect(row, "в строке основание").toContainText(NOTE);
   await expect(row, "в строке дата ДД.ММ.ГГГГ").toContainText(/\d{2}\.\d{2}\.\d{4}/);
+  await expect(row, "в строке нет ISO-даты").not.toContainText(/\d{4}-\d{2}-\d{2}/);
   await expect(row, "в строке автор подтверждения").toContainText(E2E_ADMIN.name);
 
   // Секунда нужна, чтобы новая дата отличалась от прежней: `confirmed_at` хранится в секундах.

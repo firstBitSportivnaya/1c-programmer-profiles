@@ -4,18 +4,11 @@ import { EmployeeIdpSummary } from "@/components/IdpBlock";
 import { JobFacts, NextJobs } from "@/components/JobOverview";
 import { employeeAchievements } from "@/lib/achievements";
 import { getSessionEmployee } from "@/lib/auth";
+import { formatUnixDate } from "@/lib/dates";
 import { getActiveIdp, getEmployee, getJob, jobHref } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** `employees.updated_at` хранит секунды Unix; в кабинете показываем дату как ДД.ММ.ГГГГ. */
-function dottedDate(unixSeconds: number) {
-  const date = new Date(unixSeconds * 1000);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${date.getFullYear()}`;
-}
 
 /**
  * Кабинет сотрудника: шапка с должностью и статусом, сведения о должности и росте,
@@ -59,7 +52,7 @@ export default async function MePage() {
           <dt className="muted">Логин</dt>
           <dd>{employee.login}</dd>
           <dt className="muted">Изменён</dt>
-          <dd>{dottedDate(employee.updatedAt)}</dd>
+          <dd>{formatUnixDate(employee.updatedAt)}</dd>
         </dl>
       </header>
 

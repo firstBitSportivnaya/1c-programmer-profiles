@@ -12,6 +12,7 @@ export function IdpItemEdit({
   learnText,
   verifyText,
   dueOn,
+  dueLabel,
   manage,
   learnExtra,
   test,
@@ -24,6 +25,8 @@ export function IdpItemEdit({
   learnText: string;
   verifyText: string;
   dueOn: string | null;
+  /** Готовая подпись срока: `ДД.ММ.ГГГГ` или тире. В поле ввода остаётся ISO. */
+  dueLabel: string;
   manage: boolean;
   learnExtra: ReactNode;
   test: ReactNode;
@@ -71,7 +74,7 @@ export function IdpItemEdit({
         {open ? (
           <DateField name="dueOn" ariaLabel="Срок" form={formId} defaultValue={dueOn ?? ""} />
         ) : (
-          (dueOn ?? "—")
+          dueLabel
         )}
       </td>
       <td>{status}</td>

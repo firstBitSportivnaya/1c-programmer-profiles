@@ -29,6 +29,7 @@ export type TreeItemRow = {
   competencyId: string;
   name: string;
   status: IdpItemStatus;
+  /** Срок уже как `ДД.ММ.ГГГГ` или `null`: панель дату не форматирует. */
   dueOn: string | null;
   accepted: boolean;
 };

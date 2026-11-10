@@ -43,7 +43,7 @@ test("карточка ИПР показывает сотрудника, пер�
 
   idpPath = new URL(page.url()).pathname;
   await expect(page.getByText(STAFF.name)).toBeVisible();
-  await expect(page.getByText("2026-03-01 — 2026-09-30")).toBeVisible();
+  await expect(page.getByText("01.03.2026 — 30.09.2026")).toBeVisible();
   const table = page.getByRole("table");
   await expect(table.getByRole("columnheader", { name: "Цель" })).toBeVisible();
   await expect(table.getByRole("columnheader", { name: "Узнать" })).toBeVisible();
@@ -57,7 +57,8 @@ test("карточка ИПР показывает сотрудника, пер�
   await expect(row.getByRole("cell").nth(1)).toContainText(LEARN);
   await expect(row.getByRole("cell").nth(1)).not.toContainText("Программист");
   await expect(row.getByRole("cell").nth(2)).toContainText(VERIFY);
-  await expect(row.getByRole("cell").nth(4).getByText("2026-06-15", { exact: true })).toBeVisible();
+  await expect(row.getByRole("cell").nth(4).getByText("15.06.2026", { exact: true })).toBeVisible();
+  await expect(row.getByRole("cell").nth(4)).not.toContainText(/\d{4}-\d{2}-\d{2}/);
 });
 
 // Гость идёт без сессии: файл по умолчанию от админа, здесь это выключено.
