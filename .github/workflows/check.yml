@@ -22,6 +22,8 @@ jobs:
         run: npm run check:seed
       - name: Паритет схемы
         run: npm run check:schema
+      - name: Индексы чтений
+        run: npm run check:indexes
       - name: Lint
         run: npm run lint
       - name: Типы

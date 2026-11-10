@@ -227,9 +227,8 @@ export function getActiveIdp(employeeId: string) {
   return getDb()
     .select()
     .from(idps)
-    .where(eq(idps.employeeId, employeeId))
-    .all()
-    .find((row) => row.status === "active");
+    .where(and(eq(idps.employeeId, employeeId), eq(idps.status, "active")))
+    .get();
 }
 
 export type MarkableCompetency = {

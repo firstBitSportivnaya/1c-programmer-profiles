@@ -44,6 +44,7 @@ flowchart LR
 | Правка по ходу | `npm run check:fast -- <спеки>` | да, во время работы | нет |
 | Seed по контракту | `npm run check:seed` | внутри verify | да |
 | Паритет схемы | `npm run check:schema` | внутри verify | да |
+| Индексы чтений | `npm run check:indexes` | внутри verify | да |
 | Lint | `npm run lint` | внутри verify | да |
 | Типы | `npx tsc --noEmit` | внутри verify | да |
 | Сборка | `npm run build` | внутри verify | да |

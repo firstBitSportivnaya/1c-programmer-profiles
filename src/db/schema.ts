@@ -86,7 +86,7 @@ export const employees = sqliteTable("employees", {
   isAdmin: integer("is_admin").notNull(),
   isActive: integer("is_active").notNull(),
   updatedAt: integer("updated_at").notNull(),
-});
+}, (t) => [index("employees_manager").on(t.managerId)]);
 
 export const idps = sqliteTable("idps", {
   id: text("id").primaryKey(),
@@ -106,7 +106,7 @@ export const idps = sqliteTable("idps", {
   periodEnd: text("period_end").notNull(),
   status: text("status", { enum: ["active", "completed", "cancelled"] }).notNull(),
   updatedAt: integer("updated_at").notNull(),
-});
+}, (t) => [index("idps_employee").on(t.employeeId)]);
 
 export const idpAssignments = sqliteTable("idp_assignments", {
   id: text("id").primaryKey(),
@@ -119,7 +119,7 @@ export const idpAssignments = sqliteTable("idp_assignments", {
   level: integer("level"),
   archived: integer("archived").notNull(),
   updatedAt: integer("updated_at").notNull(),
-});
+}, (t) => [index("idp_assignments_competency").on(t.competencyId)]);
 
 export const idpAssignmentQuestions = sqliteTable("idp_assignment_questions", {
   id: text("id").primaryKey(),
@@ -128,7 +128,7 @@ export const idpAssignmentQuestions = sqliteTable("idp_assignment_questions", {
     .references(() => idpAssignments.id),
   prompt: text("prompt").notNull(),
   sortOrder: integer("sort_order").notNull(),
-});
+}, (t) => [index("idp_assignment_questions_assignment").on(t.assignmentId)]);
 
 export const idpAssignmentOptions = sqliteTable("idp_assignment_options", {
   id: text("id").primaryKey(),
@@ -150,7 +150,10 @@ export const idpPool = sqliteTable(
     competencyName: text("competency_name").notNull(),
     requiredLevel: integer("required_level"),
   },
-  (t) => [uniqueIndex("idp_pool_unique").on(t.idpId, t.competencyId)],
+  (t) => [
+    uniqueIndex("idp_pool_unique").on(t.idpId, t.competencyId),
+    index("idp_pool_competency").on(t.competencyId),
+  ],
 );
 
 export const idpItems = sqliteTable("idp_items", {
@@ -171,7 +174,10 @@ export const idpItems = sqliteTable("idp_items", {
   acceptedById: text("accepted_by_id").references(() => employees.id),
   acceptedAt: integer("accepted_at"),
   sortOrder: integer("sort_order").notNull(),
-});
+}, (t) => [
+  index("idp_items_idp").on(t.idpId),
+  index("idp_items_competency").on(t.competencyId),
+]);
 
 export const idpItemQuestions = sqliteTable("idp_item_questions", {
   id: text("id").primaryKey(),
@@ -180,7 +186,7 @@ export const idpItemQuestions = sqliteTable("idp_item_questions", {
     .references(() => idpItems.id),
   prompt: text("prompt").notNull(),
   sortOrder: integer("sort_order").notNull(),
-});
+}, (t) => [index("idp_item_questions_item").on(t.itemId)]);
 
 export const idpItemOptions = sqliteTable("idp_item_options", {
   id: text("id").primaryKey(),
@@ -190,7 +196,7 @@ export const idpItemOptions = sqliteTable("idp_item_options", {
   text: text("text").notNull(),
   isCorrect: integer("is_correct").notNull(),
   sortOrder: integer("sort_order").notNull(),
-});
+}, (t) => [index("idp_item_options_question").on(t.questionId)]);
 
 export const idpItemAttempts = sqliteTable("idp_item_attempts", {
   id: text("id").primaryKey(),
@@ -214,7 +220,10 @@ export const employeeCompetencyMarks = sqliteTable(
     note: text("note").notNull().default(""),
     updatedAt: integer("updated_at").notNull(),
   },
-  (t) => [uniqueIndex("employee_competency_marks_unique").on(t.employeeId, t.competencyId)],
+  (t) => [
+    uniqueIndex("employee_competency_marks_unique").on(t.employeeId, t.competencyId),
+    index("employee_competency_marks_competency").on(t.competencyId),
+  ],
 );
 
 export const competencyLinks = sqliteTable("competency_links", {

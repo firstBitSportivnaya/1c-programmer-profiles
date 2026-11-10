@@ -15,6 +15,7 @@ type Step = { command: string; args: string[]; env?: Record<string, string> };
 const STEPS: Step[] = [
   { command: "npm", args: ["run", "check:seed"] },
   { command: "npm", args: ["run", "check:schema"] },
+  { command: "npm", args: ["run", "check:indexes"] },
   { command: "npx", args: ["tsc", "--noEmit"] },
   { command: "npm", args: ["run", "lint"] },
   { command: "npm", args: ["run", "build"] },
