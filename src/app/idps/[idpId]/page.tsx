@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { IdpBlock } from "@/components/IdpBlock";
 import { getSessionEmployee, type SessionEmployee } from "@/lib/auth";
+import { formatPeriod } from "@/lib/dates";
 import { canViewEmployee } from "@/lib/invariants";
 import { getEmployee, getIdp, getJob, jobHref, listIdpItems, listIdpPool } from "@/lib/queries";
 
@@ -70,7 +71,7 @@ export default async function IdpPage({ params }: { params: Promise<{ idpId: str
         </dd>
         <dt className="muted">Период</dt>
         <dd>
-          {idp.periodStart} — {idp.periodEnd}
+          {formatPeriod(idp.periodStart, idp.periodEnd)}
         </dd>
       </dl>
       <IdpBlock actor={actor} idp={idp} items={items} pool={pool} />

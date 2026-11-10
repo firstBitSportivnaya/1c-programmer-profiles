@@ -9,6 +9,7 @@ import {
   unacceptIdpItemAction,
 } from "@/app/idp-actions";
 import type { SessionEmployee } from "@/lib/auth";
+import { formatIsoDate } from "@/lib/dates";
 import { canManageEmployee, canTickIdpItem } from "@/lib/invariants";
 import {
   getActiveIdp,
@@ -196,6 +197,7 @@ export function IdpBlock({
                         learnText={item.learnText}
                         verifyText={item.verifyText}
                         dueOn={item.dueOn}
+                        dueLabel={formatIsoDate(item.dueOn)}
                         manage={manage}
                         learnExtra={null}
                         test={

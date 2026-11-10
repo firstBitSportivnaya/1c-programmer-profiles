@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
 import { DateField } from "@/components/DateField";
 import { createIdpAction } from "@/app/idp-actions";
+import { formatPeriod } from "@/lib/dates";
 import { getSessionEmployee } from "@/lib/auth";
 import { canManageEmployee } from "@/lib/invariants";
 import {
@@ -130,7 +131,7 @@ export default async function IdpsPage({
                 <div className="mt-1 muted caption">
                   {owner?.name ?? idp.employeeId}
                   {creator ? ` · создал ${creator.name}` : ""}
-                  {idp.periodStart && idp.periodEnd ? ` · ${idp.periodStart} — ${idp.periodEnd}` : ""}
+                  {idp.periodStart && idp.periodEnd ? ` · ${formatPeriod(idp.periodStart, idp.periodEnd)}` : ""}
                   {idp.status === "active" ? ` · принято ${progress.accepted} из ${progress.total}` : ""}
                 </div>
               </div>

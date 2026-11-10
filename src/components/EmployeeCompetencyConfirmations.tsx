@@ -3,15 +3,8 @@ import {
   confirmCompetencyAction,
   revokeCompetencyConfirmationAction,
 } from "@/app/people-actions";
+import { formatUnixDate } from "@/lib/dates";
 import { listCompetencyConfirmations, listSkillCompetencies } from "@/lib/queries";
-
-/** `confirmed_at` хранит секунды Unix; в карточке показываем дату как ДД.ММ.ГГГГ. */
-function dottedDate(unixSeconds: number) {
-  const date = new Date(unixSeconds * 1000);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${date.getFullYear()}`;
-}
 
 /**
  * Ручные подтверждения компетенций в карточке сотрудника (ADR 0011): действующие строки с датой,
@@ -61,7 +54,7 @@ export function EmployeeCompetencyConfirmations({
             >
               <span>{row.competencyName}</span>
               <span className="muted">
-                {dottedDate(row.confirmedAt)} · {row.confirmedByName}
+                {formatUnixDate(row.confirmedAt)} · {row.confirmedByName}
               </span>
               <span className="muted">{row.note}</span>
               {canManage ? (

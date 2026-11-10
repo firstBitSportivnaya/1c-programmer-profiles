@@ -3,17 +3,10 @@ import { Achievements } from "@/components/Achievements";
 import { syncEmployeeAchievements } from "@/lib/achievement-rules";
 import { confirmedCompetencies } from "@/lib/achievements";
 import { getSessionEmployee } from "@/lib/auth";
+import { formatUnixDate } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** `confirmed_at` ручной записи хранится в секундах Unix; на странице дата видна как ДД.ММ.ГГГГ. */
-function dottedDate(unixSeconds: number) {
-  const date = new Date(unixSeconds * 1000);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${date.getFullYear()}`;
-}
 
 /**
  * Достижения сотрудника — единственное место, где виден весь список. Страница только своя:
@@ -60,7 +53,7 @@ export default async function MyAchievementsPage() {
                   ) : null}
                   {row.planId && row.manual ? " · " : null}
                   {row.manual
-                    ? `вручную ${dottedDate(row.manual.confirmedAt)} · ${row.manual.confirmedByName}`
+                    ? `вручную ${formatUnixDate(row.manual.confirmedAt)} · ${row.manual.confirmedByName}`
                     : null}
                 </span>
               </li>

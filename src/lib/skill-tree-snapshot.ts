@@ -1,4 +1,5 @@
 import { confirmedCompetencies, type ConfirmedCompetency } from "@/lib/achievements";
+import { formatIsoDate, formatUnixDate } from "@/lib/dates";
 import {
   competencyMarkViews,
   getActiveIdp,
@@ -38,21 +39,13 @@ export type SkillConfirmationView = {
   manual: { confirmedOn: string; confirmedByName: string; note: string } | null;
 };
 
-/** `confirmed_at` хранит секунды Unix; в карточке и панели дата — ДД.ММ.ГГГГ по времени сервера. */
-function dottedDate(unixSeconds: number): string {
-  const date = new Date(unixSeconds * 1000);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${date.getFullYear()}`;
-}
-
 /** Строка подтверждения для панели: источник и готовая дата ручной записи. */
 function confirmationView(row: ConfirmedCompetency): SkillConfirmationView {
   return {
     planId: row.planId,
     manual: row.manual
       ? {
-          confirmedOn: dottedDate(row.manual.confirmedAt),
+          confirmedOn: formatUnixDate(row.manual.confirmedAt),
           confirmedByName: row.manual.confirmedByName,
           note: row.manual.note,
         }
@@ -178,7 +171,7 @@ export function loadSkillTreeSnapshot(employeeId: string, jobId: string, mode: S
           competencyId: item.competencyId,
           name: item.assignmentName,
           status: item.status,
-          dueOn: item.dueOn,
+          dueOn: item.dueOn ? formatIsoDate(item.dueOn) : null,
           accepted: item.acceptedAt != null,
         }))
       : [],

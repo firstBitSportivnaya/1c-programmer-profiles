@@ -151,7 +151,7 @@ test("узнать, проверить и срок сохраняются, ст�
   const saved = page.getByRole("row", { name: new RegExp(GOAL) });
   await expect(saved.getByText("Новый способ", { exact: true })).toBeVisible();
   await expect(saved.getByText("Сводка на месте", { exact: true })).toBeVisible();
-  await expect(saved.getByText("2026-06-15", { exact: true })).toBeVisible();
+  await expect(saved.getByText("15.06.2026", { exact: true })).toBeVisible();
   await expect(saved.getByRole("button", { name: "Править" })).toBeVisible();
   await saved.getByText("Править", { exact: true }).click();
   const restore = page.getByRole("row").filter({ has: page.getByRole("button", { name: "Сохранить", exact: true }) });

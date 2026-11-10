@@ -315,6 +315,8 @@ test("критерий 1: ручное подтверждение без пла�
   expect(employee, "id сотрудника A найден").not.toBe("");
 
   await confirmViaUi(page, employee, PROGRAMMING, A_NOTE);
+  const cardDate = (await confirmationRow(page, PROGRAMMING).innerText()).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] ?? "";
+  expect(cardDate, "в карточке дата ДД.ММ.ГГГГ").toMatch(/^\d{2}\.\d{2}\.\d{4}$/);
 
   // При ручном источнике плана нет, поэтому `source_ref` выдаче не ставится.
   const rows = grants(testInfo, A.login).filter((row) => row.achievement_id === "idp-competency-confirmed");
@@ -332,6 +334,7 @@ test("критерий 1: ручное подтверждение без пла�
   const record = page.getByTestId(`confirmed-${PROGRAMMING}`);
   await expect(record, "запись подтверждённой компетенции одна").toHaveCount(1);
   await expect(record).toContainText("вручную");
+  await expect(record, "дата на странице достижений совпадает с карточкой").toContainText(cardDate);
   await expect(record, "в записи имя автора-админа").toContainText(E2E_ADMIN.name);
   await expect(record.locator("a"), "у ручного подтверждения ссылки на план нет").toHaveCount(0);
   await expect(page.getByTestId("confirmed-empty"), "пустого состояния нет").toHaveCount(0);
