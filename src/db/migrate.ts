@@ -195,6 +195,22 @@ function ensureParentNameIndex() {
   `);
 }
 
+function ensureReadIndexes() {
+  // После всех CREATE TABLE: на старой базе таблицы появляются раньше этих индексов.
+  getSqlite().exec(`
+    CREATE INDEX IF NOT EXISTS employees_manager ON employees (manager_id);
+    CREATE INDEX IF NOT EXISTS idps_employee ON idps (employee_id);
+    CREATE INDEX IF NOT EXISTS idp_assignments_competency ON idp_assignments (competency_id);
+    CREATE INDEX IF NOT EXISTS idp_assignment_questions_assignment ON idp_assignment_questions (assignment_id);
+    CREATE INDEX IF NOT EXISTS idp_pool_competency ON idp_pool (competency_id);
+    CREATE INDEX IF NOT EXISTS idp_items_idp ON idp_items (idp_id);
+    CREATE INDEX IF NOT EXISTS idp_items_competency ON idp_items (competency_id);
+    CREATE INDEX IF NOT EXISTS idp_item_questions_item ON idp_item_questions (item_id);
+    CREATE INDEX IF NOT EXISTS idp_item_options_question ON idp_item_options (question_id);
+    CREATE INDEX IF NOT EXISTS employee_competency_marks_competency ON employee_competency_marks (competency_id);
+  `);
+}
+
 function ensureIdpActiveIndex() {
   getSqlite().exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idps_one_active
@@ -626,4 +642,5 @@ export function migrate() {
   addColumnIfMissing("idp_items", "assignment_level", "assignment_level INTEGER");
   retargetMergedCompetencies();
   ensureAchievementTables();
+  ensureReadIndexes();
 }

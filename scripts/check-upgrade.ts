@@ -39,6 +39,14 @@ function main() {
     }
     const foreignKeys = getSqlite().prepare("PRAGMA foreign_key_check").all() as { table: string; parent: string }[];
     for (const fk of foreignKeys) errors.push(`foreign_key_check: ${fk.table} ссылается на несуществующую строку ${fk.parent}`);
+    const indexes = new Set(
+      (getSqlite().prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]).map(
+        (row) => row.name,
+      ),
+    );
+    for (const name of ["idps_one_active", "employee_achievements_achievement", "idp_items_idp", "employees_manager"]) {
+      if (!indexes.has(name)) errors.push(`индекс пропал: ${name}`);
+    }
     resetDbConnection();
 
     const after = tableCounts(copy);
