@@ -20,6 +20,8 @@ jobs:
       - run: npm ci
       - name: Seed по контракту
         run: npm run check:seed
+      - name: Паритет схемы
+        run: npm run check:schema
       - name: Lint
         run: npm run lint
       - name: Типы
