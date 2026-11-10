@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { migrate } from "@/db/migrate";
+import { applySchema } from "@/db/schema-ready";
 import {
   achievements,
   competencies,
@@ -26,13 +26,9 @@ import {
 } from "@/db/schema";
 import { sectionForType } from "@/lib/invariants";
 
-const SCHEMA_TICK = 8;
-let appliedTick = 0;
+/** Страховка для путей без Next: скрипт и тест сами не проходят через `instrumentation.ts`. */
 export function ensureSchema() {
-  if (appliedTick !== SCHEMA_TICK) {
-    migrate();
-    appliedTick = SCHEMA_TICK;
-  }
+  applySchema();
 }
 
 export const listJobs = cache(function listJobs() {
