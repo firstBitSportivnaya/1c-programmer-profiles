@@ -14,6 +14,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:sync-catalog": "tsx scripts/sync-catalog.ts",
     "check:seed": "tsx scripts/check-seed.ts",
+    "check:schema": "tsx scripts/check-schema.ts",
     "db:snapshot": "tsx scripts/db-snapshot.ts",
     "db:upgrade-base": "tsx scripts/upgrade-base.ts",
     "check:upgrade": "tsx scripts/check-upgrade.ts",
