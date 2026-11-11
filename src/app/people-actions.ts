@@ -20,6 +20,7 @@ import {
   assertNotLastAdmin,
   canManageEmployee,
 } from "@/lib/invariants";
+import { parseEmployeeSheet, type EmployeeImportRow } from "@/lib/employee-workbook";
 import { hashPassword } from "@/lib/password";
 import {
   getAchievement,
@@ -28,9 +29,12 @@ import {
   getEmployee,
   getEmployeeByLogin,
   getJob,
+  listEmployees,
+  listJobs,
   listSkillCompetencies,
   markableCompetencies,
 } from "@/lib/queries";
+import { readXlsxSheet } from "@/lib/xlsx-sheet";
 import type { ActionResult } from "@/lib/action-result";
 
 function isNextControlFlow(error: unknown) {
@@ -574,6 +578,182 @@ export async function reactivateEmployeeAction(
     return null;
   } catch (error) {
     if (retryIfClosed(error, retried)) return reactivateEmployeeAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
+const LOGIN_RE = /^[a-z0-9._-]{2,40}$/;
+
+async function readEmployeeImport(
+  file: FormDataEntryValue | null,
+): Promise<{ error: string } | { errors: string[]; rows: EmployeeImportRow[] }> {
+  if (!(file instanceof File) || file.size === 0) return { error: "Нужен файл Excel .xlsx" };
+  if (!file.name.toLowerCase().endsWith(".xlsx")) return { error: "Нужен файл Excel .xlsx" };
+  try {
+    return parseEmployeeSheet(readXlsxSheet(Buffer.from(await file.arrayBuffer())));
+  } catch {
+    return { error: "Это не файл Excel" };
+  }
+}
+
+function yesNo(raw: string): boolean | null {
+  const value = raw.trim().toLowerCase();
+  if (value === "да") return true;
+  if (value === "нет") return false;
+  return null;
+}
+
+function resolveJob(cell: string, jobs: { id: string; name: string }[]): { id: string } | { error: string } {
+  const byId = jobs.find((job) => job.id === cell);
+  if (byId) return { id: byId.id };
+  const byName = jobs.filter((job) => job.name === cell);
+  if (byName.length > 1) return { error: "неоднозначное имя должности" };
+  if (byName.length === 1 && byName[0]) return { id: byName[0].id };
+  return { error: "должность не найдена" };
+}
+
+function resolveManager(
+  cell: string,
+  people: { id: string; name: string }[],
+): { id: string | null } | { error: string } {
+  if (cell === "" || cell.toLowerCase() === "нет") return { id: null };
+  const byId = people.find((person) => person.id === cell);
+  if (byId) return { id: byId.id };
+  const byName = people.filter((person) => person.name === cell);
+  if (byName.length > 1) return { error: "неоднозначное имя руководителя" };
+  if (byName.length === 1 && byName[0]) return { id: byName[0].id };
+  return { error: "руководитель не найден" };
+}
+
+function managerCycle(links: Map<string, string | null>, employeeId: string, managerId: string | null) {
+  const seen = new Set([employeeId]);
+  let cursor = managerId;
+  while (cursor) {
+    if (seen.has(cursor)) return true;
+    seen.add(cursor);
+    cursor = links.get(cursor) ?? null;
+  }
+  return false;
+}
+
+/**
+ * Создание сотрудников из Excel. Существующий логин не меняется. Строка с ошибкой
+ * не пишется и не отменяет остальные; годные строки — одна транзакция.
+ * Пароль в отчёт не входит. Права проверяются до чтения файла.
+ */
+export async function importEmployeesAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const parsed = await readEmployeeImport(formData.get("file"));
+    if ("error" in parsed) return { error: parsed.error };
+    if (parsed.errors.length > 0) return { error: parsed.errors.join("\n") };
+
+    const jobs = listJobs();
+    const existing = listEmployees();
+    const taken = new Set(existing.map((person) => person.login));
+    const people = existing.map((person) => ({ id: person.id, name: person.name }));
+    const links = new Map(existing.map((person) => [person.id, person.managerId]));
+    const lines: string[] = [];
+    const planned: {
+      id: string;
+      login: string;
+      name: string;
+      password: string;
+      jobId: string;
+      managerId: string | null;
+      isAdmin: number;
+    }[] = [];
+
+    for (const row of parsed.rows) {
+      const login = row.login.trim().toLowerCase();
+      if (!LOGIN_RE.test(login)) {
+        lines.push(`Строка ${row.row}: ошибка: логин: 2–40 символов, латиница, цифры, точка, дефис`);
+        continue;
+      }
+      if (taken.has(login)) {
+        lines.push(`Строка ${row.row}: пропущен: логин занят`);
+        continue;
+      }
+      if (!row.name) {
+        lines.push(`Строка ${row.row}: ошибка: нужно имя`);
+        continue;
+      }
+      if (row.password.length < 8) {
+        lines.push(`Строка ${row.row}: ошибка: пароль не короче 8 символов`);
+        continue;
+      }
+      const job = resolveJob(row.job, jobs);
+      if ("error" in job) {
+        lines.push(`Строка ${row.row}: ошибка: ${job.error}`);
+        continue;
+      }
+      const admin = yesNo(row.admin);
+      if (admin == null) {
+        lines.push(`Строка ${row.row}: ошибка: админ — да или нет`);
+        continue;
+      }
+      const manager = resolveManager(row.manager, people);
+      if ("error" in manager) {
+        lines.push(`Строка ${row.row}: ошибка: ${manager.error}`);
+        continue;
+      }
+      const id = newId("emp");
+      if (manager.id === id || managerCycle(links, id, manager.id)) {
+        lines.push(`Строка ${row.row}: ошибка: оргсвязь не может содержать цикл`);
+        continue;
+      }
+      planned.push({
+        id,
+        login,
+        name: row.name,
+        password: row.password,
+        jobId: job.id,
+        managerId: manager.id,
+        isAdmin: admin ? 1 : 0,
+      });
+      taken.add(login);
+      people.push({ id, name: row.name });
+      links.set(id, manager.id);
+      lines.push(`Строка ${row.row}: создан`);
+    }
+
+    const db = getDb();
+    const t = now();
+    getSqlite()
+      .transaction(() => {
+        for (const row of planned) {
+          assertManagerLink(row.id, row.managerId);
+          db.insert(employees)
+            .values({
+              id: row.id,
+              login: row.login,
+              name: row.name,
+              passwordHash: hashPassword(row.password),
+              jobId: row.jobId,
+              managerId: row.managerId,
+              isAdmin: row.isAdmin,
+              isActive: 1,
+              updatedAt: t,
+            })
+            .run();
+          syncPeopleAchievements(row.id, row.managerId);
+        }
+        return true;
+      })
+      .immediate(null);
+
+    for (const row of planned) {
+      revalidatePeople(row.id);
+      revalidateManagerCard(row.managerId);
+    }
+    return { notice: lines.join("\n") };
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return importEmployeesAction(_prev, formData, true);
+    if (isUniqueConstraint(error)) return { error: "Такой логин уже есть" };
     return asActionError(error);
   }
 }
