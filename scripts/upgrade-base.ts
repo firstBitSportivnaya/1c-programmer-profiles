@@ -74,10 +74,10 @@ function main() {
     .transaction(() => {
       db.insert(employees)
         .values([
-          { id: "emp-admin", login: "admin", name: "Админ", passwordHash: password, jobId: "team-lead", managerId: null, isAdmin: 1, isActive: 1, updatedAt: t },
-          { id: "emp-manager", login: "manager", name: "Руководитель", passwordHash: password, jobId: "lead", managerId: null, isAdmin: 0, isActive: 1, updatedAt: t },
-          { id: "emp-junior", login: "junior", name: "Младший", passwordHash: password, jobId: "junior", managerId: "emp-manager", isAdmin: 0, isActive: 1, updatedAt: t },
-          { id: "emp-left", login: "left", name: "Уволен", passwordHash: password, jobId: "junior", managerId: "emp-manager", isAdmin: 0, isActive: 0, updatedAt: t },
+          { id: "emp-admin", login: "admin", name: "Админ", passwordHash: password, jobId: "team-lead", managerId: null, isAdmin: 1, isActive: 1, sessionVersion: 0, updatedAt: t },
+          { id: "emp-manager", login: "manager", name: "Руководитель", passwordHash: password, jobId: "lead", managerId: null, isAdmin: 0, isActive: 1, sessionVersion: 0, updatedAt: t },
+          { id: "emp-junior", login: "junior", name: "Младший", passwordHash: password, jobId: "junior", managerId: "emp-manager", isAdmin: 0, isActive: 1, sessionVersion: 0, updatedAt: t },
+          { id: "emp-left", login: "left", name: "Уволен", passwordHash: password, jobId: "junior", managerId: "emp-manager", isAdmin: 0, isActive: 0, sessionVersion: 0, updatedAt: t },
         ])
         .run();
 

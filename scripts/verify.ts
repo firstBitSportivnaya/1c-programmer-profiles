@@ -1,13 +1,13 @@
 /**
  * Один прогон проверок перед коммитом.
- * Порты 3000 и порты e2e-серверов (3100 и дальше, по числу воркеров) не освобождает: если любой занят,
+ * Порты 3000, 3099 и порты e2e-серверов (3100 и дальше, по числу воркеров) не освобождает: если любой занят,
  * выходит до первой команды.
  * Тесты идут `next start` по готовой сборке, поэтому сборка стоит перед ними и повторно не запускается.
  * Упавшая команда останавливает следующие, таблица для pull request печатается всё равно.
  */
 import { spawn } from "node:child_process";
 import net from "node:net";
-import { E2E_PORT, E2E_WORKERS } from "../e2e/env";
+import { E2E_LOCK_PORT, E2E_PORT, E2E_WORKERS } from "../e2e/env";
 
 type Row = { command: string; result: string };
 type Step = { command: string; args: string[]; env?: Record<string, string> };
@@ -138,7 +138,7 @@ function printTable(rows: Row[]) {
 async function main() {
   const rows: Row[] = STEPS.map((step) => ({ command: label(step), result: "не запускалась" }));
   const busy = [];
-  const ports = [3000, ...Array.from({ length: E2E_WORKERS + 1 }, (_, index) => E2E_PORT + index)];
+  const ports = [3000, E2E_LOCK_PORT, ...Array.from({ length: E2E_WORKERS + 1 }, (_, index) => E2E_PORT + index)];
   for (const port of ports) {
     if (await portBusy(port)) busy.push(port);
   }

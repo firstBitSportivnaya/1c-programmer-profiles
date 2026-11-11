@@ -1,5 +1,23 @@
 import { crc32, deflateRawSync, inflateRawSync } from "node:zlib";
 
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_INFLATE_BYTES = 50 * 1024 * 1024;
+const MAX_ROWS = 10_000;
+const MAX_COLS = 100;
+
+export function xlsxSizeError(size: number): string | null {
+  if (size > MAX_FILE_BYTES) return "Файл больше 5 МБ";
+  return null;
+}
+
+/** Текст ошибки разбора книги. Чужое сообщение наружу не отдаём. */
+export function xlsxImportError(error: unknown): string {
+  if (error instanceof Error && (error.message.startsWith("Файл") || error.message.startsWith("Лист"))) {
+    return error.message;
+  }
+  return "Это не файл Excel";
+}
+
 /** Первая страница книги .xlsx: строка — массив ячеек. Пустые ячейки — пустая строка. */
 export function readXlsxSheet(buffer: Buffer): string[][] {
   const files = unzip(buffer);
@@ -12,13 +30,17 @@ export function readXlsxSheet(buffer: Buffer): string[][] {
 
 /** Книга из одной страницы со строками текста. Для проверки загрузки, не для выдачи админу. */
 export function writeXlsxSheet(rows: string[][]): Buffer {
-  const sheet = sheetXml(rows);
+  return writeXlsxWithSheetXml(sheetXml(rows).toString("utf8"));
+}
+
+/** Книга с готовым XML листа. Нужна проверке пределов, не форме загрузки. */
+export function writeXlsxWithSheetXml(sheetXmlText: string): Buffer {
   return zip([
     { name: "[Content_Types].xml", data: contentTypesXml() },
     { name: "_rels/.rels", data: rootRelsXml() },
     { name: "xl/workbook.xml", data: workbookXml() },
     { name: "xl/_rels/workbook.xml.rels", data: workbookRelsXml() },
-    { name: "xl/worksheets/sheet1.xml", data: sheet },
+    { name: "xl/worksheets/sheet1.xml", data: Buffer.from(sheetXmlText, "utf8") },
   ]);
 }
 
@@ -27,12 +49,14 @@ function unzip(buffer: Buffer): Map<string, Buffer> {
   const count = buffer.readUInt16LE(eocd + 8);
   let ptr = buffer.readUInt32LE(eocd + 16);
   const files = new Map<string, Buffer>();
+  let inflated = 0;
   for (let index = 0; index < count; index += 1) {
     if (ptr + 46 > buffer.length || buffer.readUInt32LE(ptr) !== 0x02014b50) {
       throw new Error("Это не файл Excel");
     }
     const method = buffer.readUInt16LE(ptr + 10);
     const compressedSize = buffer.readUInt32LE(ptr + 20);
+    const uncompressedSize = buffer.readUInt32LE(ptr + 24);
     const nameLength = buffer.readUInt16LE(ptr + 28);
     const extraLength = buffer.readUInt16LE(ptr + 30);
     const commentLength = buffer.readUInt16LE(ptr + 32);
@@ -40,13 +64,31 @@ function unzip(buffer: Buffer): Map<string, Buffer> {
     const name = buffer.subarray(ptr + 46, ptr + 46 + nameLength).toString("utf8").replace(/\\/g, "/");
     ptr += 46 + nameLength + extraLength + commentLength;
     if (name.endsWith("/")) continue;
+    if (uncompressedSize === 0xffffffff || uncompressedSize > MAX_INFLATE_BYTES) {
+      throw new Error("Файл Excel слишком большой");
+    }
+    inflated += uncompressedSize;
+    if (inflated > MAX_INFLATE_BYTES) throw new Error("Файл Excel слишком большой");
     const localNameLength = buffer.readUInt16LE(localOffset + 26);
     const localExtraLength = buffer.readUInt16LE(localOffset + 28);
     const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
     const compressed = buffer.subarray(dataOffset, dataOffset + compressedSize);
-    if (method === 0) files.set(name, Buffer.from(compressed));
-    else if (method === 8) files.set(name, inflateRawSync(compressed));
-    else throw new Error("Это не файл Excel");
+    if (method === 0) {
+      if (compressed.length > MAX_INFLATE_BYTES) throw new Error("Файл Excel слишком большой");
+      files.set(name, Buffer.from(compressed));
+    } else if (method === 8) {
+      let output: Buffer;
+      try {
+        output = inflateRawSync(compressed, { maxOutputLength: MAX_INFLATE_BYTES });
+      } catch {
+        throw new Error("Файл Excel слишком большой");
+      }
+      if (output.length > uncompressedSize) {
+        inflated += output.length - uncompressedSize;
+        if (inflated > MAX_INFLATE_BYTES) throw new Error("Файл Excel слишком большой");
+      }
+      files.set(name, output);
+    } else throw new Error("Это не файл Excel");
   }
   return files;
 }
@@ -95,6 +137,9 @@ function readSheet(xml: string, shared: string[]): string[][] {
     const row = Number(/(\d+)$/.exec(ref)?.[1] ?? "0") - 1;
     const col = columnIndex(/^([A-Z]+)/i.exec(ref)?.[1] ?? "");
     if (row < 0 || col < 0) continue;
+    if (row >= MAX_ROWS || col >= MAX_COLS) {
+      throw new Error("Лист больше 10 000 строк или 100 колонок");
+    }
     const kind = /t="([^"]+)"/.exec(attrs)?.[1] ?? "";
     const value = cellText(kind, body, shared);
     const rowCells = cells.get(row) ?? new Map<number, string>();

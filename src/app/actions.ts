@@ -41,7 +41,7 @@ import {
 } from "@/lib/invariants";
 import { getCompetency, getJob } from "@/lib/queries";
 import { parseMaterialJson, parseMaterialSheet } from "@/lib/material-workbook";
-import { readXlsxSheet } from "@/lib/xlsx-sheet";
+import { readXlsxSheet, xlsxImportError, xlsxSizeError } from "@/lib/xlsx-sheet";
 import type { ActionResult } from "@/lib/action-result";
 
 function revalidateCompetencyAdmin(id?: string) {
@@ -352,10 +352,12 @@ async function readMaterialImport(
   const name = file.name.toLowerCase();
   if (name.endsWith(".json")) return parseMaterialJson(await file.text());
   if (!name.endsWith(".xlsx")) return { error: "Нужен файл Excel .xlsx или JSON" };
+  const sizeError = xlsxSizeError(file.size);
+  if (sizeError) return { error: sizeError };
   try {
     return parseMaterialSheet(readXlsxSheet(Buffer.from(await file.arrayBuffer())));
-  } catch {
-    return { error: "Это не файл Excel" };
+  } catch (error) {
+    return { error: xlsxImportError(error) };
   }
 }
 

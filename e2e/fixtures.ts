@@ -1,5 +1,5 @@
 /**
- * Расширение `test` для сценариев: вход админом один раз на воркер и адрес своего сервера.
+ * Расширение `test` для сценариев: вход админом перед тестом и адрес своего сервера.
  *
  * `asAdmin: true` в файле спецификации означает «тесты файла начинают от админа»: cookie сессии
  * добавляется в контекст до первого перехода. Гостевые проверки живут в отдельном `describe`
@@ -11,7 +11,10 @@ import { E2E_ADMIN, baseUrl, projectPort } from "./env";
 type Account = { login: string; password: string };
 type SessionCookie = { name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean };
 
-/** Сессия админа: один POST `/api/session`, cookie переиспользуется всеми тестами воркера. */
+/**
+ * Сессия админа на один тест. Выход поднимает версию сессии на сервере, и cookie,
+ * выданная на весь воркер, после чужого «Выйти» уже не пускает в кабинет.
+ */
 async function adminSession(request: APIRequest, url: string): Promise<SessionCookie[]> {
   const api = await request.newContext({ baseURL: url });
   try {
@@ -32,7 +35,7 @@ async function adminSession(request: APIRequest, url: string): Promise<SessionCo
 /** Cookie админа с сервера воркера: по ней видно, что сессия в контексте ещё действует. */
 let adminCookie: { name: string; value: string } | undefined;
 
-export const test = base.extend<{ asAdmin: boolean }, { adminCookies: SessionCookie[] }>({
+export const test = base.extend<{ asAdmin: boolean }>({
   /** От админа ли идут тесты файла. Гостевые проверки выключают это в своём `describe`. */
   asAdmin: [false, { option: true }],
 
@@ -41,18 +44,13 @@ export const test = base.extend<{ asAdmin: boolean }, { adminCookies: SessionCoo
     await use(baseUrl(projectPort(testInfo.project.metadata, testInfo.parallelIndex)));
   },
 
-  adminCookies: [
-    async ({ playwright }, use, workerInfo) => {
-      const url = baseUrl(projectPort(workerInfo.project.metadata, workerInfo.parallelIndex));
+  context: async ({ context, asAdmin, playwright }, use, testInfo) => {
+    if (asAdmin) {
+      const url = baseUrl(projectPort(testInfo.project.metadata, testInfo.parallelIndex));
       const cookies = await adminSession(playwright.request, url);
       adminCookie = cookies.find((cookie) => cookie.httpOnly) ?? cookies[0];
-      await use(cookies);
-    },
-    { scope: "worker" },
-  ],
-
-  context: async ({ context, asAdmin, adminCookies }, use) => {
-    if (asAdmin) await context.addCookies(adminCookies);
+      await context.addCookies(cookies);
+    }
     await use(context);
   },
 });

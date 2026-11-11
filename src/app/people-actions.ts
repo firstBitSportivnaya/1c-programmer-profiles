@@ -2,7 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb, getSqlite, now, retryIfClosed } from "@/db";
 import {
   employeeAchievements,
@@ -34,7 +34,7 @@ import {
   listSkillCompetencies,
   markableCompetencies,
 } from "@/lib/queries";
-import { readXlsxSheet } from "@/lib/xlsx-sheet";
+import { readXlsxSheet, xlsxImportError, xlsxSizeError } from "@/lib/xlsx-sheet";
 import type { ActionResult } from "@/lib/action-result";
 
 function isNextControlFlow(error: unknown) {
@@ -167,7 +167,14 @@ export async function saveEmployeeAction(
       if (password.length < 8) throw new InvariantError("Пароль не короче 8 символов");
       patch.passwordHash = hashPassword(password);
     }
-    db.update(employees).set(patch).where(eq(employees.id, idRaw)).run();
+    db.update(employees)
+      .set(
+        password
+          ? { ...patch, sessionVersion: sql`${employees.sessionVersion} + 1` }
+          : patch,
+      )
+      .where(eq(employees.id, idRaw))
+      .run();
     syncPeopleAchievements(idRaw, existing.managerId, managerId);
     revalidatePeople(idRaw);
     return null;
@@ -589,10 +596,12 @@ async function readEmployeeImport(
 ): Promise<{ error: string } | { errors: string[]; rows: EmployeeImportRow[] }> {
   if (!(file instanceof File) || file.size === 0) return { error: "Нужен файл Excel .xlsx" };
   if (!file.name.toLowerCase().endsWith(".xlsx")) return { error: "Нужен файл Excel .xlsx" };
+  const sizeError = xlsxSizeError(file.size);
+  if (sizeError) return { error: sizeError };
   try {
     return parseEmployeeSheet(readXlsxSheet(Buffer.from(await file.arrayBuffer())));
-  } catch {
-    return { error: "Это не файл Excel" };
+  } catch (error) {
+    return { error: xlsxImportError(error) };
   }
 }
 
