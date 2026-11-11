@@ -137,10 +137,11 @@ test("поиск сотрудника по имени и должности не
   await expect.poll(query).toBe("ЛИД");
   await expect(page.getByRole("link", { name: lead, exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: byJob, exact: true })).toHaveCount(0);
-  const upper = await page.locator("ul.panel").getByRole("link").allTextContents();
+  const links = page.locator("ul.panel").getByRole("link");
+  const upper = await links.allTextContents();
   await search.fill("лид");
   await expect.poll(query).toBe("лид");
-  expect(await page.locator("ul.panel").getByRole("link").allTextContents()).toEqual(upper);
+  await expect(links).toHaveText(upper);
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Поиск" })).toHaveValue("лид");
   await expect(page.getByRole("link", { name: lead, exact: true })).toBeVisible();

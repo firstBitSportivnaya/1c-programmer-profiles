@@ -95,9 +95,12 @@ test("поиск компетенции не зависит от регистр�
   await page.getByLabel("Поиск").fill(PROF.toLocaleUpperCase("ru"));
   await expect(page).toHaveURL(/[?&]q=/);
   await expect(group(page, "Компетенции").getByRole("link", { name: PROF, exact: true })).toBeVisible();
-  const upper = await page.locator("ul.panel").getByRole("link").allTextContents();
-  await page.getByLabel("Поиск").fill(PROF.toLocaleLowerCase("ru"));
-  expect(await page.locator("ul.panel").getByRole("link").allTextContents()).toEqual(upper);
+  const links = page.locator("ul.panel").getByRole("link");
+  const upper = await links.allTextContents();
+  const lower = PROF.toLocaleLowerCase("ru");
+  await page.getByLabel("Поиск").fill(lower);
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(lower);
+  await expect(links).toHaveText(upper);
 
   await page.getByLabel("Поиск").fill(`нет-компетенции-${STAMP}`);
   await expect(page.getByText("Ничего не найдено", { exact: true })).toBeVisible();
