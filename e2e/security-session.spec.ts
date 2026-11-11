@@ -281,3 +281,22 @@ test("чужой Origin не ставит cookie, вход с сайта раб�
   await page.goto("/me");
   await expect(page).toHaveURL(/\/me$/);
 });
+
+test("http-Origin при https-прокси не ставит cookie", async ({ baseURL }) => {
+  const host = new URL(site(baseURL)).host;
+  const downgrade = await postForm(
+    site(baseURL),
+    { origin: `http://${host}`, "x-forwarded-proto": "https" },
+    { intent: "login", login: "e2e.admin", password: "e2e-account-password" },
+  );
+  expect(downgrade.status).toBe(403);
+  expect(downgrade.setCookie).not.toContain("pp_session");
+
+  const match = await postForm(
+    site(baseURL),
+    { origin: `https://${host}`, "x-forwarded-proto": "https" },
+    { intent: "login", login: "e2e.admin", password: "e2e-account-password" },
+  );
+  expect(match.status).toBe(303);
+  expect(match.setCookie).toContain("pp_session");
+});

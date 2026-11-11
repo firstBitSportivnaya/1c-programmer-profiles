@@ -65,9 +65,50 @@ test("ячейка XFD1048576 не раздувает лист", async ({ page }
   expect(await names(page)).toBe(before);
 });
 
+/** Несколько записей STORED ссылаются на один кусок и заявляют нулевой размер распаковки. */
+function storedOverlapBomb() {
+  const payload = Buffer.alloc(4 * 1024 * 1024, 0x61);
+  const name = Buffer.from("xl/worksheets/sheet1.xml");
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt32LE(payload.length, 18);
+  local.writeUInt16LE(name.length, 26);
+  const localChunk = Buffer.concat([local, name, payload]);
+  const copies = 20;
+  const centrals: Buffer[] = [];
+  for (let index = 0; index < copies; index += 1) {
+    const entryName = Buffer.from(`xl/worksheets/sheet${index}.xml`);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt32LE(payload.length, 20);
+    central.writeUInt16LE(entryName.length, 28);
+    centrals.push(Buffer.concat([central, entryName]));
+  }
+  const directory = Buffer.concat(centrals);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(copies, 8);
+  eocd.writeUInt16LE(copies, 10);
+  eocd.writeUInt32LE(directory.length, 12);
+  eocd.writeUInt32LE(localChunk.length, 16);
+  return Buffer.concat([localChunk, directory, eocd]);
+}
+
 test("zip-бомба не кладёт процесс", async ({ page }) => {
   const before = await names(page);
   await upload(page, declareHugeInflate(writeXlsxSheet([["a"]])), "bomb.xlsx");
+  await expect(uploadForm(page).locator(".form-error")).toHaveText("Файл Excel слишком большой");
+  await page.goto("/assignments");
+  await expect(page.getByRole("heading", { level: 1, name: "Задания ИПР" })).toBeVisible();
+  expect(await names(page)).toBe(before);
+});
+
+test("повторы STORED не раздувают память", async ({ page }) => {
+  const before = await names(page);
+  await upload(page, storedOverlapBomb(), "stored.xlsx");
   await expect(uploadForm(page).locator(".form-error")).toHaveText("Файл Excel слишком большой");
   await page.goto("/assignments");
   await expect(page.getByRole("heading", { level: 1, name: "Задания ИПР" })).toBeVisible();

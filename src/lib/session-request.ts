@@ -9,25 +9,40 @@ export function requestIsHttps(headers: HeaderSource) {
   return first(headers, "x-forwarded-proto").toLowerCase() === "https";
 }
 
+/** `http://host` и `https://host` — разные источники, даже при одном имени. */
+function publicOrigin(scheme: "http" | "https", host: string) {
+  const url = new URL(`${scheme}://${host}`);
+  return url.origin.toLowerCase();
+}
+
 /**
  * Чужой Origin отклоняется. Своего нет — пускаем: браузер на POST Origin присылает.
- * За IIS публичный хост приходит в `x-forwarded-host` и совпадает с Origin формы.
+ * Схема берётся снаружи (`x-forwarded-proto`), хост — из `Host` или `x-forwarded-host`.
+ * За IIS публичный адрес приходит в `x-forwarded-host` и совпадает с Origin формы.
  */
 export function foreignSessionOrigin(headers: HeaderSource) {
   const origin = headers.get("origin");
   if (!origin) return false;
-  let originHost = "";
+  let presented = "";
   try {
-    originHost = new URL(origin).host.toLowerCase();
+    const url = new URL(origin);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return true;
+    presented = url.origin.toLowerCase();
   } catch {
     return true;
   }
+  const scheme = requestIsHttps(headers) ? "https" : "http";
   const allowed = new Set<string>();
-  const host = headers.get("host")?.trim().toLowerCase() ?? "";
-  if (host) allowed.add(host);
-  const forwarded = first(headers, "x-forwarded-host").toLowerCase();
-  if (forwarded) allowed.add(forwarded);
-  return !allowed.has(originHost);
+  for (const host of [headers.get("host") ?? "", first(headers, "x-forwarded-host")]) {
+    const trimmed = host.trim();
+    if (!trimmed) continue;
+    try {
+      allowed.add(publicOrigin(scheme, trimmed));
+    } catch {
+      // Кривой заголовок хоста не расширяет список.
+    }
+  }
+  return !allowed.has(presented);
 }
 
 /**

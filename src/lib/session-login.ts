@@ -20,9 +20,10 @@ function newId(prefix: string) {
 
 export function loginWithPassword(loginRaw: string, password: string): SessionAuthResult {
   const login = loginRaw.trim().toLowerCase();
+  // Уже закрытый логин не гоняет scrypt: иначе поток запросов держит процесс. До закрытия хэш всё равно считается, в том числе для несуществующего логина.
+  if (loginBlocked(login)) return { error: LOGIN_LOCKED_MESSAGE };
   const row = login ? getEmployeeByLogin(login) : undefined;
   const passwordOk = verifyPresentedPassword(password, row?.passwordHash ?? null);
-  if (loginBlocked(login)) return { error: LOGIN_LOCKED_MESSAGE };
   if (!row || row.isActive !== 1 || !passwordOk) {
     recordLoginFailure(login);
     if (loginBlocked(login)) return { error: LOGIN_LOCKED_MESSAGE };
@@ -42,9 +43,8 @@ export function bootstrapFirstAdmin(input: {
   if (hasCatalogAdmin()) {
     return { error: "Первый админ уже есть — войдите логином учётки" };
   }
-  const locked = loginBlocked(ENV_ADMIN_ATTEMPT_KEY);
+  if (loginBlocked(ENV_ADMIN_ATTEMPT_KEY)) return { error: LOGIN_LOCKED_MESSAGE };
   const envOk = verifyEnvAdminPassword(input.envPassword);
-  if (locked) return { error: LOGIN_LOCKED_MESSAGE };
   if (!envOk) {
     recordLoginFailure(ENV_ADMIN_ATTEMPT_KEY);
     if (loginBlocked(ENV_ADMIN_ATTEMPT_KEY)) return { error: LOGIN_LOCKED_MESSAGE };

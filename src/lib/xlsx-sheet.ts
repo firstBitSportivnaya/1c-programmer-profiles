@@ -67,16 +67,20 @@ function unzip(buffer: Buffer): Map<string, Buffer> {
     if (uncompressedSize === 0xffffffff || uncompressedSize > MAX_INFLATE_BYTES) {
       throw new Error("Файл Excel слишком большой");
     }
-    inflated += uncompressedSize;
-    if (inflated > MAX_INFLATE_BYTES) throw new Error("Файл Excel слишком большой");
+    if (localOffset + 30 > buffer.length) throw new Error("Это не файл Excel");
     const localNameLength = buffer.readUInt16LE(localOffset + 26);
     const localExtraLength = buffer.readUInt16LE(localOffset + 28);
     const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
-    const compressed = buffer.subarray(dataOffset, dataOffset + compressedSize);
+    if (dataOffset > buffer.length) throw new Error("Это не файл Excel");
+    const compressed = buffer.subarray(dataOffset, Math.min(buffer.length, dataOffset + compressedSize));
     if (method === 0) {
-      if (compressed.length > MAX_INFLATE_BYTES) throw new Error("Файл Excel слишком большой");
+      // Заявленный размер может быть нулевым, а копируется фактический кусок. Один и тот же localOffset в нескольких записях считается каждый раз.
+      inflated += Math.max(uncompressedSize, compressed.length);
+      if (inflated > MAX_INFLATE_BYTES) throw new Error("Файл Excel слишком большой");
       files.set(name, Buffer.from(compressed));
     } else if (method === 8) {
+      inflated += uncompressedSize;
+      if (inflated > MAX_INFLATE_BYTES) throw new Error("Файл Excel слишком большой");
       let output: Buffer;
       try {
         output = inflateRawSync(compressed, { maxOutputLength: MAX_INFLATE_BYTES });
