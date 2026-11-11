@@ -865,32 +865,8 @@ details[open] > .skill-summary::before {
   min-width: 9rem;
 }
 
-.date-calendar-open {
-  width: fit-content;
-}
-
-.date-calendar {
-  position: fixed;
-  z-index: 40;
-  width: 16.5rem;
-}
-
-.date-calendar-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem;
-}
-
-.date-calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.2rem;
-  margin-top: 0.5rem;
-}
-
-.date-calendar-grid .btn {
-  padding: 0.3rem 0;
+[data-theme="dark"] .date-field input[type="date"] {
+  color-scheme: dark;
 }
 
 .idp-table {
