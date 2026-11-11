@@ -1714,3 +1714,82 @@ details[open] > .skill-summary::before {
   line-height: 1;
   box-shadow: 0 0 10px color-mix(in srgb, var(--arrow-emphasis) 65%, transparent);
 }
+
+/* На экране штамп печати не занимает место: типографика и контраст его не считают. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  :root,
+  [data-theme="dark"],
+  [data-theme="light"] {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --panel-solid: #ffffff;
+    --panel-border: #e2e8f0;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --accent-text: #0a5f91;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+    color: #0f172a;
+  }
+
+  .toolbar,
+  .btn,
+  .btn-primary,
+  .btn-danger,
+  .btn-warn,
+  .btn-success,
+  form,
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  a {
+    color: #0a5f91;
+  }
+
+  .idp-table-scroll,
+  .overflow-x-auto {
+    overflow: visible;
+  }
+
+  .idp-table,
+  .compare-table {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .idp-table th,
+  .idp-table td,
+  .compare-table th,
+  .compare-table td {
+    width: auto;
+  }
+
+  .idp-table tr,
+  .compare-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Закрытые карточки профиля на бумаге раскрыты. В Edge содержимое details
+     прячется через ::details-content, поэтому одного display у детей мало. */
+  details::details-content {
+    content-visibility: visible;
+    height: auto;
+  }
+
+  details > *:not(summary):not(form) {
+    display: block !important;
+  }
+}

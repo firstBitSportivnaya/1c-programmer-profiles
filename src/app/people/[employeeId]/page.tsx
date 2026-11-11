@@ -3,6 +3,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { EmployeeAchievements } from "@/components/EmployeeAchievements";
 import { EmployeeCompetencyConfirmations } from "@/components/EmployeeCompetencyConfirmations";
 import { EmployeeIdpSummary } from "@/components/IdpBlock";
+import { PrintStamp } from "@/components/PrintStamp";
 import { assignJobAction, deactivateEmployeeAction, saveEmployeeAction } from "@/app/people-actions";
 import { getSessionEmployee } from "@/lib/auth";
 import { canManageEmployee, canViewEmployee } from "@/lib/invariants";
@@ -33,6 +34,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
         <span className="pulse-dot" />
         <h1 className="page-title">{row.name}</h1>
       </div>
+      <PrintStamp />
       <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3">
         <dt className="muted">Логин</dt>
         <dd>{row.login}</dd>

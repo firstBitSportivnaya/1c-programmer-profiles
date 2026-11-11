@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { IdpBlock } from "@/components/IdpBlock";
+import { PrintStamp } from "@/components/PrintStamp";
 import { getSessionEmployee, type SessionEmployee } from "@/lib/auth";
 import { formatPeriod } from "@/lib/dates";
 import { canViewEmployee } from "@/lib/invariants";
@@ -44,7 +45,7 @@ export default async function IdpPage({ params }: { params: Promise<{ idpId: str
   return (
     <article className="space-y-6">
       <p>
-        <a href="/idps" className="link-accent">
+        <a href="/idps" className="link-accent print-hide">
           ← Все ИПР
         </a>
       </p>
@@ -52,6 +53,7 @@ export default async function IdpPage({ params }: { params: Promise<{ idpId: str
         <span className="pulse-dot" />
         <h1 className="page-title">ИПР: {target?.name ?? idp.targetJobId}</h1>
       </div>
+      <PrintStamp />
       <dl className="panel panel-pad grid grid-cols-2 gap-x-6 gap-y-3">
         <dt className="muted">Сотрудник</dt>
         <dd>
