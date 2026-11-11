@@ -916,6 +916,10 @@ details[open] > .skill-summary::before {
   overflow-wrap: anywhere;
 }
 
+.idp-table tr:target {
+  background: color-mix(in srgb, var(--accent-text) 18%, var(--panel-solid));
+}
+
 .idp-confirm-line {
   display: flex;
   flex-wrap: wrap;

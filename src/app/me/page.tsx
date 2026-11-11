@@ -5,7 +5,8 @@ import { JobFacts, NextJobs } from "@/components/JobOverview";
 import { employeeAchievements } from "@/lib/achievements";
 import { getSessionEmployee } from "@/lib/auth";
 import { formatUnixDate } from "@/lib/dates";
-import { getActiveIdp, getEmployee, getJob, jobHref } from "@/lib/queries";
+import { getActiveIdp, getEmployee, getJob, jobHref, listDirectReports, listDueItems } from "@/lib/queries";
+import { DueList } from "@/components/DueList";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,13 @@ export default async function MePage() {
   const job = getJob(employee.jobId);
   const active = getActiveIdp(employee.id);
   const achievementsCount = employeeAchievements(employee.id).length;
+  const due = listDueItems(employee.id);
+  const ownDue = due.filter((row) => row.employeeId === employee.id);
+  const peopleDue = due.filter((row) => row.employeeId !== employee.id);
+  const showPeople =
+    employee.isAdmin === 1 ||
+    listDirectReports(employee.id).some((row) => row.isActive === 1 && row.id !== employee.id);
+  const overdueCount = due.filter((row) => row.overdue).length;
   return (
     <article className="space-y-6">
       <header className="cabinet-head">
@@ -70,7 +78,7 @@ export default async function MePage() {
             Достижения ({achievementsCount})
           </a>
           <a className="cabinet-action" href={active ? `/idps/${active.id}` : "/idps"}>
-            Мой ИПР
+            {overdueCount > 0 ? `Мой ИПР (${overdueCount})` : "Мой ИПР"}
           </a>
         </nav>
 
@@ -98,6 +106,19 @@ export default async function MePage() {
           <div className="cabinet-card">
             <EmployeeIdpSummary employeeId={employee.id} />
           </div>
+          <section className="cabinet-card" data-testid="due-summary">
+            <h2 className="section-title">Сроки</h2>
+            {showPeople ? (
+              <div className="space-y-2">
+                <h3 className="section-title">По людям</h3>
+                <DueList rows={peopleDue} empty="Нет сроков по людям." />
+              </div>
+            ) : null}
+            <div className="space-y-2">
+              <h3 className="section-title">Мои</h3>
+              <DueList rows={ownDue} empty="Своих сроков нет." />
+            </div>
+          </section>
         </div>
       </div>
     </article>

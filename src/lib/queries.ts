@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { applySchema } from "@/db/schema-ready";
 import {
@@ -25,6 +25,7 @@ import {
   type CompetencyMarkStatus,
 } from "@/db/schema";
 import { sectionForType } from "@/lib/invariants";
+import { isoToday, shiftIsoDate } from "@/lib/dates";
 
 /** Страховка для путей без Next: скрипт и тест сами не проходят через `instrumentation.ts`. */
 export function ensureSchema() {
@@ -211,6 +212,102 @@ export function getEmployeeByLogin(login: string) {
 export function listDirectReports(managerId: string) {
   ensureSchema();
   return getDb().select().from(employees).where(eq(employees.managerId, managerId)).orderBy(asc(employees.name)).all();
+}
+
+export type DueItem = {
+  itemId: number;
+  idpId: string;
+  employeeId: string;
+  employeeName: string;
+  competencyName: string;
+  assignmentName: string;
+  dueOn: string;
+  overdue: boolean;
+};
+
+/**
+ * Непринятые строки со сроком не позже чем через 14 дней: свои и прямых подчинённых.
+ * Просрочка — срок раньше сегодня. Админ чужие строки здесь не видит.
+ */
+export function listDueItems(actorId: string): DueItem[] {
+  ensureSchema();
+  const today = isoToday();
+  const until = shiftIsoDate(today, 14);
+  const db = getDb();
+  const people = db
+    .select({ id: employees.id })
+    .from(employees)
+    .where(and(eq(employees.isActive, 1), or(eq(employees.id, actorId), eq(employees.managerId, actorId))))
+    .all();
+  if (people.length === 0) return [];
+  const plans = db
+    .select({ id: idps.id, employeeId: idps.employeeId })
+    .from(idps)
+    .where(
+      and(
+        inArray(
+          idps.employeeId,
+          people.map((row) => row.id),
+        ),
+        eq(idps.status, "active"),
+      ),
+    )
+    .all();
+  if (plans.length === 0) return [];
+  const owner = new Map(plans.map((row) => [row.id, row.employeeId]));
+  const names = new Map(
+    db
+      .select({ id: employees.id, name: employees.name })
+      .from(employees)
+      .where(
+        inArray(
+          employees.id,
+          people.map((row) => row.id),
+        ),
+      )
+      .all()
+      .map((row) => [row.id, row.name]),
+  );
+  const items = db
+    .select({
+      itemId: idpItems.id,
+      idpId: idpItems.idpId,
+      competencyName: idpItems.competencyName,
+      assignmentName: idpItems.assignmentName,
+      dueOn: idpItems.dueOn,
+    })
+    .from(idpItems)
+    .where(
+      and(
+        inArray(
+          idpItems.idpId,
+          plans.map((row) => row.id),
+        ),
+        isNull(idpItems.acceptedAt),
+        isNotNull(idpItems.dueOn),
+        lte(idpItems.dueOn, until),
+      ),
+    )
+    .all();
+  return items
+    .flatMap((row) => {
+      if (!row.dueOn) return [];
+      const employeeId = owner.get(row.idpId);
+      if (!employeeId) return [];
+      return [
+        {
+          itemId: row.itemId,
+          idpId: row.idpId,
+          employeeId,
+          employeeName: names.get(employeeId) ?? employeeId,
+          competencyName: row.competencyName,
+          assignmentName: row.assignmentName,
+          dueOn: row.dueOn,
+          overdue: row.dueOn < today,
+        },
+      ];
+    })
+    .sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.assignmentName.localeCompare(b.assignmentName, "ru"));
 }
 
 export function listEmployeesVisibleTo(actor: { id: string; isAdmin: boolean }) {
