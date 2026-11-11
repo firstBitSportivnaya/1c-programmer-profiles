@@ -124,6 +124,13 @@ async function main() {
     sqlite.exec("ANALYZE");
     assertSearch(plan(sqlite, "SELECT id FROM idp_items WHERE idp_id = 'p1'"), "idp_items_idp");
     assertSearch(
+      plan(
+        sqlite,
+        "SELECT id FROM idp_items WHERE idp_id = 'p1' AND accepted_at IS NULL AND due_on IS NOT NULL AND due_on <= '2026-12-01'",
+      ),
+      "idp_items_idp",
+    );
+    assertSearch(
       plan(sqlite, "SELECT id FROM idp_assignments WHERE competency_id = 'c1' AND archived = 0"),
       "idp_assignments_competency",
     );

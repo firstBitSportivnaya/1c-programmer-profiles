@@ -26,3 +26,19 @@ export function formatIsoDate(iso: string | null | undefined): string {
 export function formatPeriod(start: string, end: string): string {
   return `${formatIsoDate(start)} — ${formatIsoDate(end)}`;
 }
+
+/** Сегодняшний календарный день сервера: `ГГГГ-ММ-ДД`. Сравнение сроков с ним не переводит дату в момент. */
+export function isoToday(now = new Date()): string {
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** Сдвиг календарного дня `ГГГГ-ММ-ДД` на число суток. Неразборчивая строка возвращается как есть. */
+export function shiftIsoDate(iso: string, days: number): string {
+  const match = ISO_DATE.exec(iso);
+  if (!match) return iso;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  date.setDate(date.getDate() + days);
+  return isoToday(date);
+}

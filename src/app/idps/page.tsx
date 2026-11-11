@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
 import { DateField } from "@/components/DateField";
+import { DueList } from "@/components/DueList";
 import { createIdpAction } from "@/app/idp-actions";
 import { formatPeriod } from "@/lib/dates";
 import { getSessionEmployee } from "@/lib/auth";
@@ -13,6 +14,7 @@ import {
   listIdpAcceptance,
   listIdpsVisibleTo,
   listJobs,
+  listDueItems,
 } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -33,12 +35,13 @@ function statusChipClass(status: string) {
 export default async function IdpsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ employee?: string | string[] }>;
+  searchParams: Promise<{ employee?: string | string[]; overdue?: string | string[] }>;
 }) {
   const actor = await getSessionEmployee();
   if (!actor) redirect("/login");
-  const { employee = "" } = await searchParams;
+  const { employee = "", overdue: overdueRaw = "" } = await searchParams;
   const requested = (Array.isArray(employee) ? employee[0] : employee).trim();
+  const overdue = (Array.isArray(overdueRaw) ? overdueRaw[0] : overdueRaw) === "1";
   const plans = listIdpsVisibleTo(actor);
   const people = listEmployeesVisibleTo(actor);
   const targets = jobsWithProfiles().map((job) => ({ id: job.id, name: job.name }));
@@ -97,7 +100,18 @@ export default async function IdpsPage({
           </button>
         </ActionForm>
       ) : null}
-      {plans.length > 0 ? (
+      {overdue ? (
+        <section className="space-y-3" data-testid="due-summary">
+          <h2 className="section-title">Сроки</h2>
+          <p>
+            <a className="link-accent" href="/idps">
+              Все планы
+            </a>
+          </p>
+          <DueList rows={listDueItems(actor.id)} empty="Нет сроков: просроченных и ближайших строк нет." />
+        </section>
+      ) : null}
+      {plans.length > 0 && !overdue ? (
         <form action="/idps" className="flex flex-wrap items-end gap-3">
           <label className="lbl">
             Сотрудник
@@ -115,6 +129,7 @@ export default async function IdpsPage({
           </button>
         </form>
       ) : null}
+      {overdue ? null : (
       <ul className="panel">
         {shown.map((idp) => {
           const owner = employeesById.get(idp.employeeId);
@@ -143,6 +158,7 @@ export default async function IdpsPage({
           <li className="list-row muted">{plans.length === 0 ? "ИПР ещё нет" : "Ничего не найдено."}</li>
         ) : null}
       </ul>
+      )}
     </div>
   );
 }
