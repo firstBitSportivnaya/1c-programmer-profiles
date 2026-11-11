@@ -90,6 +90,24 @@ test("пустая группа оставляет заголовок и под�
   await expect(group(page, "Личные").getByText("Нет записей")).toHaveCount(0);
 });
 
+test("поиск компетенции не зависит от регистра и пустой результат не оставляет список", async ({ page }) => {
+  await page.goto("/admin/competencies");
+  await page.getByLabel("Поиск").fill(PROF.toLocaleUpperCase("ru"));
+  await expect(page).toHaveURL(/[?&]q=/);
+  await expect(group(page, "Компетенции").getByRole("link", { name: PROF, exact: true })).toBeVisible();
+  const links = page.locator("ul.panel").getByRole("link");
+  const upper = await links.allTextContents();
+  const lower = PROF.toLocaleLowerCase("ru");
+  await page.getByLabel("Поиск").fill(lower);
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(lower);
+  await expect(links).toHaveText(upper);
+
+  await page.getByLabel("Поиск").fill(`нет-компетенции-${STAMP}`);
+  await expect(page.getByText("Ничего не найдено", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region")).toHaveCount(0);
+  await expect(page.locator("ul.panel")).toHaveCount(0);
+});
+
 test("не админ списков не видит и уходит со страницы", async ({ page }) => {
   await page.goto("/people");
   const person = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
