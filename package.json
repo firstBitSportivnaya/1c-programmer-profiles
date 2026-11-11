@@ -22,7 +22,8 @@
     "test:e2e": "tsx e2e/ensure-build.ts && playwright test",
     "db:spike": "tsx scripts/sqlite-spike.ts",
     "assignments:xlsx": "tsx scripts/write-assignment-workbook.ts",
-    "materials:xlsx": "tsx scripts/write-material-workbook.ts"
+    "materials:xlsx": "tsx scripts/write-material-workbook.ts",
+    "employees:xlsx": "tsx scripts/write-employee-workbook.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.6",

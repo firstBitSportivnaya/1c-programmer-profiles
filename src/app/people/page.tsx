@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
+import { EmployeeImportForm } from "@/components/EmployeeImportForm";
 import { ListFilter } from "@/components/ListFilter";
 import { saveEmployeeAction } from "@/app/people-actions";
 import { getSessionEmployee } from "@/lib/auth";
@@ -67,6 +68,7 @@ export default async function PeoplePage({
         </ul>
       )}
       {actor.isAdmin ? (
+        <>
         <ActionForm action={saveEmployeeAction} className="panel panel-pad grid gap-3 md:grid-cols-2">
           <h2 className="section-title md:col-span-2 mb-0">Новый сотрудник</h2>
           <label className="lbl">
@@ -113,6 +115,8 @@ export default async function PeoplePage({
             Создать
           </button>
         </ActionForm>
+        <EmployeeImportForm />
+        </>
       ) : null}
     </div>
   );
