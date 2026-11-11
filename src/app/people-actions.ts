@@ -531,3 +531,50 @@ export async function deactivateEmployeeAction(
   }
 }
 
+/**
+ * Возврат деактивированного (issue 144). Пароль не меняется. Руководителя выбирают заново
+ * или оставляют пустым: прежняя оргсвязь и отвязанные подчинённые сами не восстанавливаются,
+ * отменённый ИПР остаётся отменённым.
+ */
+export async function reactivateEmployeeAction(
+  _prev: ActionResult,
+  formData: FormData,
+  retried = false,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const employeeId = String(formData.get("employeeId") ?? "");
+    const managerId = String(formData.get("managerId") ?? "").trim() || null;
+    const existing = getEmployee(employeeId);
+    if (!existing) throw new InvariantError("Сотрудник не найден");
+    if (existing.isActive === 1) throw new InvariantError("Сотрудник уже активен");
+    if (managerId) {
+      const manager = getEmployee(managerId);
+      if (!manager || manager.isActive !== 1) throw new InvariantError("Руководитель не активен");
+    }
+    assertManagerLink(employeeId, managerId);
+    const previousManagerId = existing.managerId;
+    const t = now();
+    // Запись и сверка вместе: сбой сверки не должен оставить сотрудника активным,
+    // иначе повтор упрётся в «уже активен» и достижения прежнего руководителя не пересчитаются.
+    getSqlite()
+      .transaction(() => {
+        getDb()
+          .update(employees)
+          .set({ isActive: 1, managerId, updatedAt: t })
+          .where(eq(employees.id, employeeId))
+          .run();
+        syncPeopleAchievements(employeeId, previousManagerId, managerId);
+        return true;
+      })
+      .immediate(null);
+    revalidatePeople(employeeId);
+    revalidateManagerCard(previousManagerId);
+    revalidateManagerCard(managerId);
+    return null;
+  } catch (error) {
+    if (retryIfClosed(error, retried)) return reactivateEmployeeAction(_prev, formData, true);
+    return asActionError(error);
+  }
+}
+
