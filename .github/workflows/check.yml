@@ -40,11 +40,21 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # Playwright 1.63 обрывает загрузку Chromium, если IPv6 на раннере молчит. ipv4first не даёт ждать этот адрес.
+      - name: Системные пакеты для браузера
+        timeout-minutes: 8
+        run: npx playwright install-deps chromium
+      # Загрузка Chromium на раннере иногда висит без вывода: каждая попытка ограничена, третья — последняя.
       - name: Браузер для сценариев
+        timeout-minutes: 12
         env:
           NODE_OPTIONS: --dns-result-order=ipv4first
-        run: npx playwright install --with-deps chromium
+        run: |
+          for attempt in 1 2 3; do
+            timeout 180 npx playwright install chromium && exit 0
+            echo "Загрузка Chromium не удалась, попытка $attempt"
+            sleep 10
+          done
+          exit 1
       - name: Сценарии в браузере
         run: npm run test:e2e
       - if: failure()
