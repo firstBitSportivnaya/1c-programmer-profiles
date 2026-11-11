@@ -8,6 +8,7 @@ const boss = { login: "e2e.due.boss", name: "Руководитель сроко
 const report = { login: "e2e.due.report", name: "Подчинённый сроков E2E", password: "e2e-due-report-password" };
 const other = { login: "e2e.due.other", name: "Чужой руководитель E2E", password: "e2e-due-other-password" };
 const stranger = { login: "e2e.due.stranger", name: "Чужой сотрудник E2E", password: "e2e-due-stranger-password" };
+const lone = { login: "e2e.due.lone", name: "Админ без людей E2E", password: "e2e-due-lone-password" };
 
 function isoShift(days: number) {
   const date = new Date();
@@ -22,14 +23,16 @@ async function addPerson(
   page: Page,
   account: { login: string; name: string; password: string },
   managerName?: string,
+  admin = false,
 ) {
   await page.goto("/people");
   const form = page.locator("form", { has: page.getByRole("heading", { name: "Новый сотрудник" }) });
   await form.getByLabel("Логин").fill(account.login);
   await form.getByLabel("Имя").fill(account.name);
-  await form.getByLabel("Пароль").fill(account.password);
+  await form.getByLabel("Пароль", { exact: true }).fill(account.password);
   await form.getByLabel(/^Должность/).selectOption("junior");
   await form.getByLabel(/^Руководитель/).selectOption(managerName ? { label: managerName } : "");
+  if (admin) await form.getByLabel(/^Админ/).selectOption("1");
   await form.getByRole("button", { name: "Создать" }).click();
   await expect(page.getByRole("link", { name: account.name, exact: true })).toBeVisible();
 }
@@ -61,6 +64,7 @@ test("критерии 1 и 3: просроченная строка в каби
   await addPerson(page, report, boss.name);
   await addPerson(page, other);
   await addPerson(page, stranger, other.name);
+  await addPerson(page, lone, undefined, true);
   await planFor(page, report.name);
   await addItem(page, "Срок вчера", isoShift(-1));
   await addItem(page, "Срок сегодня", isoShift(0));
@@ -138,7 +142,7 @@ test("критерий 4: чужой руководитель и админ бе
   await page.goto("/idps?overdue=1");
   await expect(page.getByTestId("due-summary").getByRole("link", { name: "Срок вчера" })).toHaveCount(0);
 
-  await login(page);
+  await login(page, lone);
   const me = await page.goto("/me");
   expect(me?.status()).toBe(200);
   const summary = page.getByTestId("due-summary");

@@ -46,7 +46,7 @@ import {
 } from "@/lib/queries";
 import type { ActionResult } from "@/lib/action-result";
 import { parseAssignmentJson, parseAssignmentSheet, type ParsedAssignment } from "@/lib/assignment-workbook";
-import { readXlsxSheet } from "@/lib/xlsx-sheet";
+import { readXlsxSheet, xlsxImportError, xlsxSizeError } from "@/lib/xlsx-sheet";
 
 function isNextControlFlow(error: unknown) {
   return (
@@ -662,10 +662,12 @@ async function readAssignmentImport(
   const name = file.name.toLowerCase();
   if (name.endsWith(".json")) return parseAssignmentJson(await file.text());
   if (!name.endsWith(".xlsx")) return { error: "Нужен файл Excel .xlsx или JSON" };
+  const sizeError = xlsxSizeError(file.size);
+  if (sizeError) return { error: sizeError };
   try {
     return parseAssignmentSheet(readXlsxSheet(Buffer.from(await file.arrayBuffer())));
-  } catch {
-    return { error: "Это не файл Excel" };
+  } catch (error) {
+    return { error: xlsxImportError(error) };
   }
 }
 

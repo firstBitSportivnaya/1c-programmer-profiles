@@ -85,6 +85,8 @@ export const employees = sqliteTable("employees", {
   managerId: text("manager_id").references((): AnySQLiteColumn => employees.id),
   isAdmin: integer("is_admin").notNull(),
   isActive: integer("is_active").notNull(),
+  /** Растёт на выходе и при смене пароля: старые подписи cookie больше не подходят. */
+  sessionVersion: integer("session_version").notNull().default(0),
   updatedAt: integer("updated_at").notNull(),
 }, (t) => [index("employees_manager").on(t.managerId)]);
 

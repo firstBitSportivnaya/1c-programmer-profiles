@@ -6,6 +6,8 @@
  * Отдельный сервер (`E2E_PORT`) держит базу без админа — на ней `session.spec.ts` проверяет создание первого.
  */
 export const E2E_PORT = 3100;
+/** Сервер проверки перебора пароля первого админа: своя база и своя память счётчика. */
+export const E2E_LOCK_PORT = 3099;
 export const E2E_ADMIN_PASSWORD = "e2e-admin-password";
 export const E2E_SESSION_SECRET = "e2e-session-secret-0123456789abcdef";
 /** Админ базы воркера: его заводит `e2e/seed-admin.ts` до старта сервера. */
@@ -21,6 +23,8 @@ export const E2E_WORKERS = workers;
 
 /** База сервера `session.spec.ts`: админа здесь нет, его создаёт сам тест. */
 export const E2E_BOOTSTRAP_DB_PATH = "tmp/e2e-bootstrap.sqlite";
+/** База `session-lock.spec.ts`: админа нет, удачный пароль после перебора его не создаёт. */
+export const E2E_LOCK_DB_PATH = "tmp/e2e-lock.sqlite";
 
 /** Порт сервера воркера основного проекта: 3101, 3102, … */
 export function workerPort(index: number) {

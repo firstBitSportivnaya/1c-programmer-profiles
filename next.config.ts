@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Иначе тело больше 1 МБ обрывается до проверки «файл больше 5 МБ» и форма не получает ошибку.
+    serverActions: { bodySizeLimit: 6 * 1024 * 1024 },
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) return config;
     const builtins = (

@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS employees (
   manager_id TEXT REFERENCES employees(id),
   is_admin INTEGER NOT NULL,
   is_active INTEGER NOT NULL,
+  session_version INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS idps (
@@ -630,6 +631,7 @@ function backfillLegacyAchievements() {
 
 export function migrate() {
   getSqlite().exec(DDL);
+  addColumnIfMissing("employees", "session_version", "session_version INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("employee_competency_marks", "note", "note TEXT NOT NULL DEFAULT ''");
   ensureCompetenciesParentFk();
   ensureParentNameIndex();

@@ -2,7 +2,14 @@ import { randomBytes } from "node:crypto";
 import { getDb, now } from "@/db";
 import { employees } from "@/db/schema";
 import { hasCatalogAdmin, verifyEnvAdminPassword } from "@/lib/auth";
-import { hashPassword, verifyPasswordHash } from "@/lib/password";
+import {
+  ENV_ADMIN_ATTEMPT_KEY,
+  LOGIN_LOCKED_MESSAGE,
+  clearLoginAttempts,
+  loginBlocked,
+  recordLoginFailure,
+} from "@/lib/login-attempts";
+import { hashPassword, verifyPresentedPassword } from "@/lib/password";
 import { getEmployeeByLogin, getJob } from "@/lib/queries";
 
 export type SessionAuthResult = { employeeId: string } | { error: string };
@@ -13,10 +20,16 @@ function newId(prefix: string) {
 
 export function loginWithPassword(loginRaw: string, password: string): SessionAuthResult {
   const login = loginRaw.trim().toLowerCase();
-  const row = getEmployeeByLogin(login);
-  if (!row || row.isActive !== 1 || !verifyPasswordHash(password, row.passwordHash)) {
+  // Уже закрытый логин не гоняет scrypt: иначе поток запросов держит процесс. До закрытия хэш всё равно считается, в том числе для несуществующего логина.
+  if (loginBlocked(login)) return { error: LOGIN_LOCKED_MESSAGE };
+  const row = login ? getEmployeeByLogin(login) : undefined;
+  const passwordOk = verifyPresentedPassword(password, row?.passwordHash ?? null);
+  if (!row || row.isActive !== 1 || !passwordOk) {
+    recordLoginFailure(login);
+    if (loginBlocked(login)) return { error: LOGIN_LOCKED_MESSAGE };
     return { error: "Неверный логин или пароль" };
   }
+  clearLoginAttempts(login);
   return { employeeId: row.id };
 }
 
@@ -30,9 +43,14 @@ export function bootstrapFirstAdmin(input: {
   if (hasCatalogAdmin()) {
     return { error: "Первый админ уже есть — войдите логином учётки" };
   }
-  if (!verifyEnvAdminPassword(input.envPassword)) {
+  if (loginBlocked(ENV_ADMIN_ATTEMPT_KEY)) return { error: LOGIN_LOCKED_MESSAGE };
+  const envOk = verifyEnvAdminPassword(input.envPassword);
+  if (!envOk) {
+    recordLoginFailure(ENV_ADMIN_ATTEMPT_KEY);
+    if (loginBlocked(ENV_ADMIN_ATTEMPT_KEY)) return { error: LOGIN_LOCKED_MESSAGE };
     return { error: "Неверный пароль из окружения" };
   }
+  clearLoginAttempts(ENV_ADMIN_ATTEMPT_KEY);
   const login = input.login.trim().toLowerCase();
   if (!/^[a-z0-9._-]{2,40}$/.test(login)) {
     return { error: "Логин: 2–40 символов, латиница, цифры, точка, дефис" };

@@ -105,8 +105,9 @@ function parseSpecs(argv: string[]): string[] {
       process.exit(1);
     }
   }
-  if (argv.some((spec) => spec.endsWith("session.spec.ts"))) {
-    console.error("session.spec.ts идёт на отдельном сервере без админа: проверяйте его одним npm run verify.");
+  const solo = new Set(["session.spec.ts", "session-lock.spec.ts"]);
+  if (argv.some((spec) => solo.has(spec.slice(spec.lastIndexOf("/") + 1)))) {
+    console.error("session.spec.ts и session-lock.spec.ts идут на отдельных серверах без админа: проверяйте их одним npm run verify.");
     process.exit(1);
   }
   return argv;
