@@ -90,7 +90,16 @@ test("в светлой теме значок даты тёмный, срок с
   const row = page.getByRole("row", { name: new RegExp(WITH_DUE) });
   await row.getByText("Править", { exact: true }).click();
   const editing = page.getByRole("row").filter({ has: page.getByRole("button", { name: "Сохранить", exact: true }) });
-  await dateInput(editing, "dueOn").fill(EDITED);
+  const dueEdit = dateInput(editing, "dueOn");
+  const insideCell = await dueEdit.evaluate((element) => {
+    const cell = element.closest("td");
+    if (!cell) return false;
+    const input = element.getBoundingClientRect();
+    const box = cell.getBoundingClientRect();
+    return input.left >= box.left - 1 && input.right <= box.right + 1 && input.width >= 140;
+  });
+  expect(insideCell).toBe(true);
+  await dueEdit.fill(EDITED);
   await editing.getByRole("button", { name: "Сохранить", exact: true }).click();
   await expect(page.getByRole("row", { name: new RegExp(WITH_DUE) }).getByText(EDITED_LABEL, { exact: true })).toBeVisible();
   await page.reload();

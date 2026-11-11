@@ -871,14 +871,15 @@ details[open] > .skill-summary::before {
 
 .idp-table {
   width: 100%;
-  min-width: 60rem;
+  min-width: 66rem;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--fs-md);
   background: var(--panel-solid);
 }
 
-.idp-table th:nth-child(5) { width: 6.5rem; }
+/* «Срок» вмещает поле даты со значком календаря. В 6.5rem значок уходил под колонку «Статус». */
+.idp-table th:nth-child(5) { width: 12.5rem; }
 .idp-table th:nth-child(6) { width: 7.5rem; }
 .idp-table th:nth-child(7) { width: 20rem; }
 .idp-table th:nth-child(8) { width: 7rem; }
@@ -1747,12 +1748,15 @@ details[open] > .skill-summary::before {
   .compare-table {
     width: 100%;
     min-width: 0;
+    table-layout: auto;
   }
 
   .idp-table th,
   .idp-table td,
   .compare-table th,
-  .compare-table td {
+  .compare-table td,
+  .idp-table th:nth-child(n),
+  .idp-table td:nth-child(n) {
     width: auto;
   }
 
