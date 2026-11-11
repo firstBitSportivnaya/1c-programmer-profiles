@@ -4,7 +4,12 @@ import { EmployeeAchievements } from "@/components/EmployeeAchievements";
 import { EmployeeCompetencyConfirmations } from "@/components/EmployeeCompetencyConfirmations";
 import { EmployeeIdpSummary } from "@/components/IdpBlock";
 import { PrintStamp } from "@/components/PrintStamp";
-import { assignJobAction, deactivateEmployeeAction, saveEmployeeAction } from "@/app/people-actions";
+import {
+  assignJobAction,
+  deactivateEmployeeAction,
+  reactivateEmployeeAction,
+  saveEmployeeAction,
+} from "@/app/people-actions";
 import { getSessionEmployee } from "@/lib/auth";
 import { canManageEmployee, canViewEmployee } from "@/lib/invariants";
 import { getEmployee, getJob, jobHref, listEmployees, listJobs } from "@/lib/queries";
@@ -24,6 +29,7 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
   if (!row) notFound();
   if (!canViewEmployee(actor, employeeId)) notFound();
   const job = getJob(row.jobId);
+  const manager = row.managerId ? getEmployee(row.managerId) : undefined;
   const jobs = listJobs();
   const people = listEmployees().filter((e) => e.isActive === 1 && e.id !== row.id);
   const manage = canManageEmployee(actor, row.id);
@@ -48,6 +54,8 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
             row.jobId
           )}
         </dd>
+        <dt className="muted">Руководитель</dt>
+        <dd>{manager?.name ?? "нет"}</dd>
         <dt className="muted">Активен</dt>
         <dd>{row.isActive === 1 ? "да" : "нет"}</dd>
       </dl>
@@ -127,7 +135,25 @@ export default async function PersonPage({ params }: { params: Promise<{ employe
                 Деактивировать
               </button>
             </ActionForm>
-          ) : null}
+          ) : (
+            <ActionForm action={reactivateEmployeeAction} className="flex flex-wrap items-end gap-3">
+              <input type="hidden" name="employeeId" value={row.id} />
+              <label className="lbl">
+                Руководитель
+                <select className="field" name="managerId" defaultValue="">
+                  <option value="">нет</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="btn-primary" type="submit">
+                Вернуть в активные
+              </button>
+            </ActionForm>
+          )}
         </section>
       ) : null}
 
