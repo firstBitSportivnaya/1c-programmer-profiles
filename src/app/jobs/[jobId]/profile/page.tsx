@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { ActionForm } from "@/components/ActionForm";
 import { ExpandAll } from "@/components/ExpandAll";
+import { PrintStamp } from "@/components/PrintStamp";
 import { JobAdminPanel, JobFacts, NextJobs } from "@/components/JobOverview";
 import { deleteSkillAction, upsertSkillAction } from "@/app/actions";
 import { CompetencyLinks } from "@/components/CompetencyLinks";
@@ -52,6 +53,7 @@ function SkillCard({
   links: Map<string, CompetencyLink[]>;
 }) {
   return (
+    <>
     <details className="skill-card">
       <summary className="skill-summary">
         <span className="skill-summary-body">
@@ -85,7 +87,7 @@ function SkillCard({
           </button>
         </ActionForm>
       ) : row.skill.criteria ? (
-        <p className="skill-criteria">{row.skill.criteria}</p>
+        <p className="skill-criteria print-hide">{row.skill.criteria}</p>
       ) : null}
       <CompetencyLinks links={links.get(row.competency.id) ?? []} />
       {admin ? (
@@ -98,6 +100,8 @@ function SkillCard({
         </ActionForm>
       ) : null}
     </details>
+    {row.skill.criteria ? <p className="skill-criteria print-only">{row.skill.criteria}</p> : null}
+    </>
   );
 }
 
@@ -202,6 +206,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ jobId:
         <span className="pulse-dot" />
         <h1 className="page-title">{job.name}</h1>
       </div>
+      <PrintStamp />
       <JobFacts job={job} />
       <NextJobs jobId={jobId} admin={admin} />
       <ExpandAll className="grid gap-4 md:grid-cols-3">
