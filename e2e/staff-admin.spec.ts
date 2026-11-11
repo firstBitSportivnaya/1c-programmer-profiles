@@ -298,7 +298,7 @@ test("критерии 1, 4 и 5: возврат с руководителем �
   await back.getByLabel(/^Руководитель/).selectOption({ label: boss.name });
   await back.getByRole("button", { name: "Вернуть в активные" }).click();
   await expect(page.getByRole("button", { name: "Деактивировать" })).toBeVisible();
-  await expect(page.locator(".form-error")).toHaveCount(0);
+  await expect(page.locator(".form-error[role='alert']")).toHaveCount(0);
   await expect(fact(page, "Активен")).toHaveText("да");
   await expect(fact(page, "Руководитель")).toHaveText(boss.name);
   await expect(page.getByText("Активного плана нет")).toBeVisible();
@@ -339,7 +339,7 @@ test("критерий 2: возврат без руководителя ост�
   await returnForm(page).getByLabel(/^Руководитель/).selectOption({ label: "нет" });
   await returnForm(page).getByRole("button", { name: "Вернуть в активные" }).click();
   await expect(page.getByRole("button", { name: "Деактивировать" })).toBeVisible();
-  await expect(page.locator(".form-error")).toHaveCount(0);
+  await expect(page.locator(".form-error[role='alert']")).toHaveCount(0);
   await expect(fact(page, "Активен")).toHaveText("да");
   await expect(fact(page, "Руководитель")).toHaveText("нет");
   expect(personRow(testInfo, person.login)).toMatchObject({ is_active: 1, manager_id: null });

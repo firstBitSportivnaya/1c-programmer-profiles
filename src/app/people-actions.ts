@@ -553,14 +553,23 @@ export async function reactivateEmployeeAction(
       if (!manager || manager.isActive !== 1) throw new InvariantError("Руководитель не активен");
     }
     assertManagerLink(employeeId, managerId);
+    const previousManagerId = existing.managerId;
     const t = now();
-    getDb()
-      .update(employees)
-      .set({ isActive: 1, managerId, updatedAt: t })
-      .where(eq(employees.id, employeeId))
-      .run();
-    syncPeopleAchievements(employeeId, managerId);
+    // Запись и сверка вместе: сбой сверки не должен оставить сотрудника активным,
+    // иначе повтор упрётся в «уже активен» и достижения прежнего руководителя не пересчитаются.
+    getSqlite()
+      .transaction(() => {
+        getDb()
+          .update(employees)
+          .set({ isActive: 1, managerId, updatedAt: t })
+          .where(eq(employees.id, employeeId))
+          .run();
+        syncPeopleAchievements(employeeId, previousManagerId, managerId);
+        return true;
+      })
+      .immediate(null);
     revalidatePeople(employeeId);
+    revalidateManagerCard(previousManagerId);
     revalidateManagerCard(managerId);
     return null;
   } catch (error) {
