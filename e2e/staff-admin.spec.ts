@@ -102,3 +102,65 @@ test("сотрудник без признака админа не видит п
   await expect(page.getByLabel(/^Админ/)).toHaveCount(0);
   await expect(page.getByText("Админ", { exact: true })).toHaveCount(0);
 });
+
+test("поиск сотрудника по имени и должности не зависит от регистра и не выходит за подчинённых", async ({ page }) => {
+  const stamp = Date.now();
+  const manager = { login: `e2e.lead.${stamp}`, name: `Руководитель поиска ${stamp}`, password: "e2e-lead-password" };
+  const lead = `Лид поиска ${stamp}`;
+  const byJob = `Иван списка ${stamp}`;
+  const outsider = `Чужой списка ${stamp}`;
+  const report = `Подчинённый поиска ${stamp}`;
+
+  await login(page);
+  await page.goto("/people");
+  const create = page.locator("form").filter({ has: page.getByRole("heading", { name: "Новый сотрудник" }) });
+
+  async function addPerson(loginName: string, name: string, password: string, jobId: string, managerName?: string) {
+    await create.getByLabel("Логин").fill(loginName);
+    await create.getByLabel("Имя").fill(name);
+    await create.getByLabel("Пароль").fill(password);
+    await create.getByLabel(/^Должность/).selectOption(jobId);
+    await create.getByLabel(/^Руководитель/).selectOption(managerName ? { label: managerName } : "");
+    await create.getByRole("button", { name: "Создать" }).click();
+    await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  }
+
+  await addPerson(manager.login, manager.name, manager.password, "junior");
+  await addPerson(`e2e.report.${stamp}`, report, "e2e-report-password", "junior", manager.name);
+  await addPerson(`e2e.leadname.${stamp}`, lead, "e2e-leadname-password", "junior");
+  await addPerson(`e2e.byjob.${stamp}`, byJob, "e2e-byjob-password", "mentor");
+  await addPerson(`e2e.out.${stamp}`, outsider, "e2e-out-password", "programmer");
+
+  const search = page.getByRole("textbox", { name: "Поиск" });
+  const query = () => new URL(page.url()).searchParams.get("q");
+  await search.fill("ЛИД");
+  await expect.poll(query).toBe("ЛИД");
+  await expect(page.getByRole("link", { name: lead, exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: byJob, exact: true })).toHaveCount(0);
+  const upper = await page.locator("ul.panel").getByRole("link").allTextContents();
+  await search.fill("лид");
+  await expect.poll(query).toBe("лид");
+  expect(await page.locator("ul.panel").getByRole("link").allTextContents()).toEqual(upper);
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Поиск" })).toHaveValue("лид");
+  await expect(page.getByRole("link", { name: lead, exact: true })).toBeVisible();
+
+  await search.fill("наставник");
+  await expect(page.getByRole("link", { name: byJob, exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: lead, exact: true })).toHaveCount(0);
+
+  await search.fill(`нет-сотрудника-${stamp}`);
+  await expect(page.getByText("Ничего не найдено", { exact: true })).toBeVisible();
+  await expect(page.locator("ul.panel")).toHaveCount(0);
+
+  await login(page, manager);
+  await page.goto("/people");
+  const ownSearch = page.getByRole("textbox", { name: "Поиск" });
+  await ownSearch.fill(outsider);
+  await expect(page.getByRole("link", { name: outsider, exact: true })).toHaveCount(0);
+  await expect(page.getByText("Ничего не найдено", { exact: true })).toBeVisible();
+  await ownSearch.fill("Подчинённый");
+  await expect(page.getByRole("link", { name: report, exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: outsider, exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: lead, exact: true })).toHaveCount(0);
+});

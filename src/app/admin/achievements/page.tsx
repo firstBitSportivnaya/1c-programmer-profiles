@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { ListFilter } from "@/components/ListFilter";
 import { AchievementIcon } from "@/components/skill-icons";
 import { ACHIEVEMENT_CATEGORY_LABELS, ACHIEVEMENT_RULE_LABELS } from "@/lib/achievement-catalog";
 import { isAdmin } from "@/lib/auth";
+import { matchesText, NAME_SORTS, pickedSort, queryNeedle, sortRows } from "@/lib/list-query";
 import { listAchievements } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -11,9 +13,20 @@ export const dynamic = "force-dynamic";
  * Каталог достижений для админа (ADR 0010): ключ, название, категория, правило, иконка и признак «скрыто».
  * Скрытые записи остаются в списке — иначе их нечем вернуть, — но к выдаче не предлагаются.
  */
-export default async function AchievementsAdminPage() {
+export default async function AchievementsAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; sort?: string }>;
+}) {
   if (!(await isAdmin())) redirect("/admin/login");
-  const items = listAchievements();
+  const { q = "", sort } = await searchParams;
+  const order = pickedSort(sort, ["name", "name-desc"]);
+  const needle = queryNeedle(q);
+  const items = sortRows(
+    listAchievements().filter((item) => matchesText(needle, item.title)),
+    order,
+    (item) => item.title,
+  );
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -29,7 +42,12 @@ export default async function AchievementsAdminPage() {
         Запись не удаляют, а скрывают: скрытая не предлагается к выдаче, уже выданные достижения остаются у сотрудников.
         Ключ после создания не меняется.
       </p>
-      <ul className="panel" data-testid="achievements-catalog">
+      <ListFilter action="/admin/achievements" q={q} sort={order} sorts={NAME_SORTS} />
+      <div data-testid="achievements-catalog">
+      {items.length === 0 ? (
+        <p className="muted">{needle ? "Ничего не найдено" : "Нет записей"}</p>
+      ) : (
+      <ul className="panel">
         {items.map((item) => (
           <li key={item.id} className="list-row">
             <span className="achievement-row__main">
@@ -49,6 +67,8 @@ export default async function AchievementsAdminPage() {
           </li>
         ))}
       </ul>
+      )}
+      </div>
     </div>
   );
 }

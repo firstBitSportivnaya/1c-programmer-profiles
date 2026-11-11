@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { AssignmentImportForm } from "@/components/AssignmentImportForm";
+import { ListFilter } from "@/components/ListFilter";
 import { getSessionEmployee } from "@/lib/auth";
 import { canEditAssignmentCatalog } from "@/lib/invariants";
+import { LEVEL_SORTS, matchesText, pickedSort, queryNeedle, sortRows } from "@/lib/list-query";
 import { listCompetencies, listIdpAssignments } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -10,12 +12,14 @@ export const dynamic = "force-dynamic";
 export default async function AssignmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ competency?: string }>;
+  searchParams: Promise<{ competency?: string; q?: string; sort?: string }>;
 }) {
   const actor = await getSessionEmployee();
   if (!actor) redirect("/login");
   if (!canEditAssignmentCatalog(actor)) redirect("/idps");
-  const { competency = "" } = await searchParams;
+  const { competency = "", q = "", sort } = await searchParams;
+  const order = pickedSort(sort, ["name", "name-desc", "level", "level-desc"]);
+  const needle = queryNeedle(q);
   const names = new Map(listCompetencies().map((item) => [item.id, item.name]));
   const items = listIdpAssignments().map((row) => ({
     id: row.id,
@@ -29,7 +33,12 @@ export default async function AssignmentsPage({
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name, "ru"));
   const selected = competencies.some((item) => item.id === competency) ? competency : "";
-  const visible = selected ? items.filter((item) => item.competencyId === selected) : items;
+  const visible = sortRows(
+    items.filter((item) => (selected ? item.competencyId === selected : true) && matchesText(needle, item.name)),
+    order,
+    (item) => item.name,
+    (item) => item.level,
+  );
 
   return (
     <div className="space-y-6">
@@ -49,39 +58,33 @@ export default async function AssignmentsPage({
         </ul>
       ) : (
         <div className="space-y-4">
-          <form action="/assignments" className="flex flex-wrap items-end gap-3">
-            <label className="lbl">
-              Компетенция
-              <select className="field" name="competency" aria-label="Фильтр компетенции" defaultValue={selected}>
-                <option value="">все</option>
-                {competencies.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="btn" type="submit">
-              Показать
-            </button>
-          </form>
-          {visible.length === 0 ? <p className="muted">Ничего не найдено.</p> : null}
-          <ul className="panel">
-            {visible.map((row) => (
-              <li key={row.id} className="list-row">
-                <div>
-                  <a href={`/assignments/${encodeURIComponent(row.id)}`} className="link-accent font-medium">
-                    {row.name}
-                  </a>
-                  <div className="mt-1 muted caption">
-                    {row.competencyName}
-                    {row.level != null ? ` · ур. ${row.level}` : ""}
+          <ListFilter
+            action="/assignments"
+            q={q}
+            sort={order}
+            sorts={LEVEL_SORTS}
+            competency={{ value: selected, options: competencies }}
+          />
+          {visible.length === 0 ? (
+            <p className="muted">Ничего не найдено</p>
+          ) : (
+            <ul className="panel">
+              {visible.map((row) => (
+                <li key={row.id} className="list-row">
+                  <div>
+                    <a href={`/assignments/${encodeURIComponent(row.id)}`} className="link-accent font-medium">
+                      {row.name}
+                    </a>
+                    <div className="mt-1 muted caption">
+                      {row.competencyName}
+                      {row.level != null ? ` · ур. ${row.level}` : ""}
+                    </div>
                   </div>
-                </div>
-                {row.archived ? <span className="chip">скрыто</span> : null}
-              </li>
-            ))}
-          </ul>
+                  {row.archived ? <span className="chip">скрыто</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

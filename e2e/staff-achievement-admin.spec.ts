@@ -491,6 +491,28 @@ test("критерий 5 (негативный): пустое название �
   expect(catalogRow(testInfo, jobKey), "запись без должности не создана").toBeUndefined();
 });
 
+test("поиск каталога не зависит от регистра, сортировка остаётся в адресе", async ({ page }) => {
+  await page.goto("/admin/achievements");
+  const catalog = page.getByTestId("achievements-catalog");
+  await page.getByLabel("Поиск").fill("НАГРАДА");
+  await expect(page).toHaveURL(/[?&]q=/);
+  const upper = await catalog.getByRole("link").allTextContents();
+  expect(upper.length).toBeGreaterThan(0);
+  await page.getByLabel("Поиск").fill("награда");
+  expect(await catalog.getByRole("link").allTextContents()).toEqual(upper);
+
+  await page.getByLabel("Поиск").fill(`нет-награды-${STAMP}`);
+  await expect(page.getByText("Ничего не найдено", { exact: true })).toBeVisible();
+  await expect(catalog.locator("ul")).toHaveCount(0);
+
+  await page.getByLabel("Поиск").fill("");
+  await page.getByLabel("Сортировка").selectOption("name-desc");
+  await expect(page).toHaveURL(/[?&]sort=name-desc/);
+  await expect(page).not.toHaveURL(/[?&]q=/);
+  const names = await catalog.getByRole("link").allTextContents();
+  expect(names).toEqual([...names].sort((a, b) => b.localeCompare(a, "ru")));
+});
+
 test("ключ new зарезервирован: запись, которую нельзя открыть и скрыть, не создаётся", async ({ page }, testInfo) => {
   await page.goto("/admin/achievements/new");
   const form = createForm(page);

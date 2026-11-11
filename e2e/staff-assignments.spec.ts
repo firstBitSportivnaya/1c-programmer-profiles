@@ -157,6 +157,42 @@ test("то же название без учёта регистра не соз�
   await expect(page.getByRole("link", { name: lower, exact: true })).toHaveCount(0);
 });
 
+test("поиск задания и сортировка по уровню остаются в адресе", async ({ page }) => {
+  const low = `Я уровень ${STAMP}`;
+  const high = `А уровень ${STAMP}`;
+
+  async function createLevel(name: string, level: string) {
+    await page.goto("/assignments/new");
+    const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Создать" }) });
+    await form.getByLabel(/^Компетенция/).selectOption({ index: 0 });
+    await form.getByLabel(/^Уровень/).selectOption(level);
+    await form.getByLabel(/^Название/).fill(name);
+    await form.getByLabel(/^Узнать/).fill(LEARN);
+    await form.getByLabel(/^Проверить/).fill(VERIFY);
+    await form.getByRole("button", { name: "Создать" }).click();
+    await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  }
+
+  await createLevel(low, "1");
+  await createLevel(high, "3");
+  await page.goto("/assignments");
+  await page.getByLabel("Поиск").fill(`уровень ${STAMP}`);
+  await expect(page).toHaveURL(/[?&]q=/);
+  const links = page.locator("ul.panel").getByRole("link");
+  await expect(links.nth(0)).toHaveText(high);
+  await expect(links.nth(1)).toHaveText(low);
+
+  await page.getByLabel("Сортировка").selectOption("level");
+  await expect(page).toHaveURL(/[?&]q=/);
+  await expect(page).toHaveURL(/[?&]sort=level/);
+  await expect(links.nth(0)).toHaveText(low);
+  await expect(links.nth(1)).toHaveText(high);
+
+  await page.getByLabel("Поиск").fill(`нет-задания-${STAMP}`);
+  await expect(page.getByText("Ничего не найдено", { exact: true })).toBeVisible();
+  await expect(page.locator("ul.panel")).toHaveCount(0);
+});
+
 test("чужой идентификатор — 404", async ({ page }) => {
   const response = await page.goto("/assignments/no-such-assignment");
   expect(response?.status()).toBe(404);
