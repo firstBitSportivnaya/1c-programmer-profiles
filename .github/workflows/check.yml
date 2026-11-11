@@ -40,8 +40,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Библиотеки Chromium уже есть в образе ubuntu-24.04, apt докладывает только шрифты.
+      # Когда зеркало Ubuntu не резолвится, apt висит до тайм-аута — задание из-за этого не падает.
       - name: Системные пакеты для браузера
-        timeout-minutes: 8
+        timeout-minutes: 4
+        continue-on-error: true
         run: npx playwright install-deps chromium
       # Загрузка Chromium на раннере иногда висит без вывода: каждая попытка ограничена, третья — последняя.
       - name: Браузер для сценариев
